@@ -93,8 +93,8 @@
       if (v.grupo && v.grupo !== grupo) { grupo = v.grupo; cuerpo += "<tr><th class=\"grupo\" colspan=\"" + (cols.length + 1) + "\">" + esc(grupo) + "</th></tr>"; }
       var ob = H.objetivo(muestra, v.id), uni = H.unidadVisible(v.id, v.unidad);
       cuerpo += "<tr><th class=\"var\" scope=\"row\" title=\"" + esc(ob ? "Objetivo " + ob[0] + "–" + ob[1] + " " + v.unidad : "") + "\">" + esc(v.nombre) + (uni ? "<span class=\"u\">" + esc(uni) + "</span>" : "") + "</th>" + cols.map(function (p) {
-        var m = H.valor(exp, muestra, p.punto, v.id), val = m ? (C.num(m.Valor) !== null ? H.aVista(v.id, m.Valor) : m.Texto) : "", cl = m ? H.claseValor(muestra, v.id, m.Valor) : "";
-        return "<td><input aria-label=\"" + esc(v.nombre + " " + p.punto) + "\" inputmode=\"decimal\" autocomplete=\"off\" class=\"" + cl + "\" value=\"" + esc(String(val).replace(".", ",")) + "\"" + (puedo ? "" : " readonly") +
+        var m = H.valor(exp, muestra, p.punto, v.id), val = m ? (C.num(m.Valor) !== null ? H.aVista(v.id, m.Valor) : m.Texto) : "", cl = (m ? H.claseValor(muestra, v.id, m.Valor) : "") + (m && H.pendiente(m) ? " pend" : "");
+        return "<td><input" + (m && H.pendiente(m) ? " title=\"Pendiente de validación por un administrador\"" : "") + " aria-label=\"" + esc(v.nombre + " " + p.punto) + (m && H.pendiente(m) ? " (pendiente de validación)" : "") + "\" inputmode=\"decimal\" autocomplete=\"off\" class=\"" + cl + "\" value=\"" + esc(String(val).replace(".", ",")) + "\"" + (puedo ? "" : " readonly") +
           " data-cambio=\"celda\" data-exp=\"" + esc(exp) + "\" data-m=\"" + muestra + "\" data-p=\"" + esc(p.punto) + "\" data-t=\"" + (p.t_h === null || p.t_h === undefined ? "" : p.t_h) + "\" data-f=\"" + esc(p.fechaReal || p.fecha || "") + "\" data-v=\"" + v.id + "\"></td>";
       }).join("") + "</tr>";
     });
@@ -130,56 +130,7 @@
       } });
   };
 
-  // ================================================================ INICIO
-  H.vistas.inicio = function () {
-    var exps = H.listaExp(), act = exps.filter(function (e) { return e.Estado === "Perfusión"; }), qx = exps.filter(function (e) { return e.Estado === "Cirugía" || e.Estado === "Aclimatación"; });
-    var bajo = H.stockBajo(), solP = H.filas("Solicitudes").filter(function (s) { return s.Estado === "Pendiente"; });
-    var html = "<div class=\"ancho\"><div class=\"titulo-pag\"><h1>Inicio</h1><span id=\"indDirecto\" class=\"muy-tenue\">En directo · se actualiza cada 20 s</span>" +
-      (H.puede("registrar") ? "<button class=\"bt pri\" data-act=\"nuevoExp\">" + ico("plus") + "Nuevo experimento</button>" : "") + "</div>";
-    if (!S.cfg.circadiano.verificado && H.esAdmin()) html += "<div class=\"aviso aj\">" + ico("triangle-alert") + "<div><b>El horario circadiano y el recalentamiento son un borrador</b> leído de las hojas escaneadas. Revísalos en <a href=\"#/config/circadiano\">Configuración → Horario circadiano</a> antes de la primera perfusión; los avisos se generan a partir de ellos.</div></div>";
-    act.forEach(function (e) { html += tarjetaPerfusion(e); });
-    qx.forEach(function (e) { html += tarjetaPreparacion(e); });
-    if (!act.length && !qx.length) html += "<div class=\"vacio\">" + ico("flask-conical", "l") + "<p>No hay ningún experimento en curso.</p>" + (H.puede("registrar") ? "<button class=\"bt pri\" data-act=\"nuevoExp\">" + ico("plus") + "Nuevo experimento</button>" : "") + "</div>";
-    html += "<div class=\"columnas\" style=\"margin-top:14px\">";
-    html += "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>Inventario</h2><a class=\"bt texto\" href=\"#/inventario\">Abrir" + ico("chevron-right", "s") + "</a></div>" +
-      (bajo.length ? "<ul style=\"margin:0;padding-left:18px\">" + bajo.slice(0, 6).map(function (m) { return "<li><b>" + esc(m.Nombre) + "</b> · " + H.n(m._stock, 1) + " " + esc(m.Unidad || "") + " <span class=\"chip " + (m._stock <= 0 ? "al" : "aj") + "\">" + (m._stock <= 0 ? "Agotado" : "Bajo mínimo (" + H.n(m.Stock_minimo, 1) + ")") + "</span></li>"; }).join("") + "</ul>" + (bajo.length > 6 ? "<p class=\"muy-tenue\">y " + (bajo.length - 6) + " más</p>" : "") : "<p class=\"tenue\">" + ico("circle-check", "s") + " Ningún material por debajo del mínimo.</p>") +
-      (H.esAdmin() && solP.length ? "<div class=\"aviso info\" style=\"margin-top:10px\">" + ico("shopping-cart") + "<div>" + solP.length + " solicitud(es) de material pendientes. <a href=\"#/inventario/solicitudes\">Revisar</a></div></div>" : "") + "</section>";
-    var fin = exps.filter(function (e) { return e.Estado === "Finalizado"; }).slice(-5).reverse();
-    html += "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>Últimas perfusiones</h2><a class=\"bt texto\" href=\"#/experimentos\">Histórico" + ico("chevron-right", "s") + "</a></div>" +
-      (fin.length ? "<div class=\"tabla-env\"><table class=\"t\"><thead><tr><th>ID</th><th>Fecha</th><th class=\"num\">Duración</th><th class=\"num\">Hígado</th></tr></thead><tbody>" + fin.map(function (e) {
-        var t = C.tiempos(H.eventos(e.ID)); return "<tr class=\"clic\" data-act=\"abrirExp\" data-id=\"" + esc(e.ID) + "\"><td><span class=\"punto-color\" style=\"background:" + esc(H.colorExp(e.ID)) + "\"></span> <a href=\"#/exp/" + encodeURIComponent(e.ID) + "\">" + esc(e.ID) + "</a></td><td>" + esc(H.fecha(e.Fecha_cirugia)) + "</td><td class=\"num\">" + (t.duracion_perfusion_h !== null ? H.n(t.duracion_perfusion_h, 1) + " h" : "—") + "</td><td class=\"num\">" + (e.Peso_higado_inicial_g ? H.n(e.Peso_higado_inicial_g, 0) + " g" : "—") + "</td></tr>";
-      }).join("") + "</tbody></table></div>" : "<p class=\"tenue\">Todavía no hay perfusiones finalizadas.</p>") + "</section></div></div>";
-    return html;
-  };
-  function tarjetaPerfusion(e) {
-    var t0 = H.inicioPerf(e.ID), ev = H.eventos(e.ID), horas = t0 ? C.horasEntre(t0, new Date()) : null, prox = H.proximoPunto(e.ID), rv = C.ritmosVigentes(S.cfg.circadiano, new Date());
-    var enRecal = t0 && !ev.fin_recalentamiento && (Date.now() - C.aFecha(t0).getTime()) / 6e4 < (S.cfg.recalentamiento.pasos.slice(-1)[0].t + S.cfg.recalentamiento.paso_min + 30);
-    var kp = ["ART", "POR"].map(function (r) {
-      var g = {}; ["pH", "pO2", "pCO2"].forEach(function (v) { var u = H.ultimo(e.ID, r, v); g[v] = u ? u.Valor : null; });
-      var ase = C.asesorGas(r, g, {}, S.cfg.objetivos, S.cfg.gases); var u2 = H.ultimo(e.ID, r, "pO2");
-      return "<div class=\"kpi " + (g.pH === null ? "" : ase.estado === "ok" ? "ok" : ase.estado === "alerta" ? "al" : "aj") + "\"><div class=\"et\">Gasometría " + (r === "ART" ? "arterial" : "portal") + (u2 ? " · " + esc(u2.Punto) : "") + "</div><div class=\"v\">" +
-        (g.pH === null ? "—" : H.nFijo(g.pH, 2) + "<small>pH</small> " + H.n(H.aVista("pO2", g.pO2), 1) + "<small>" + H.unidadVisible("pO2", "mmHg") + "</small>") + "</div></div>";
-    }).join("");
-    ["Lactato", "Glucosa"].forEach(function (v) { var u = H.ultimo(e.ID, "PERF", v) || H.ultimo(e.ID, "ART", v), cl = u ? H.claseValor("PERF", v, u.Valor) : ""; kp += "<div class=\"kpi " + (cl === "v-ok" ? "ok" : cl ? "al" : "") + "\"><div class=\"et\">" + v + (u ? " · " + esc(u.Punto) : "") + "</div><div class=\"v\">" + (u ? H.n(u.Valor, v === "Lactato" ? 2 : 0) + "<small>" + esc(C.variable("PERF", v).unidad) + "</small>" : "—") + "</div></div>"; });
-    var ritmos = Object.keys(rv.vigentes).map(function (k) { var c = rv.vigentes[k]; return "<span class=\"chip\">" + esc(k) + " · " + H.n(c.valor, 1) + " " + esc(c.unidad) + "</span>"; }).join(" ");
-    return "<section class=\"tarjeta\" aria-label=\"Perfusión en curso " + esc(e.ID) + "\"><div class=\"cabecera\"><h2><span class=\"punto-color\" style=\"background:" + esc(H.colorExp(e.ID)) + "\"></span> " + esc(e.ID) + " · perfusión en curso</h2>" + H.estadoChip(e.Estado) +
-      "<a class=\"bt\" href=\"#/exp/" + encodeURIComponent(e.ID) + "/seguimiento\">" + ico("activity") + "Seguimiento</a>" + (enRecal ? "<a class=\"bt pri\" href=\"#/exp/" + encodeURIComponent(e.ID) + "/quirofano\">" + ico("thermometer") + "Recalentamiento</a>" : "") + "</div>" +
-      "<div class=\"cronos\"><div class=\"crono activo\"><div class=\"et\">Tiempo de perfusión · día " + (horas !== null ? Math.floor(horas / 24) + 1 : "—") + "</div><div class=\"t\" data-crono=\"" + esc(t0 || "") + "\">--:--:--</div><div class=\"muy-tenue\">Inicio " + esc(H.fechaHora(t0)) + "</div></div>" +
-      (prox ? "<div class=\"crono\"><div class=\"et\">Próxima muestra · " + esc(prox.etiqueta) + "</div><div class=\"t cuenta-atras\" style=\"font-size:30px\" data-cuenta=\"" + prox.fecha.toISOString() + "\">--:--</div><div class=\"muy-tenue\">" + esc(H.diaCorto(prox.fecha) + " " + H.hora(prox.fecha)) + "</div></div>" : "") +
-      (rv.proxima_hora ? "<div class=\"crono\"><div class=\"et\">Próximo cambio de ritmo · " + esc(rv.proxima_hora) + "</div><div class=\"t\" style=\"font-size:15px;font-family:inherit;line-height:1.4\">" + rv.proximos.map(function (c) { return esc(c.linea) + " → <b>" + H.n(c.valor, 1) + " " + esc(c.unidad) + "</b>"; }).join("<br>") + "</div></div>" : "") + "</div>" +
-      "<h4 style=\"margin:14px 0 8px\">Últimos valores</h4><div class=\"kpis\">" + kp + "</div>" +
-      "<h4 style=\"margin:14px 0 8px\">Ritmos vigentes ahora (" + esc(H.hora(new Date())) + ")</h4><div class=\"fila-flex\">" + ritmos + "</div></section>";
-  }
-  function tarjetaPreparacion(e) {
-    var an = H.animales(e.ID), ev = H.eventos(e.ID), tt = C.tiempos(ev);
-    var wit = ev.inicio_exanguinacion ? "<div class=\"crono caliente " + (ev.inicio_preservacion_fria ? "" : "activo") + "\"><div class=\"et\">Isquemia caliente</div><div class=\"t\" data-crono=\"" + esc(ev.inicio_exanguinacion) + "\"" + (ev.inicio_preservacion_fria ? " data-hasta=\"" + esc(ev.inicio_preservacion_fria) + "\"" : "") + ">--</div></div>" : "";
-    var cit = ev.inicio_preservacion_fria ? "<div class=\"crono fria " + (ev.inicio_perfusion ? "" : "activo") + "\"><div class=\"et\">Isquemia fría</div><div class=\"t\" data-crono=\"" + esc(ev.inicio_preservacion_fria) + "\"" + (ev.inicio_perfusion ? " data-hasta=\"" + esc(ev.inicio_perfusion) + "\"" : "") + ">--</div></div>" : "";
-    var dieta = H.filas("Dieta").filter(function (d) { return d.Experimento === e.ID; }).length;
-    return "<section class=\"tarjeta\"><div class=\"cabecera\"><h2><span class=\"punto-color\" style=\"background:" + esc(H.colorExp(e.ID)) + "\"></span> " + esc(e.ID) + "</h2>" + H.estadoChip(e.Estado) +
-      "<a class=\"bt\" href=\"#/exp/" + encodeURIComponent(e.ID) + "/dieta\">" + ico("utensils") + "Dieta</a><a class=\"bt\" href=\"#/exp/" + encodeURIComponent(e.ID) + "/preparacion\">" + ico("clipboard-check") + "Preparación</a><a class=\"bt pri\" href=\"#/exp/" + encodeURIComponent(e.ID) + "/quirofano\">" + ico("timer") + "Quirófano</a></div>" +
-      "<p class=\"tenue\">" + ["BD", "LD"].map(function (r) { var a = an[r]; return a ? (r === "BD" ? "Donante de sangre" : "Donante de hígado") + ": " + esc(a.ID) + " · " + (a.Sexo === "H" ? "hembra" : a.Sexo === "M" ? "macho" + (a.Castrado === "Sí" ? " castrado" : "") : "—") + " · " + (a.Peso_llegada_kg ? H.n(a.Peso_llegada_kg, 1) + " kg" : "peso —") : ""; }).filter(Boolean).join(" · ") +
-      " · " + dieta + " registro(s) de dieta" + (e.Fecha_cirugia ? " · cirugía " + esc(H.fecha(e.Fecha_cirugia)) : "") + "</p>" + (wit || cit ? "<div class=\"cronos\">" + wit + cit + "</div>" : "") + "</section>";
-  }
+  // INICIO: ver app_v02.js (v0.2)
 
   // ================================================================ LISTA DE EXPERIMENTOS (histórico)
   H.vistas.experimentos = function (p, q) {

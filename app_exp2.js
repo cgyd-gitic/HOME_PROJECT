@@ -17,7 +17,8 @@
     d.items = d.items || {}; var cats = {}; mats.forEach(function (m) { (cats[m.Categoria || "Sin categoría"] = cats[m.Categoria || "Sin categoría"] || []).push(m); });
     var total = mats.length, hechos = mats.filter(function (m) { return d.items[m.ID] && d.items[m.ID].ok; }).length, falta = [];
     var html = "<div class=\"fila-flex sep\" style=\"margin-bottom:10px\"><div><b>" + hechos + " / " + total + "</b> comprobados" + (d.confirmado_en ? " · <span class=\"chip ok\">Descontado del inventario el " + esc(H.fechaHora(d.confirmado_en)) + " por " + esc(d.confirmado_por || "") + "</span>" : "") + "</div>" +
-      (puedo ? "<div class=\"fila-flex\"><button class=\"bt\" data-act=\"chkTodo\">Marcar todo</button>" + (d.confirmado_en ? "<button class=\"bt peligro\" data-act=\"chkDeshacer\" data-exp=\"" + esc(e.ID) + "\">" + ico("undo-2") + "Devolver al inventario</button>" : "<button class=\"bt pri\" data-act=\"chkConfirmar\" data-exp=\"" + esc(e.ID) + "\">" + ico("clipboard-check") + "Confirmar y descontar</button>") + "</div>" : "") + "</div>";
+      (puedo ? "<div class=\"fila-flex\"><button class=\"bt\" data-act=\"chkTodo\">Marcar todo</button>" + (!H.puede("inventario") ? (d.revisado_en ? "<span class=\"chip ok\">Revisado " + esc(H.fechaHora(d.revisado_en)) + "</span>" : "<button class=\"bt pri\" data-act=\"chkRevisado\" data-exp=\"" + esc(e.ID) + "\">" + ico("clipboard-check") + "Marcar checklist como revisado</button>") : d.confirmado_en ? "<button class=\"bt peligro\" data-act=\"chkDeshacer\" data-exp=\"" + esc(e.ID) + "\">" + ico("undo-2") + "Devolver al inventario</button>" : "<button class=\"bt pri\" data-act=\"chkConfirmar\" data-exp=\"" + esc(e.ID) + "\">" + ico("clipboard-check") + "Confirmar y descontar</button>") + "</div>" : "") + "</div>" +
+      (puedo && !H.puede("inventario") && !d.confirmado_en ? "<div class=\"aviso info\">" + ico("info") + "<div>El descuento del material del inventario lo hace un administrador (el inventario es de gestión exclusiva de los administradores).</div></div>" : "");
     Object.keys(cats).sort().forEach(function (c) {
       html += "<section class=\"tarjeta\"><div class=\"cabecera\"><h3>" + esc(c) + "</h3></div><div class=\"tabla-env\"><table class=\"t\"><thead><tr><th style=\"width:40px\"><span class=\"sr\">Comprobado</span></th><th>Material</th><th class=\"num\">Cantidad para esta perfusión</th><th class=\"num\">Stock</th><th>Estado</th></tr></thead><tbody>" +
         cats[c].map(function (m) {
@@ -43,6 +44,7 @@
       H.guardar("Movimientos", movs, { sinRepintar: true }); H.guardarForm(exp, "checklist", "", d, {}); H.toast("Material descontado."); H.pintarMarco(); H.repintar();
     });
   };
+  H.acc.chkRevisado = function (el) { var exp = el.getAttribute("data-exp"), d = H.usarForm(exp, "checklist", ""); d.revisado_en = new Date().toISOString(); d.revisado_por = (S.usuario || {}).nombre; H.guardarForm(exp, "checklist", "", d); H.toast("Checklist marcado como revisado. Un administrador hará el descuento del inventario."); H.repintar(); };
   H.acc.chkDeshacer = function (el) {
     var exp = el.getAttribute("data-exp"), d = H.usarForm(exp, "checklist", "");
     H.confirmar("Devolver al inventario", "Se anularán las salidas registradas por este checklist.", "Devolver", true).then(function (ok) { if (!ok) return; H.borrar("Movimientos", d.movimientos || []); delete d.confirmado_en; delete d.confirmado_por; d.movimientos = []; H.guardarForm(exp, "checklist", "", d, {}); H.pintarMarco(); H.repintar(); });

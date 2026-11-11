@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var C = window.HOMECalc, H = window.HOME = window.HOME || {};
-  var VERSION = "0.1.0";
+  var VERSION = "0.2.0";
   var S = H.S = { token: null, usuario: null, demo: false, cfg: null, t: {}, med: {}, medCargada: {}, cola: [], enviando: false, online: navigator.onLine !== false,
     ultima: null, pref: {}, avisosVistos: {}, pendienteRepintar: false, errores: [] };
   var TABLAS = ["Experimentos", "Animales", "Dieta", "Formularios", "Eventos", "Avisos", "Material", "Movimientos", "Solicitudes", "Personal", "Usuarios", "Config"];
@@ -98,23 +98,30 @@
   // Guardar: aplica en local al instante y encola el envío (funciona sin conexión; los ID los genera el cliente → reintentos idempotentes)
   H.guardar = function (tabla, filas, opc) {
     opc = opc || {}; if (!filas || !filas.length) return Promise.resolve();
-    if (!H.puede(tabla === "Solicitudes" ? "solicitar" : "registrar")) { H.toast("Tu usuario es de solo lectura: no puedes guardar cambios.", "error"); return Promise.reject(new Error("solo lectura")); }
+    if (!H.puede(permisoTabla(tabla))) { H.toast(SOLO_ADMIN[tabla] ? "Solo un administrador puede modificar " + tabla + "." : "Tu usuario es de solo lectura: no puedes guardar cambios.", "error"); return Promise.reject(new Error("sin permiso")); }
+    var pendVal = H.requiereValidacion(tabla);
     var ahora = new Date().toISOString(), u = S.usuario ? S.usuario.email : "", filasOrig = filas;
     filas = filas.map(function (f) {
       var prev = tabla === "Mediciones" ? (S.med[f.Experimento] || []).filter(function (x) { return x.ID === f.ID; })[0] : (S.t[tabla] || []).filter(function (x) { return x.ID === f.ID; })[0];
-      var o = mezclarFila(prev || {}, f); if (!prev) { o.Creado_por = u; o.Creado_en = ahora; } o.Actualizado_por = u; o.Actualizado_en = ahora; if (o.Borrado === undefined) o.Borrado = false; return o;
+      var o = mezclarFila(prev || {}, f); if (!prev) { o.Creado_por = u; o.Creado_en = ahora; } o.Actualizado_por = u; o.Actualizado_en = ahora; if (o.Borrado === undefined) o.Borrado = false;
+      if (pendVal) o.Validado = false; else if (H.esAdmin() && H.VALIDABLES.indexOf(tabla) !== -1) { o.Validado = true; o.Previo_JSON = ""; }
+      return o;
     });
     upsertLocal(tabla, filas);
-    var envio = filasOrig.map(function (f) { var o = {}; Object.keys(f).forEach(function (k) { if (k.charAt(0) !== "_" && !/^(Creado_|Actualizado_)/.test(k)) o[k] = f[k]; }); return o; });   // solo los campos que cambian
+    var envio = filasOrig.map(function (f) { var o = {}; Object.keys(f).forEach(function (k) { if (k.charAt(0) !== "_" && !/^(Creado_|Actualizado_|Validado|Previo_JSON$)/.test(k)) o[k] = f[k]; }); return o; });   // solo los campos que cambian
     for (var i = 0; i < envio.length; i += 500) S.cola.push({ id: H.uid(), fn: "webGuardar", args: [tabla, envio.slice(i, i + 500)], t: ahora });
     guardarCache(); actualizarSync(); if (!opc.sinRepintar) H.repintarPronto();
     return H.enviarCola();
   };
   H.borrar = function (tabla, ids) {
     var l = tabla === "Mediciones" ? H.todasMed() : (S.t[tabla] || []);
-    l.forEach(function (f) { if (ids.indexOf(f.ID) !== -1) f.Borrado = true; });
+    if (!H.puede(permisoTabla(tabla))) { H.toast("No tienes permiso para borrar en " + tabla + ".", "error"); return Promise.reject(new Error("sin permiso")); }
+    var pendVal = H.requiereValidacion(tabla);
+    l.forEach(function (f) { if (ids.indexOf(f.ID) !== -1) { f.Borrado = true; if (pendVal) f.Validado = false; } });
     S.cola.push({ id: H.uid(), fn: "webBorrar", args: [tabla, ids] }); guardarCache(); actualizarSync(); H.repintarPronto(); return H.enviarCola();
   };
+  // Encola cualquier función del servidor con token (p. ej. webValidar/webRechazar); la respuesta {filas} se mezcla en la tabla args[0]
+  H.encolar = function (fn, args) { S.cola.push({ id: H.uid(), fn: fn, args: args, t: new Date().toISOString() }); guardarCache(); actualizarSync(); H.repintarPronto(); return H.enviarCola(); };
   H.enviarCola = function () {
     if (S.enviando || !S.cola.length || !S.token) return Promise.resolve();
     S.enviando = true; actualizarSync();
@@ -162,34 +169,79 @@
   };
 
   // ---------------------------------------------------------------- permisos
-  H.rol = function () { return S.usuario ? String(S.usuario.rol || "").toUpperCase() : ""; };
+  // Roles v0.2: ADMIN (todo) · INVESTIGADOR (registra; un ADMIN valida) · COLABORADOR (solo lectura). Alias de v0.1: REGISTRO, VISUALIZAR.
+  var ALIAS_ROL = { REGISTRO: "INVESTIGADOR", VISUALIZAR: "COLABORADOR" };
+  H.ROLES = [["ADMIN", "Administrador", "Todo, incluida la validación, el inventario y la configuración"], ["INVESTIGADOR", "Investigador", "Registra datos; un administrador los valida"], ["COLABORADOR", "Colaborador / personal externo", "Solo consulta"]];
+  H.normRol = function (r) { r = String(r || "").toUpperCase().trim(); return ALIAS_ROL[r] || r; };
+  H.nombreRol = function (r) { r = H.normRol(r); for (var i = 0; i < H.ROLES.length; i++) if (H.ROLES[i][0] === r) return H.ROLES[i][1]; return r; };
+  H.rol = function () { return S.usuario ? H.normRol(S.usuario.rol) : ""; };
   H.esAdmin = function () { return H.rol() === "ADMIN"; };
-  H.puede = function (accion) { var r = H.rol(); if (accion === "solicitar") return !!r; if (accion === "registrar") return r === "ADMIN" || r === "REGISTRO"; if (accion === "admin") return r === "ADMIN"; return !!r; };
+  H.puede = function (accion) {
+    var r = H.rol(); if (!r) return false;
+    if (accion === "registrar" || accion === "solicitar") return r === "ADMIN" || r === "INVESTIGADOR";
+    if (accion === "admin" || accion === "inventario" || accion === "validar") return r === "ADMIN";
+    return true;
+  };
+  // Tablas cuyos registros de un INVESTIGADOR quedan pendientes de validación
+  H.VALIDABLES = ["Experimentos", "Animales", "Dieta", "Formularios", "Mediciones", "Eventos"];
+  H.pendiente = function (f) { return !!f && (f.Validado === false || f.Validado === "FALSE" || f.Validado === "false"); };
+  H.requiereValidacion = function (tabla) { return H.rol() === "INVESTIGADOR" && H.VALIDABLES.indexOf(tabla) !== -1; };
+  var SOLO_ADMIN = { Material: 1, Movimientos: 1, Config: 1, Usuarios: 1, Solicitudes_Acceso: 1 };
+  function permisoTabla(tabla) { return SOLO_ADMIN[tabla] ? "admin" : tabla === "Solicitudes" ? "solicitar" : "registrar"; }
+  H.permisoTabla = permisoTabla;
 
   // ---------------------------------------------------------------- acceso
+  H.marcaAccesoHTML = function () {
+    return "<div class=\"marca-acceso\"><svg viewBox=\"0 0 32 32\" aria-hidden=\"true\"><rect width=\"32\" height=\"32\" rx=\"8\" fill=\"var(--pri)\"/><path d=\"M4 14C4 9 9 7 15 7.5S27 8 28 10.5S24 15 20 17.5S11 23 7.5 21.5S4 17.5 4 14z\" fill=\"#fff\"/><path d=\"M15 7.6C13.5 10 13.2 12.5 14 15.5\" stroke=\"var(--pri)\" stroke-width=\"1.3\" fill=\"none\" stroke-linecap=\"round\"/></svg>" +
+      "<div class=\"nombre\">HOME</div><div class=\"lema\">Perfusión hepática extendida</div></div>";
+  };
   H.pantallaAcceso = function (paso, email) {
-    document.body.innerHTML = "<div id=\"toasts\" class=\"toasts\" aria-live=\"polite\"></div><main class=\"acceso\"><div class=\"caja\">" + H.marcaHTML() +
-      (paso === "codigo"
-        ? "<h1>Introduce el código</h1><p class=\"tenue\">Hemos enviado un código de 6 dígitos a <b>" + esc(email) + "</b>. Caduca en 10 minutos; si no lo ves, revisa el correo no deseado.</p>" +
-          "<form id=\"fCodigo\" novalidate><div class=\"campo\"><label class=\"et\" for=\"codigo\">Código</label><input id=\"codigo\" name=\"one-time-code\" autocomplete=\"one-time-code\" inputmode=\"numeric\" pattern=\"[0-9]*\" maxlength=\"6\" spellcheck=\"false\" placeholder=\"123456…\" required></div>" +
-          "<div class=\"msg-error\" id=\"errAcc\" role=\"alert\"></div><button class=\"bt pri grande\" style=\"width:100%\" type=\"submit\">Entrar</button></form><p style=\"margin-top:12px\"><button class=\"bt texto\" id=\"volver\">Usar otro correo</button></p>"
-        : "<h1>Acceso</h1><p class=\"tenue\">Registro de experimentos del proyecto HOME. Escribe el correo con el que te dieron de alta y te enviaremos un código.</p>" +
-          "<form id=\"fEmail\" novalidate><div class=\"campo\"><label class=\"et\" for=\"email\">Correo</label><input id=\"email\" type=\"email\" name=\"email\" autocomplete=\"email\" spellcheck=\"false\" placeholder=\"nombre@salud.madrid.org…\" required></div>" +
-          "<div class=\"msg-error\" id=\"errAcc\" role=\"alert\"></div><button class=\"bt pri grande\" style=\"width:100%\" type=\"submit\">Enviar código</button></form>" +
-          "<details class=\"plegable\" style=\"margin-top:16px\"" + (sinServidor() ? " open" : "") + "><summary>Modo demostración (sin servidor)</summary><div class=\"dentro\"><p class=\"tenue\">Datos simulados guardados solo en este navegador. Sirve para probar la app antes de instalar el servidor.</p>" +
-          "<div class=\"fila-flex\"><button class=\"bt\" data-demo=\"ADMIN\">Entrar como ADMIN</button><button class=\"bt\" data-demo=\"REGISTRO\">REGISTRO</button><button class=\"bt\" data-demo=\"VISUALIZAR\">VISUALIZAR</button></div></div></details>") +
+    var cuerpo;
+    if (paso === "codigo") cuerpo = "<h1>Introduce el código</h1><p class=\"tenue\">Hemos enviado un código de 6 dígitos a <b>" + esc(email) + "</b>. Caduca en 10 minutos; si no lo ves, revisa el correo no deseado.</p>" +
+      "<form id=\"fCodigo\" novalidate><div class=\"campo\"><label class=\"et\" for=\"codigo\">Código</label><input id=\"codigo\" name=\"one-time-code\" autocomplete=\"one-time-code\" inputmode=\"numeric\" pattern=\"[0-9]*\" maxlength=\"6\" spellcheck=\"false\" placeholder=\"123456…\" required></div>" +
+      "<div class=\"msg-error\" id=\"errAcc\" role=\"alert\"></div><button class=\"bt pri grande\" style=\"width:100%\" type=\"submit\">Entrar</button></form><p style=\"margin-top:12px\"><button class=\"bt texto\" id=\"volver\">Usar otro correo</button></p>";
+    else if (paso === "alta") cuerpo = "<h1>Solicitar acceso</h1><p class=\"tenue\">Un administrador revisará la solicitud, te asignará los permisos y te avisará por correo.</p>" +
+      "<form id=\"fAlta\" novalidate><div class=\"rejilla dos\"><div class=\"campo\"><label class=\"et\" for=\"alN\">Nombre</label><input id=\"alN\" name=\"given-name\" autocomplete=\"given-name\" required></div>" +
+      "<div class=\"campo\"><label class=\"et\" for=\"alA\">Apellidos</label><input id=\"alA\" name=\"family-name\" autocomplete=\"family-name\" required></div></div>" +
+      "<div class=\"campo\"><label class=\"et\" for=\"alE\">Correo</label><input id=\"alE\" type=\"email\" name=\"email\" autocomplete=\"email\" spellcheck=\"false\" placeholder=\"nombre@salud.madrid.org…\" value=\"" + esc(email || "") + "\" required></div>" +
+      "<div class=\"rejilla dos\"><div class=\"campo\"><label class=\"et\" for=\"alC\">Cargo o función</label><input id=\"alC\" name=\"organization-title\" autocomplete=\"organization-title\" placeholder=\"Residente, veterinaria, técnico…\" required></div>" +
+      "<div class=\"campo\"><label class=\"et\" for=\"alI\">Institución <span class=\"muy-tenue\">(opcional)</span></label><input id=\"alI\" name=\"organization\" autocomplete=\"organization\" placeholder=\"HU La Paz / IdiPAZ…\"></div></div>" +
+      "<fieldset class=\"campo\"><legend class=\"et\">Tipo de acceso que solicitas</legend>" + H.ROLES.slice(1).map(function (r, i) { return "<label class=\"check\" style=\"display:flex;margin:4px 0\"><input type=\"radio\" name=\"alR\" value=\"" + r[0] + "\"" + (i === 0 ? " checked" : "") + "> <span><b>" + esc(r[1]) + "</b> · <span class=\"tenue\">" + esc(r[2]) + "</span></span></label>"; }).join("") + "</fieldset>" +
+      "<div class=\"campo\"><label class=\"et\" for=\"alM\">Comentario <span class=\"muy-tenue\">(opcional)</span></label><textarea id=\"alM\" rows=\"2\" placeholder=\"Grupo, motivo del acceso…\"></textarea></div>" +
+      "<div class=\"trampa\" aria-hidden=\"true\"><label for=\"alW\">Web</label><input id=\"alW\" name=\"web\" tabindex=\"-1\" autocomplete=\"off\"></div>" +
+      "<label class=\"check\" style=\"display:flex;margin:6px 0 12px\"><input type=\"checkbox\" id=\"alOk\"> <span class=\"tenue\">Acepto que se guarden estos datos para gestionar mi acceso a la aplicación del proyecto.</span></label>" +
+      "<div class=\"msg-error\" id=\"errAcc\" role=\"alert\"></div><button class=\"bt pri grande\" style=\"width:100%\" type=\"submit\">Enviar solicitud</button></form><p style=\"margin-top:12px\"><button class=\"bt texto\" id=\"volver\">Volver al acceso</button></p>";
+    else if (paso === "alta_ok") cuerpo = "<h1>Solicitud enviada</h1><div class=\"aviso ok\">" + H.ico("circle-check") + "<div>" + esc(email || "Solicitud recibida. Un administrador revisará tu alta y te avisará por correo.") + "</div></div><p style=\"margin-top:12px\"><button class=\"bt\" id=\"volver\">Volver al acceso</button></p>";
+    else cuerpo = "<h1 class=\"sr\">Acceso</h1><p class=\"tenue\">Escribe tu correo y te enviaremos un código de acceso.</p>" +
+      "<form id=\"fEmail\" novalidate><div class=\"campo\"><label class=\"et\" for=\"email\">Correo</label><input id=\"email\" type=\"email\" name=\"email\" autocomplete=\"email\" spellcheck=\"false\" placeholder=\"nombre@salud.madrid.org…\" required></div>" +
+      "<div class=\"msg-error\" id=\"errAcc\" role=\"alert\"></div><button class=\"bt pri grande\" style=\"width:100%\" type=\"submit\">Enviar código</button></form>" +
+      "<div class=\"alta-enlace\"><span class=\"tenue\">¿Aún no tienes acceso?</span> <button class=\"bt texto\" id=\"irAlta\">" + H.ico("user-plus", "s") + "Solicitar alta</button></div>" +
+      "<details class=\"plegable\" style=\"margin-top:16px\"" + (sinServidor() ? " open" : "") + "><summary>Modo demostración (sin servidor)</summary><div class=\"dentro\"><p class=\"tenue\">Datos simulados guardados solo en este navegador. Sirve para probar la app antes de instalar el servidor.</p>" +
+      "<div class=\"fila-flex\">" + H.ROLES.map(function (r) { return "<button class=\"bt\" data-demo=\"" + r[0] + "\">" + esc(r[1]) + "</button>"; }).join("") + "</div></div></details>";
+    document.body.innerHTML = "<div id=\"toasts\" class=\"toasts\" aria-live=\"polite\"></div><main class=\"acceso\"><div class=\"caja" + (paso === "alta" ? " ancha" : "") + "\">" + H.marcaAccesoHTML() + cuerpo +
       "<p class=\"pie\">GITIC · Hospital Universitario La Paz / IdiPAZ · PI23/00364 · PI26/00141 · v" + VERSION + "</p></div></main>";
     H.cargarIconos();
-    var fE = H.$("#fEmail"), fC = H.$("#fCodigo");
+    var fE = H.$("#fEmail"), fC = H.$("#fCodigo"), fA = H.$("#fAlta");
     H.$$("[data-demo]").forEach(function (b) { b.addEventListener("click", function () { H.entrarDemo(b.getAttribute("data-demo")); }); });
+    if (H.$("#volver")) H.$("#volver").addEventListener("click", function () { H.pantallaAcceso("email"); });
+    if (H.$("#irAlta")) H.$("#irAlta").addEventListener("click", function () { H.pantallaAcceso("alta", (H.$("#email") || {}).value || ""); });
     if (fE) fE.addEventListener("submit", function (e) {
       e.preventDefault(); var em = H.$("#email").value.trim().toLowerCase(), err = H.$("#errAcc"), bt = fE.querySelector("button[type=submit]");
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { err.textContent = "Escribe un correo válido, por ejemplo nombre@salud.madrid.org."; H.$("#email").focus(); return; }
       bt.disabled = true; bt.classList.add("cargando-bt"); err.textContent = "";
       H.servidor("webSolicitarCodigo", [em]).then(function (r) { if (r && r.ok === false) throw new Error(r.mensaje || "No se ha podido enviar el código."); H.pantallaAcceso("codigo", em); }).catch(function (x) { err.textContent = x.message || "No se ha podido contactar con el servidor. Comprueba la conexión y vuelve a intentarlo."; bt.disabled = false; bt.classList.remove("cargando-bt"); });
     });
+    if (fA) fA.addEventListener("submit", function (e) {
+      e.preventDefault(); var err = H.$("#errAcc"), bt = fA.querySelector("button[type=submit]"), v = function (id) { return H.$(id).value.trim(); };
+      var d = { nombre: v("#alN"), apellidos: v("#alA"), email: v("#alE").toLowerCase(), cargo: v("#alC"), institucion: v("#alI"), rol_solicitado: (fA.querySelector("input[name=alR]:checked") || {}).value || "COLABORADOR", comentario: v("#alM"), acepta: H.$("#alOk").checked, web: H.$("#alW").value };
+      var falta = !d.nombre ? ["#alN", "Escribe tu nombre."] : !d.apellidos ? ["#alA", "Escribe tus apellidos."] : !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email) ? ["#alE", "Escribe un correo válido."] : !d.cargo ? ["#alC", "Indica tu cargo o función."] : !d.acepta ? ["#alOk", "Marca la casilla de aceptación para enviar la solicitud."] : null;
+      if (falta) { err.textContent = falta[1]; H.$(falta[0]).focus(); return; }
+      bt.disabled = true; bt.classList.add("cargando-bt"); err.textContent = "";
+      var llamar = sinServidor() ? (window.HOMEDemo.iniciar(), window.HOMEDemo.llamar) : H.servidor;
+      llamar("webSolicitarAlta", [d]).then(function (r) { if (r && r.ok === false) throw new Error(r.mensaje || "No se ha podido enviar la solicitud."); H.pantallaAcceso("alta_ok", r && r.mensaje); })
+        .catch(function (x) { err.textContent = x.message || "No se ha podido contactar con el servidor."; bt.disabled = false; bt.classList.remove("cargando-bt"); });
+    });
     if (fC) {
-      H.$("#volver").addEventListener("click", function () { H.pantallaAcceso("email"); });
       fC.addEventListener("submit", function (e) {
         e.preventDefault(); var c = H.$("#codigo").value.replace(/\D/g, ""), err = H.$("#errAcc"), bt = fC.querySelector("button[type=submit]");
         if (c.length !== 6) { err.textContent = "El código tiene 6 dígitos."; return; }
@@ -200,12 +252,12 @@
         }).catch(function (x) { err.textContent = x.message || "Código incorrecto."; bt.disabled = false; bt.classList.remove("cargando-bt"); });
       });
     }
-    var primero = H.$("#email") || H.$("#codigo"); if (primero && window.matchMedia("(pointer: fine)").matches) primero.focus();
+    var primero = H.$("#email") || H.$("#codigo") || H.$("#alN"); if (primero && window.matchMedia && window.matchMedia("(pointer: fine)").matches) primero.focus();
   };
   function sinServidor() { return !window.HOME_API || /PEGA_AQUI/.test(window.HOME_API); }
   function nombreDispositivo() { var u = navigator.userAgent; return (/iPhone/.test(u) ? "iPhone" : /iPad/.test(u) ? "iPad" : /Android/.test(u) ? "Android" : /Mac/.test(u) ? "Mac" : /Windows/.test(u) ? "Windows" : "Navegador") + " · " + (/Edg\//.test(u) ? "Edge" : /Chrome\//.test(u) ? "Chrome" : /Firefox\//.test(u) ? "Firefox" : /Safari\//.test(u) ? "Safari" : ""); }
   H.entrarDemo = function (rol) {
-    S.demo = true; window.HOMEDemo.iniciar(); return window.HOMEDemo.llamar("webVerificarCodigo", ["demo-" + rol.toLowerCase() + "@home.demo", "000000", "demo"]).then(function (r) {
+    S.demo = true; window.HOMEDemo.iniciar(); return window.HOMEDemo.llamar("webVerificarCodigo", ["demo-" + H.normRol(rol).toLowerCase() + "@home.demo", "000000", "demo"]).then(function (r) {
       S.token = r.token; S.usuario = r.usuario; localStorage.setItem("home_sesion", JSON.stringify({ token: r.token, usuario: r.usuario, demo: true })); H.arrancar();
     });
   };
@@ -271,17 +323,18 @@
   };
   var NAV = [
     { r: "inicio", n: "Inicio", i: "house" }, { r: "experimentos", n: "Experimentos", i: "flask-conical" }, { r: "graficos", n: "Gráficos", i: "chart-line" },
-    { r: "inventario", n: "Inventario", i: "package" }, { r: "exportar", n: "Exportar", i: "download" }, { r: "config", n: "Configuración", i: "settings", admin: true }];
+    { r: "inventario", n: "Inventario", i: "package" }, { r: "exportar", n: "Exportar", i: "download" }, { r: "validar", n: "Validar", i: "badge-check", admin: true }, { r: "config", n: "Configuración", i: "settings", admin: true }];
   H.pintarMarco = function () {
     var u = S.usuario || {}, ini = String(u.nombre || u.email || "?").trim().charAt(0).toUpperCase();
     var bajo = H.stockBajo ? H.stockBajo().length : 0, solP = H.filas("Solicitudes").filter(function (s) { return s.Estado === "Pendiente"; }).length;
     var nav = NAV.filter(function (x) { return !x.admin || H.esAdmin(); });
-    function cont(r) { var n = r === "inventario" ? bajo + (H.esAdmin() ? solP : 0) : 0; return n ? "<span class=\"cont\" aria-label=\"" + n + " avisos\">" + n + "</span>" : ""; }
+    var pendV = H.esAdmin() && H.pendientesValidacion ? H.pendientesValidacion().length : 0, accP = H.esAdmin() ? H.filas("Solicitudes_Acceso").filter(function (s) { return s.Estado === "Pendiente"; }).length : 0;
+    function cont(r) { var n = r === "inventario" ? bajo + (H.esAdmin() ? solP : 0) : r === "validar" ? pendV : r === "config" ? accP : 0; return n ? "<span class=\"cont\" aria-label=\"" + n + " avisos\">" + n + "</span>" : ""; }
     document.body.innerHTML = "<a class=\"saltar\" href=\"#principal\">Saltar al contenido</a>" + (S.demo ? "<div class=\"demo-banda\">Modo demostración · datos simulados guardados solo en este navegador</div>" : "") +
       "<header class=\"cab\">" + H.marcaHTML() + "<span id=\"chipActivo\"></span><span class=\"empuja\"></span><span id=\"estadoSync\" class=\"estado-sync\" role=\"status\"></span>" +
-      "<button class=\"avatar\" data-act=\"cuenta\" aria-label=\"Mi cuenta: " + esc(u.nombre || u.email || "") + " (" + esc(u.rol || "") + ")\">" + esc(ini) + "</button></header>" +
+      "<button class=\"avatar\" data-act=\"cuenta\" aria-label=\"Mi cuenta: " + esc(u.nombre || u.email || "") + " (" + esc(H.nombreRol(u.rol)) + ")\">" + esc(ini) + "</button></header>" +
       "<div class=\"marco\"><nav class=\"riel\" aria-label=\"Secciones\">" + nav.map(function (x) { return "<a href=\"#/" + x.r + "\" data-nav=\"" + x.r + "\">" + H.ico(x.i) + x.n + cont(x.r) + "</a>"; }).join("") +
-      "<div class=\"sep\"></div><a href=\"#/cuenta\" data-nav=\"cuenta\">" + H.ico("user") + "Mi cuenta</a><p class=\"muy-tenue\" style=\"padding:8px 10px\">" + esc(u.nombre || "") + "<br>" + esc(u.rol || "") + " · v" + VERSION + "</p></nav>" +
+      "<div class=\"sep\"></div><a href=\"#/cuenta\" data-nav=\"cuenta\">" + H.ico("user") + "Mi cuenta</a><p class=\"muy-tenue\" style=\"padding:8px 10px\">" + esc(u.nombre || "") + "<br>" + esc(H.nombreRol(u.rol)) + " · v" + VERSION + "</p></nav>" +
       "<main id=\"principal\" class=\"principal\" tabindex=\"-1\"></main></div>" +
       "<nav class=\"inferior\" aria-label=\"Secciones\">" + nav.slice(0, 5).map(function (x) { return "<a href=\"#/" + x.r + "\" data-nav=\"" + x.r + "\">" + H.ico(x.i) + "<span>" + x.n + "</span></a>"; }).join("") + "</nav>" +
       "<div id=\"toasts\" class=\"toasts\" aria-live=\"polite\"></div><div id=\"alarmas\"></div>";

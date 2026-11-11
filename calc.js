@@ -123,65 +123,71 @@
       { f: "Ketamina", dosis_mg_kg: 12, conc_mg_mL: 100 }, { f: "Xilacina", dosis_mg_kg: null, conc_mg_mL: 20 },
       { f: "Midazolam", dosis_mg_kg: 0.5, conc_mg_mL: 5 }, { f: "Lidocaína", dosis_mg: 10, conc_mg_mL: 20 }],
     heparina_donante_mg_kg: 3,
-    // Recalentamiento: escalones de 5 min (hoja 2026-HOME-Recalentamiento; FiO2 y presión portal leídos de celdas combinadas → verificar)
-    recalentamiento: { verificado: false, paso_min: 5, pasos: [
+    // Recalentamiento: escalones de 5 min, comprobado contra «2026-HOME-Recalentamiento.pdf» (v0.2)
+    recalentamiento: { verificado: true, fuente: "2026-HOME-Recalentamiento.pdf", paso_min: 5, pasos: [
       { t: 0,  Temp: 24, P_VP: 2, FiO2_POR: 21, Barrido_POR: 160, P_AH: 35, FiO2_ART: 21, Barrido_ART: 50 },
       { t: 5,  Temp: 25, P_VP: 2, FiO2_POR: 21, Barrido_POR: 170, P_AH: 37, FiO2_ART: 21, Barrido_ART: 60 },
       { t: 10, Temp: 26, P_VP: 2, FiO2_POR: 21, Barrido_POR: 180, P_AH: 39, FiO2_ART: 21, Barrido_ART: 60 },
-      { t: 15, Temp: 27, P_VP: 2, FiO2_POR: 21, Barrido_POR: 190, P_AH: 41, FiO2_ART: 30, Barrido_ART: 70 },
+      { t: 15, Temp: 27, P_VP: 2, FiO2_POR: 21, Barrido_POR: 190, P_AH: 41, FiO2_ART: 21, Barrido_ART: 70 },
       { t: 20, Temp: 28, P_VP: 2, FiO2_POR: 21, Barrido_POR: 200, P_AH: 44, FiO2_ART: 30, Barrido_ART: 80 },
       { t: 25, Temp: 29, P_VP: 2, FiO2_POR: 21, Barrido_POR: 210, P_AH: 46, FiO2_ART: 30, Barrido_ART: 80 },
       { t: 30, Temp: 30, P_VP: 2, FiO2_POR: 21, Barrido_POR: 220, P_AH: 48, FiO2_ART: 30, Barrido_ART: 90 },
       { t: 35, Temp: 31, P_VP: 3, FiO2_POR: 21, Barrido_POR: 260, P_AH: 50, FiO2_ART: 30, Barrido_ART: 90 },
       { t: 40, Temp: 32, P_VP: 3, FiO2_POR: 21, Barrido_POR: 280, P_AH: 52, FiO2_ART: 30, Barrido_ART: 90 },
-      { t: 45, Temp: 33, P_VP: 3, FiO2_POR: 21, Barrido_POR: 300, P_AH: 54, FiO2_ART: 30, Barrido_ART: 100 },
+      { t: 45, Temp: 33, P_VP: 3, FiO2_POR: 21, Barrido_POR: 300, P_AH: 54, FiO2_ART: 40, Barrido_ART: 100 },
       { t: 50, Temp: 34, P_VP: 3, FiO2_POR: 21, Barrido_POR: 320, P_AH: 56, FiO2_ART: 40, Barrido_ART: 100 },
-      { t: 55, Temp: 35, P_VP: 3, FiO2_POR: 21, Barrido_POR: 360, P_AH: 59, FiO2_ART: 40, Barrido_ART: 110 },
+      { t: 55, Temp: 35, P_VP: 4, FiO2_POR: 21, Barrido_POR: 360, P_AH: 59, FiO2_ART: 40, Barrido_ART: 110 },
       { t: 60, Temp: 36, P_VP: 4, FiO2_POR: 21, Barrido_POR: 390, P_AH: 61, FiO2_ART: 40, Barrido_ART: 110 },
       { t: 65, Temp: 37, P_VP: 4, FiO2_POR: 21, Barrido_POR: 410, P_AH: 63, FiO2_ART: 40, Barrido_ART: 120 },
       { t: 70, Temp: 38, P_VP: 4, FiO2_POR: 21, Barrido_POR: 440, P_AH: 65, FiO2_ART: 40, Barrido_ART: 130 }] },
     // Horario circadiano: CAMBIOS de ritmo (el ritmo se mantiene hasta el siguiente cambio de la misma línea).
-    // Borrador leído de «2026-HOME-Administración Circadiana PRE-ESTABLECIDA» (la página 2 del PDF está mal escaneada): VERIFICAR.
-    circadiano: { verificado: false, lineas: ["Hidrocortisona", "Ácidos biliares", "NP (glucosa + AA)", "NP (lípidos)", "Insulina", "Profilaxis", "Melatonina", "HDF", "Temperatura"], cambios: [
+    // Transcrito de «2026-HOME-Administración Circadiana PRE-ESTABLECIDA.pdf» (v0.2). Dudas marcadas en «nota».
+    circadiano: { verificado: true, fuente: "2026-HOME-Administración Circadiana PRE-ESTABLECIDA.pdf", lineas: ["Hidrocortisona", "Ácidos biliares", "NP (glucosa + AA)", "NP (lípidos)", "Insulina", "Profilaxis", "Profilaxis (bolo)", "Melatonina", "HDF"], cambios: [
       { h: "08:00", linea: "Hidrocortisona", valor: 44, unidad: "mL/h", nota: "Bolo matutino (pico 250–300 nmol/L)" },
+      { h: "08:00", linea: "Ácidos biliares", valor: 2, unidad: "mL/h", nota: "" },
+      { h: "08:00", linea: "NP (glucosa + AA)", valor: 15, unidad: "mL/h", nota: "" },
       { h: "08:00", linea: "Insulina", valor: 0.5, unidad: "mL/h", nota: "" },
-      { h: "08:00", linea: "HDF", valor: 20, unidad: "mL/h", nota: "Verificar unidad/parámetro" },
-      { h: "08:00", linea: "Temperatura", valor: 37.5, unidad: "°C", nota: "Fase diurna (rango 36,5–38 °C)" },
-      { h: "08:30", linea: "Hidrocortisona", valor: 0, unidad: "mL/h", nota: "Fin del bolo" },
-      { h: "09:00", linea: "Ácidos biliares", valor: 2, unidad: "mL/h", nota: "" },
-      { h: "09:30", linea: "Hidrocortisona", valor: 4, unidad: "mL/h", nota: "Basal" },
-      { h: "09:30", linea: "NP (glucosa + AA)", valor: 15, unidad: "mL/h", nota: "Ciclo nutricional 1" },
-      { h: "10:00", linea: "Profilaxis", valor: 2, unidad: "mL/h", nota: "" },
+      { h: "08:00", linea: "Profilaxis", valor: 2, unidad: "mL/h", nota: "Continua 2 mL/h las 24 h" },
+      { h: "08:00", linea: "Melatonina", valor: 0, unidad: "mL/h", nota: "Fin" },
+      { h: "08:30", linea: "Hidrocortisona", valor: 4, unidad: "mL/h", nota: "" },
+      { h: "09:00", linea: "Insulina", valor: 0, unidad: "mL/h", nota: "Fin" },
+      { h: "09:00", linea: "HDF", valor: 40, unidad: "mL/h", nota: "" },
       { h: "10:30", linea: "Hidrocortisona", valor: 22, unidad: "mL/h", nota: "Bolo posprandial (150–200 nmol/L)" },
+      { h: "10:30", linea: "Ácidos biliares", valor: 5, unidad: "mL/h", nota: "" },
       { h: "10:30", linea: "Insulina", valor: 0.5, unidad: "mL/h", nota: "" },
-      { h: "11:00", linea: "Hidrocortisona", valor: 0, unidad: "mL/h", nota: "Fin del bolo" },
-      { h: "11:30", linea: "Ácidos biliares", valor: 5, unidad: "mL/h", nota: "Ventana posprandial" },
-      { h: "12:00", linea: "NP (glucosa + AA)", valor: 30, unidad: "mL/h", nota: "Ciclo nutricional 2" },
-      { h: "12:00", linea: "NP (lípidos)", valor: 2, unidad: "mL/h", nota: "" },
-      { h: "12:00", linea: "Insulina", valor: 1, unidad: "mL/h", nota: "" },
-      { h: "12:00", linea: "HDF", valor: 40, unidad: "mL/h", nota: "Verificar" },
-      { h: "13:00", linea: "Hidrocortisona", valor: 4, unidad: "mL/h", nota: "Basal" },
-      { h: "13:00", linea: "Profilaxis", valor: 105, unidad: "mL/h", nota: "Verificar (¿metronidazol 105 mL/h + 2 mL/h?)" },
-      { h: "14:30", linea: "Ácidos biliares", valor: 2, unidad: "mL/h", nota: "Basal" },
-      { h: "14:30", linea: "NP (glucosa + AA)", valor: 15, unidad: "mL/h", nota: "" },
-      { h: "14:30", linea: "Profilaxis", valor: 2, unidad: "mL/h", nota: "" },
-      { h: "16:30", linea: "Hidrocortisona", valor: 11, unidad: "mL/h", nota: "Bolo posprandial vespertino" },
+      { h: "11:00", linea: "Hidrocortisona", valor: 4, unidad: "mL/h", nota: "" },
+      { h: "11:00", linea: "NP (glucosa + AA)", valor: 30, unidad: "mL/h", nota: "" },
+      { h: "11:00", linea: "NP (lípidos)", valor: 2, unidad: "mL/h", nota: "" },
+      { h: "11:00", linea: "Insulina", valor: 1, unidad: "mL/h", nota: "" },
+      { h: "13:00", linea: "Ácidos biliares", valor: 2, unidad: "mL/h", nota: "" },
+      { h: "13:00", linea: "NP (glucosa + AA)", valor: 15, unidad: "mL/h", nota: "" },
+      { h: "13:00", linea: "NP (lípidos)", valor: 0, unidad: "mL/h", nota: "Fin" },
+      { h: "13:00", linea: "Insulina", valor: 0, unidad: "mL/h", nota: "Fin" },
+      { h: "13:00", linea: "Profilaxis (bolo)", valor: 105, unidad: "mL/h", nota: "Celda dividida «105 | 2» del PDF: bolo 30 min + continua 2 mL/h (verificar)" },
+      { h: "13:30", linea: "Profilaxis (bolo)", valor: 0, unidad: "mL/h", nota: "Fin del bolo" },
+      { h: "16:30", linea: "Hidrocortisona", valor: 11, unidad: "mL/h", nota: "Bolo posprandial vespertino · 16:00–16:30 sin dato legible: se asume basal 4 mL/h (verificar)" },
+      { h: "16:30", linea: "Ácidos biliares", valor: 5, unidad: "mL/h", nota: "" },
       { h: "16:30", linea: "Insulina", valor: 0.5, unidad: "mL/h", nota: "" },
-      { h: "17:00", linea: "Hidrocortisona", valor: 4, unidad: "mL/h", nota: "Basal" },
-      { h: "17:30", linea: "Ácidos biliares", valor: 5, unidad: "mL/h", nota: "Ventana posprandial" },
-      { h: "18:00", linea: "NP (glucosa + AA)", valor: 30, unidad: "mL/h", nota: "Ciclo nutricional 3" },
-      { h: "18:00", linea: "NP (lípidos)", valor: 2, unidad: "mL/h", nota: "" },
-      { h: "18:00", linea: "Insulina", valor: 1, unidad: "mL/h", nota: "" },
-      { h: "19:00", linea: "Profilaxis", valor: 105, unidad: "mL/h", nota: "Verificar" },
-      { h: "19:30", linea: "Ácidos biliares", valor: 2, unidad: "mL/h", nota: "Basal" },
-      { h: "19:30", linea: "NP (glucosa + AA)", valor: 15, unidad: "mL/h", nota: "" },
-      { h: "20:00", linea: "Melatonina", valor: 5, unidad: "mL/h", nota: "Infusión 20:00–23:00 (100–200 pg/mL)" },
-      { h: "20:00", linea: "HDF", valor: 20, unidad: "mL/h", nota: "Verificar" },
-      { h: "21:00", linea: "NP (glucosa + AA)", valor: 0, unidad: "mL/h", nota: "Ayuno nocturno" },
-      { h: "21:00", linea: "NP (lípidos)", valor: 0, unidad: "mL/h", nota: "" },
-      { h: "21:00", linea: "Insulina", valor: 0, unidad: "mL/h", nota: "" },
-      { h: "22:00", linea: "Temperatura", valor: 36.5, unidad: "°C", nota: "Nadir nocturno" },
-      { h: "23:00", linea: "Melatonina", valor: 0, unidad: "mL/h", nota: "Fin de la infusión" }] },
+      { h: "17:00", linea: "Hidrocortisona", valor: 4, unidad: "mL/h", nota: "" },
+      { h: "17:00", linea: "NP (glucosa + AA)", valor: 30, unidad: "mL/h", nota: "" },
+      { h: "17:00", linea: "NP (lípidos)", valor: 2, unidad: "mL/h", nota: "" },
+      { h: "17:00", linea: "Insulina", valor: 1, unidad: "mL/h", nota: "" },
+      { h: "19:00", linea: "Ácidos biliares", valor: 2, unidad: "mL/h", nota: "" },
+      { h: "19:00", linea: "NP (glucosa + AA)", valor: 15, unidad: "mL/h", nota: "" },
+      { h: "19:00", linea: "NP (lípidos)", valor: 0, unidad: "mL/h", nota: "Fin" },
+      { h: "19:00", linea: "Insulina", valor: 0, unidad: "mL/h", nota: "Fin" },
+      { h: "19:00", linea: "Profilaxis (bolo)", valor: 105, unidad: "mL/h", nota: "Celda dividida «105 | 2» del PDF: bolo 30 min + continua 2 mL/h (verificar)" },
+      { h: "19:00", linea: "HDF", valor: 20, unidad: "mL/h", nota: "" },
+      { h: "19:30", linea: "Profilaxis (bolo)", valor: 0, unidad: "mL/h", nota: "Fin del bolo" },
+      { h: "20:00", linea: "Ácidos biliares", valor: 1, unidad: "mL/h", nota: "Ritmo nocturno" },
+      { h: "20:00", linea: "NP (glucosa + AA)", valor: 4, unidad: "mL/h", nota: "Ritmo nocturno" },
+      { h: "20:00", linea: "Melatonina", valor: 5, unidad: "mL/h", nota: "Inicio (objetivo 100–200 pg/mL)" },
+      { h: "20:30", linea: "Melatonina", valor: 7, unidad: "mL/h", nota: "Mantenimiento nocturno" }] },
+    // Pantalla de inicio (v0.2): fecha de la próxima perfusión (vacío = la Fecha_cirugia más próxima), «Últimos valores» y muestras que alimentan las alertas
+    inicio: { proxima_perfusion: "", ultimos_valores: ["PERF:Lactato", "ART:pH", "PERF:Glucosa", "PERF:ALT", "PERF:AST", "PERF:LDH", "PERF:BilT", "PERF:ActPT", "PERF:Amonio", "PERF:K", "BILIS:Volumen_mL", "FLUJO:Q_AH", "FLUJO:Q_VP", "ART:pO2"],
+      alertas_muestras: ["ART", "POR", "CAV", "PERF", "FLUJO"] },
+    // Reposición de material (v0.2; la usa también el servidor): aviso N días antes y después de cada procedimiento
+    reposicion: { dias_antes: 14, dias_despues: 7, hora: "08:00", destinatarios: [] },
     // Muestreo (memoria PI26/00141): día 1 a 30 min y 2-4-6-8-12-16-20-24 h; después a las 10, 14, 16 y 20 h. Biopsia cada 24 h.
     muestreo: { dia1_h: [0, 0.5, 2, 4, 6, 8, 12, 16, 20, 24], diarias: ["10:00", "14:00", "16:00", "20:00"], biopsia_cada_h: 24,
       bilis_dia1_cada_h: 2, flujos_cada_h_dia1: 0.5, flujos_cada_h_despues: 3, hdf_inicio_h: 6, inmuno_cada_h: 24 },
@@ -439,6 +445,13 @@
       out.push({ ID: expId + "|biopsia|" + h, Experimento: expId, Fecha_hora: new Date(t0.getTime() + (h * 60 - antelMin) * 6e4).toISOString(), Tipo: "muestra", Destino: "equipo", Vista: "exp:" + expId + ":seguimiento", Titulo: "Biopsia hepática " + h + " h en " + antelMin + " min", Texto: "Parénquima (parafina + criopreservación)." });
     return out;
   }
+  // Reposición (idéntica al servidor): a_reponer = max(0, mínimo + por perfusión − stock); solo > 0; orden Categoria, Nombre
+  function reposicion(materiales, stockDe) {
+    return (materiales || []).filter(function (m) { return m && m.Borrado !== true && m.Borrado !== "TRUE" && m.Activo !== false && m.Activo !== "FALSE"; }).map(function (m) {
+      var st = stockDe ? stockDe(m) : num(m.Stock_actual), mn = num(m.Stock_minimo) || 0, pp = num(m.Por_perfusion) || 0; st = st || 0;
+      return { ID: m.ID, Nombre: m.Nombre, Categoria: m.Categoria || "", Unidad: m.Unidad || "", Referencia: m.Referencia || "", Proveedor: m.Proveedor || "", stock: st, minimo: mn, por_perfusion: pp, a_reponer: r(Math.max(0, mn + pp - st), 3) };
+    }).filter(function (x) { return x.a_reponer > 0; }).sort(function (a, b) { return String(a.Categoria).localeCompare(String(b.Categoria), "es") || String(a.Nombre).localeCompare(String(b.Nombre), "es"); });
+  }
   // Ritmo vigente de cada línea a una hora dada (para el panel «ahora mismo»)
   function ritmosVigentes(circ, fecha) {
     circ = circ || DEF.circadiano; var m = fecha.getHours() * 60 + fecha.getMinutes(), est = {};
@@ -517,7 +530,7 @@
     volumenPerfusato: volumenPerfusato, correccionesPerfusato: correccionesPerfusato, heparina: heparina, cortisolBolo: cortisolBolo,
     enRango: enRango, asesorGas: asesorGas, sO2Hill: sO2Hill, sO2Estimada: sO2Estimada, p50Corregida: p50Corregida, contenidoO2: contenidoO2, consumoO2: consumoO2, hemodinamica: hemodinamica, produccionBilis: produccionBilis,
     tiempos: tiempos, pasoRecalentamiento: pasoRecalentamiento, cambiosRecal: cambiosRecal, NOMBRES_RECAL: NOMBRES_RECAL, UNIDAD_RECAL: UNIDAD_RECAL, avisosRecalentamiento: avisosRecalentamiento,
-    avisosCircadianos: avisosCircadianos, puntosMuestreo: puntosMuestreo, avisosMuestreo: avisosMuestreo, ritmosVigentes: ritmosVigentes,
+    avisosCircadianos: avisosCircadianos, puntosMuestreo: puntosMuestreo, avisosMuestreo: avisosMuestreo, ritmosVigentes: ritmosVigentes, reposicion: reposicion,
     serie: serie, xDe: xDe, bandaHistorica: bandaHistorica, zScore: zScore, agregarSeries: agregarSeries, pivotAncho: pivotAncho, tablaPrismXY: tablaPrismXY,
     PALETA: PALETA, pesoMorfometrico: pesoMorfometrico };
 });
