@@ -1,0 +1,1 @@
+Plotly.js (MIT) · SheetJS Community Edition (Apache-2.0) · Lucide icons (ISC) · Roboto / Roboto Mono (Apache-2.0 / OFL) vía Fontsource.
