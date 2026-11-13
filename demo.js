@@ -2,8 +2,8 @@
    Los datos son SINTÉTICOS (generador con semilla) y se guardan solo en este navegador (IndexedDB). */
 (function () {
   "use strict";
-  var C = window.HOMECalc, DB = null, listo = null, VERSION_DEMO = 4;
-  var TABLAS = ["Experimentos", "Animales", "Dieta", "Formularios", "Mediciones", "Eventos", "Avisos", "Material", "Movimientos", "Solicitudes", "Personal", "Usuarios", "Config", "Solicitudes_Acceso"];
+  var C = window.HOMECalc, DB = null, listo = null, VERSION_DEMO = 5;
+  var TABLAS = ["Experimentos", "Animales", "Dieta", "Formularios", "Mediciones", "Eventos", "Avisos", "Material", "Movimientos", "Solicitudes", "Personal", "Usuarios", "Config", "Solicitudes_Acceso", "Fotos", "Pedidos"];
   function idb(op, v) { return new Promise(function (ok) { try { var r = indexedDB.open("home-demo", 1); r.onupgradeneeded = function () { r.result.createObjectStore("kv"); }; r.onsuccess = function () { var tx = r.result.transaction("kv", op === "get" ? "readonly" : "readwrite"), st = tx.objectStore("kv"); if (op === "get") { var q = st.get("db"); q.onsuccess = function () { ok(q.result); }; q.onerror = function () { ok(null); }; } else { st.put(v, "db"); tx.oncomplete = function () { ok(true); }; } }; r.onerror = function () { ok(null); }; } catch (e) { ok(null); } }); }
   var tGuardar = null; function persistir() { clearTimeout(tGuardar); tGuardar = setTimeout(function () { idb("put", DB); }, 400); }
   function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -24,22 +24,28 @@
       ["Filtro de hemodiafiltración", "HDF", "unidad", 7, 3, 2], ["Línea arteriovenosa Aquarius", "HDF", "unidad", 5, 2, 1], ["Líquido de reposición 5 L", "HDF", "bolsa", 40, 20, 14], ["Bolsa de efluente", "HDF", "unidad", 20, 10, 7],
       ["Bolsa CPDA-1 450 mL", "Material quirúrgico", "unidad", 18, 10, 6], ["Seda 2/0", "Material quirúrgico", "sobre", 30, 10, 4], ["Bisturí nº 23", "Material quirúrgico", "unidad", 25, 10, 3], ["Solución IGL-1 1 L", "Fármacos y soluciones", "bolsa", 4, 3, 3],
       ["Periolimel N4E 1500 mL", "Fármacos y soluciones", "bolsa", 10, 7, 7], ["Heparina sódica 5000 U/mL (5 mL)", "Fármacos y soluciones", "vial", 30, 25, 22], ["Jeringa 50 mL", "Fungible general", "unidad", 80, 40, 30], ["Tubo de gasometría", "Fungible general", "unidad", 150, 100, 120], ["Guantes estériles 7,5", "Fungible general", "par", 60, 30, 20]];
-    MAT.forEach(function (m, i) { add("Material", { ID: "MAT-D" + i, Nombre: m[0], Categoria: m[1], Unidad: m[2], Stock_inicial: m[3], Stock_minimo: m[4], Por_perfusion: m[5], Referencia: "", Proveedor: "", Ubicacion: "Almacén CCE", Activo: true }); });
+    function via(m) { return m[1] === "Fármacos y soluciones" ? (/IGL/.test(m[0]) ? ["Reactivo", "Licitación", "EXP-2026-014", "Proveedor de perfusión (demo)", "pedidos-perfusion@example.org", 40] : ["Fármaco", "Farmacia", "", "", "", null])
+      : m[1] === "Fungible de perfusión" ? ["Fungible", "Licitación", "EXP-2026-014", "Proveedor de perfusión (demo)", "pedidos-perfusion@example.org", 30] : m[1] === "HDF" ? ["Fungible", "Contrato menor", "CM-2026-031", "Proveedor de HDF (demo)", "pedidos-hdf@example.org", 60] : ["Fungible", "Otro", "", "", "", null]; }
+    MAT.forEach(function (m, i) { var v = via(m); add("Material", { ID: "MAT-D" + i, Nombre: m[0], Categoria: m[1], Unidad: m[2], Stock_inicial: m[3], Stock_minimo: m[4], Por_perfusion: m[5], Referencia: "REF-" + (1000 + i), Proveedor: v[3], Ubicacion: "Almacén CCE", Activo: true, Tipo: v[0], Via: v[1], Expediente: v[2], Email_proveedor: v[4], Unidades_contrato: v[5], Unidades_pedidas: 0 }); });
+    [["Máquina de perfusión Liver Assist", "Máquina de perfusión"], ["Monitor de hemodiafiltración Aquarius", "HDF"], ["Termohigrómetro LIORQUE YGH5254", "Fungible general"]].forEach(function (m, i) { add("Material", { ID: "MAT-I" + i, Nombre: m[0], Categoria: m[1], Unidad: "unidad", Stock_inicial: 1, Stock_minimo: 1, Por_perfusion: 0, Referencia: "", Proveedor: "", Ubicacion: "Quirófano experimental", Activo: true, Tipo: "Inventariable", Via: "", Expediente: "" }); });
     add("Solicitudes", { ID: "SOL-D1", Fecha: new Date(Date.now() - 2 * 864e5).toISOString(), Solicitante: "Investigador demo", Material: "MAT-D14", Cantidad: 6, Urgencia: "Urgente", Motivo: "Quedan 4 bolsas de IGL-1 y cada perfusión usa 3", Estado: "Pendiente" });
     add("Solicitudes", { ID: "SOL-D2", Fecha: new Date(Date.now() - 5 * 864e5).toISOString(), Solicitante: "Investigador demo", Material: "", Nombre_nuevo: "Monitor continuo de glucosa (sensor)", Categoria: "Máquina de perfusión", Cantidad: 4, Urgencia: "Normal", Motivo: "Controlador BES (objetivo 1 del PI26/00141)", Estado: "Aprobada" });
 
     var ahora = Date.now(), H0 = 36e5;
     var exps = [{ n: 1, dias: 7, ini: ahora - 70 * 864e5, sexo: "H", peso: 24.6, hig: 640 }, { n: 2, dias: 7, ini: ahora - 45 * 864e5, sexo: "M", peso: 25.8, hig: 702 }, { n: 3, dias: 5.6, ini: ahora - 20 * 864e5, sexo: "H", peso: 23.9, hig: 611, fallo: true },
-      { n: 4, dias: null, ini: ahora - 26.3 * H0, sexo: "M", peso: 25.1, hig: 668 }, { n: 5, dias: null, ini: null, sexo: "H", peso: 24.2, hig: 0, en_dias: 14 }, { n: 6, dias: null, ini: null, sexo: "M", peso: 25, hig: 0, en_dias: 42 }];
+      { n: 4, dias: null, ini: ahora - 26.3 * H0, sexo: "M", peso: 25.1, hig: 668 }, { n: 5, dias: null, ini: null, sexo: "H", peso: 24.2, hig: 0, en_dias: 8, llegada: -1 }, { n: 6, dias: null, ini: null, sexo: "M", peso: 25, hig: 0, en_dias: 20, prov: true }];
     exps.forEach(function (x) {
       var s = (x.n < 10 ? "0" : "") + x.n, id = "HOME-" + s, ini = x.ini ? new Date(C.enHora(new Date(x.ini), "11:00", 0).getTime() + (x.n === 4 ? 0 : 0)) : null;
       if (x.n === 4) ini = new Date(x.ini);
       var fin = ini && x.dias ? new Date(ini.getTime() + x.dias * 864e5) : null, est = x.n <= 3 ? "Finalizado" : x.n === 4 ? "Perfusión" : "Planificado";
       var fqx = ini ? new Date(ini.getTime() - 3.2 * H0) : C.enHora(new Date(ahora), "08:00", x.en_dias);
-      add("Experimentos", { ID: id, Numero: x.n, Codigo_PM: "HOME-PM-" + s, Fase: "Fase 2 · 7 días de perfusión", Protocolo: "CHRONO-LIVER (circadiano)", Estado: est, Fecha_llegada: new Date(fqx.getTime() - 6 * 864e5).toISOString(), Fecha_cirugia: fqx.toISOString().slice(0, 10),
+      var fcx = C.diaISO(fqx), fll = x.llegada !== undefined ? C.sumarDias(C.diaISO(new Date(ahora)), x.llegada) : C.sumarDias(fcx, -7);
+      add("Experimentos", { ID: id, Numero: x.n, Codigo_PM: "HOME-PM-" + s, Fase: "Fase 2 · 7 días de perfusión", Protocolo: "CHRONO-LIVER (circadiano)", Estado: est, Fecha_llegada: fll, Fecha_cirugia: fcx, Fecha_trasplante: C.sumarDias(fcx, 7), Fecha_sacrificio: C.sumarDias(fcx, 12), Programacion: x.prov ? "Provisional" : "Confirmado", Participantes: JSON.stringify(["demo-admin@home.demo", "demo-investigador@home.demo"]),
         Inicio_perfusion: ini ? ini.toISOString() : "", Fin_perfusion: fin ? fin.toISOString() : "", Peso_higado_inicial_g: x.hig || null, Peso_higado_final_g: fin ? Math.round(x.hig * (x.fallo ? 1.18 : 1.06)) : null, Volumen_perfusato_mL: 2390, Color: C.PALETA[(x.n - 1) % C.PALETA.length], Responsable: "Investigador demo", Notas: x.fallo ? "Datos sintéticos de demostración. Fin anticipado por deterioro del injerto (lactato y transaminasas en ascenso desde el día 4)." : "Datos sintéticos de demostración." });
-      [["BD", 61, "M"], ["LD", x.peso, x.sexo]].forEach(function (a) { add("Animales", { ID: "HOME-" + a[0] + "-" + s, Experimento: id, Rol: a[0], Crotal: "ES" + (10000 + x.n * 7 + (a[0] === "BD" ? 1 : 2)), Sexo: a[2], Castrado: a[2] === "M" ? "Sí" : "No", Raza: "Landrace × Large White", Fecha_llegada: new Date(fqx.getTime() - 6 * 864e5).toISOString(), Hora_llegada: "10:00", Peso_llegada_kg: C.r(a[1] - 1.2, 1) }); });
-      if (x.en_dias) return;   // planificados: sin animales, dieta ni datos todavía
+      [["BD", 61, "M"], ["LD", x.peso, x.sexo]].forEach(function (a) { add("Animales", { ID: "HOME-" + a[0] + "-" + s, Experimento: id, Rol: a[0], Crotal: "ES" + (10000 + x.n * 7 + (a[0] === "BD" ? 1 : 2)), Sexo: a[2], Castrado: a[2] === "M" ? "Sí" : "No", Raza: "Landrace × Large White", Fecha_llegada: new Date(fqx.getTime() - 6 * 864e5).toISOString(), Hora_llegada: "10:00", Peso_llegada_kg: x.prov ? null : C.r(a[1] - 1.2, 1) }); });
+      if (x.n === 5) { var hoyD = C.diaISO(new Date(ahora)); ["BD", "LD"].forEach(function (rol) { var pk = rol === "BD" ? 59.8 : x.peso - 1.2, en = C.energiaDieta(pk, rol === "BD" ? "M" : x.sexo, rol === "BD" ? "Sí" : "No", C.DEF.dieta);
+        add("Dieta", { ID: id + "|qr|HOME-" + rol + "-" + s + "|" + hoyD + "|1", Experimento: id, Animal: "HOME-" + rol + "-" + s, Fecha: hoyD, Hora: "09:35", Toma: "1ª toma", Peso_kg: null, EM_objetivo_kcal: Math.round(en.em_kcal), Ofrecido_g: Math.round(en.g_toma), Agua_ok: true, Enriquecimiento_ok: true, Responsable: "Celador demo", Observaciones: "", Origen: "qr", _qr: true }); }); }
+      if (x.en_dias) return;   // planificados: sin dieta previa ni datos todavía
       // dieta (6 días, 2 tomas)
       for (var d = 6; d >= 1; d--) ["08:00", "17:00"].forEach(function (h, k) {
         var f = new Date(fqx.getTime() - d * 864e5); if (d === 1 && k === 1) return;
@@ -95,8 +101,12 @@
         add("Eventos", { ID: id + "|ev2", Experimento: id, Tipo: "incidencia", Fecha_hora: new Date(ini.getTime() + 9.4 * H0).toISOString(), Nota: "Alarma de presión de acceso de la HDF; se recoloca la línea. Sin consecuencias." });
       }
     });
+    // v0.3: fotos (miniaturas sintéticas), pedido automático en borrador
+    [28, 4].forEach(function (hAtras, k) { var ft = new Date(ahora - hAtras * H0), mini = "data:image/svg+xml;utf8," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='220' height='165'><rect width='220' height='165' fill='#d9e4e6'/><path d='M30 85C30 52 62 40 100 43s78 3 85 20-26 30-52 46-59 37-82 27S30 108 30 85z' fill='" + (k ? "#8c3b2e" : "#9a4a3a") + "'/><text x='8' y='156' font-size='12' font-family='sans-serif' fill='#345'>Foto simulada</text></svg>");
+      add("Fotos", { ID: "HOME-04|foto|d" + k, Experimento: "HOME-04", Fecha_hora: ft.toISOString(), T_real_h: C.r(26.3 - hAtras, 2), Tipo: "injerto", Archivo_ID: "demo", Nombre: "HOME-04_demo_" + k + ".svg", Miniatura: mini, Nota: k ? "Color homogéneo, bordes romos." : "Tras el recalentamiento." }); });
+    add("Pedidos", { ID: "PED-0001", Fecha: new Date(ahora - 864e5).toISOString(), Via: "Licitación", Expediente: "EXP-2026-014", Proveedor: "Proveedor de perfusión (demo)", Email_proveedor: "pedidos-perfusion@example.org", Lineas_JSON: JSON.stringify([{ Material: "MAT-D0", Nombre: MAT[0][0], Referencia: "REF-1000", Cantidad: 2, Unidad: "unidad" }, { Material: "MAT-D14", Nombre: MAT[14][0], Referencia: "REF-1014", Cantidad: 3, Unidad: "bolsa" }]), Estado: "Borrador", Origen: "auto", Experimento: "HOME-05" });
     // v0.2: todo lo sembrado está validado; algunos registros del investigador quedan pendientes
-    TABLAS.forEach(function (tb) { if (VALIDABLES.indexOf(tb) !== -1) T[tb].forEach(function (f) { f.Validado = true; f.Validado_por = "demo-admin@home.demo"; f.Validado_en = t; f.Previo_JSON = ""; }); });
+    TABLAS.forEach(function (tb) { if (VALIDABLES.indexOf(tb) !== -1) T[tb].forEach(function (f) { var qr = f._qr; delete f._qr; f.Validado = !qr; f.Validado_por = qr ? "" : "demo-admin@home.demo"; f.Validado_en = qr ? "" : t; f.Previo_JSON = ""; if (qr) { f.Creado_por = "qr:Celador demo"; f.Actualizado_por = "qr:Celador demo"; } }); });
     var inv = "demo-investigador@home.demo", m4 = T.Mediciones.filter(function (m) { return m.Experimento === "HOME-04" && m.Muestra === "PERF"; }).sort(function (a, b) { return b.T_real_h - a.T_real_h; });
     var tUlt = m4.length ? m4[0].T_real_h : null;
     m4.filter(function (m) { return m.T_real_h === tUlt && /^(Lactato|ALT|Glucosa)$/.test(m.Variable); }).forEach(function (m) { var antes = m.Valor; m.Valor = C.r(m.Valor * 1.08, 2); m.Validado = false; m.Previo_JSON = JSON.stringify({ Valor: antes }); m.Validado_por = ""; m.Validado_en = ""; m.Actualizado_por = inv; });
@@ -105,7 +115,7 @@
     T.Solicitudes_Acceso.push(meta({ ID: "ACC-0000", Fecha: new Date(ahora - 9 * 864e5).toISOString(), Nombre: "Colaborador", Apellidos: "Externo Demo", Email: "externo.demo@example.org", Cargo: "Investigador visitante", Institucion: "Universidad", Rol_solicitado: "COLABORADOR", Estado: "Aprobada", Rol_asignado: "COLABORADOR", Resuelto_por: "demo-admin@home.demo", Resuelto_en: new Date(ahora - 8 * 864e5).toISOString() }, "anónimo", t));
     return db;
   }
-  var VALIDABLES = ["Experimentos", "Animales", "Dieta", "Formularios", "Mediciones", "Eventos"], ALIAS = { REGISTRO: "INVESTIGADOR", VISUALIZAR: "COLABORADOR" };
+  var VALIDABLES = ["Experimentos", "Animales", "Dieta", "Formularios", "Mediciones", "Eventos", "Fotos"], ALIAS = { REGISTRO: "INVESTIGADOR", VISUALIZAR: "COLABORADOR" };
   function normRol(r) { r = String(r || "").toUpperCase(); return ALIAS[r] || r; }
   function esPend(f) { return f.Validado === false || f.Validado === "FALSE"; }
 
@@ -113,22 +123,25 @@
   function sesion(token) { var s = DB.sesiones[token]; if (!s) throw new Error("Sesión caducada. Vuelve a entrar."); var u = DB.tablas.Usuarios.filter(function (x) { return x.Email === s; })[0]; if (!u || u.Activo === false) throw new Error("Sesión caducada. Vuelve a entrar."); return { email: u.Email, nombre: u.Nombre, rol: normRol(u.Rol), id: u.ID }; }
   function req(u, roles) { if (roles.indexOf(u.rol) === -1) throw new Error("Tu rol (" + u.rol + ") no permite esta acción."); }
   function vivas(t, admin) { return DB.tablas[t].filter(function (f) { return f.Borrado !== true || (admin && esPend(f)); }); }
+  function stockDemo(m) { var s2 = C.num(m.Stock_inicial) || 0; DB.tablas.Movimientos.forEach(function (x) { if (x.Material === m.ID && x.Borrado !== true) s2 += C.num(x.Cantidad) || 0; }); return s2; }
   var API = {
     webSolicitarCodigo: function () { return { ok: true, mensaje: "Si el correo tiene acceso, recibirás un código." }; },
     webVerificarCodigo: function (email) { var u = DB.tablas.Usuarios.filter(function (x) { return x.Email === email; })[0]; if (!u) throw new Error("Código incorrecto o caducado."); var tok = "demo-" + Math.random().toString(36).slice(2) + Date.now(); DB.sesiones[tok] = email; u.Ultimo_acceso = ahoraISO(); persistir(); return { ok: true, token: tok, usuario: { email: u.Email, nombre: u.Nombre, rol: normRol(u.Rol), personalId: "", id: u.ID } }; },
     webSesion: function (tok) { return { usuario: sesion(tok) }; },
     webSalir: function (tok) { delete DB.sesiones[tok]; persistir(); return { ok: true }; },
-    webCargar: function (tok) { var u = sesion(tok), o = {}, ad = u.rol === "ADMIN"; TABLAS.forEach(function (t) { if (t !== "Mediciones") o[t] = vivas(t, ad); }); if (!ad) { o.Usuarios = []; o.Solicitudes_Acceso = []; } return { usuario: u, ahora: ahoraISO(), config: {}, tablas: o }; },
+    webCargar: function (tok) { var u = sesion(tok), o = {}, ad = u.rol === "ADMIN"; TABLAS.forEach(function (t) { if (t !== "Mediciones") o[t] = vivas(t, ad); }); if (!ad) { o.Usuarios = []; o.Solicitudes_Acceso = []; o.Pedidos = []; } return { usuario: u, ahora: ahoraISO(), config: {}, tablas: o }; },
     webMediciones: function (tok, exps) { var u = sesion(tok); return { filas: vivas("Mediciones", u.rol === "ADMIN").filter(function (m) { return exps.indexOf(m.Experimento) !== -1; }) }; },
-    webCambios: function (tok, desde) { var u = sesion(tok), o = {}; TABLAS.forEach(function (t) { if ((t === "Usuarios" || t === "Solicitudes_Acceso") && u.rol !== "ADMIN") return; var f = DB.tablas[t].filter(function (x) { return String(x.Actualizado_en) > String(desde); }); if (f.length) o[t] = f; }); return { ahora: ahoraISO(), tablas: o }; },
+    webCambios: function (tok, desde) { var u = sesion(tok), o = {}; TABLAS.forEach(function (t) { if ((t === "Usuarios" || t === "Solicitudes_Acceso" || t === "Pedidos") && u.rol !== "ADMIN") return; var f = DB.tablas[t].filter(function (x) { return String(x.Actualizado_en) > String(desde); }); if (f.length) o[t] = f; }); return { ahora: ahoraISO(), tablas: o }; },
     webGuardar: function (tok, tabla, filas) {
       var u = sesion(tok); if (TABLAS.indexOf(tabla) === -1) throw new Error("Tabla no válida: " + tabla);
-      if (/^(Config|Usuarios|Material|Movimientos)$/.test(tabla)) req(u, ["ADMIN"]); else if (/^(Avisos|Solicitudes_Acceso)$/.test(tabla)) throw new Error("Sin permiso: " + tabla + " no se escribe con webGuardar."); else req(u, ["ADMIN", "INVESTIGADOR"]);
+      if (/^(Config|Usuarios|Material|Movimientos|Pedidos)$/.test(tabla)) req(u, ["ADMIN"]); else if (/^(Avisos|Solicitudes_Acceso)$/.test(tabla)) throw new Error("Sin permiso: " + tabla + " no se escribe con webGuardar."); else req(u, ["ADMIN", "INVESTIGADOR"]);
       var val = VALIDABLES.indexOf(tabla) !== -1;
       var l = DB.tablas[tabla], idx = {}, t = ahoraISO(), out = []; l.forEach(function (f, i) { idx[f.ID] = i; });
       filas.forEach(function (f) {
         if (tabla === "Solicitudes" && u.rol !== "ADMIN" && idx[f.ID] !== undefined && f.Estado && f.Estado !== l[idx[f.ID]].Estado) throw new Error("Solo un administrador puede cambiar el estado de una solicitud.");
         f = Object.assign({}, f); ["Validado", "Validado_por", "Validado_en", "Previo_JSON"].forEach(function (k) { delete f[k]; });
+        if (tabla === "Experimentos" && u.rol !== "ADMIN") { var pe = idx[f.ID] !== undefined ? l[idx[f.ID]] : null; if (!pe) throw new Error("Sin permiso: solo un administrador programa experimentos."); ["Fecha_llegada", "Fecha_cirugia", "Fecha_trasplante", "Fecha_sacrificio", "Programacion", "Participantes"].forEach(function (k) { if (f[k] !== undefined && String(f[k]) !== String(pe[k] === undefined ? "" : pe[k])) throw new Error("Sin permiso: las fechas y los participantes los cambia un administrador."); }); }
+        if (tabla === "Pedidos" && /^(Enviado|Recibido)$/.test(f.Estado || "")) throw new Error("El pedido se envía o se recibe con su botón.");
         var prev = idx[f.ID] !== undefined ? l[idx[f.ID]] : null, o = prev ? Object.assign({}, prev, f) : Object.assign({}, f); delete o.Creado_por; if (prev) { o.Creado_por = prev.Creado_por; o.Creado_en = prev.Creado_en; } meta(o, u.email, t);
         if (val) {
           if (u.rol === "ADMIN") { o.Validado = true; o.Validado_por = u.email; o.Validado_en = t; o.Previo_JSON = ""; }
@@ -140,7 +153,7 @@
       });
       persistir(); return { ok: true, filas: out, ahora: t };
     },
-    webBorrar: function (tok, tabla, ids) { var u = sesion(tok); if (/^(Config|Usuarios|Material|Movimientos)$/.test(tabla)) req(u, ["ADMIN"]); else req(u, ["ADMIN", "INVESTIGADOR"]); var n = 0, t = ahoraISO(), val = VALIDABLES.indexOf(tabla) !== -1;
+    webBorrar: function (tok, tabla, ids) { var u = sesion(tok); if (/^(Config|Usuarios|Material|Movimientos|Pedidos)$/.test(tabla)) req(u, ["ADMIN"]); else req(u, ["ADMIN", "INVESTIGADOR"]); var n = 0, t = ahoraISO(), val = VALIDABLES.indexOf(tabla) !== -1;
       DB.tablas[tabla].forEach(function (f) { if (ids.indexOf(f.ID) === -1 || f.Borrado === true) return; if (u.rol !== "ADMIN" && f.Creado_por !== u.email && f.Creado_por !== "demo") throw new Error("Sin permiso: solo puedes borrar tus propios registros.");
         var eraVal = !esPend(f); f.Borrado = true; meta(f, u.email, t); if (val) { if (u.rol === "ADMIN") { f.Validado = true; f.Previo_JSON = ""; } else { f.Validado = false; f.Previo_JSON = eraVal ? JSON.stringify({ Borrado: false }) : f.Previo_JSON || ""; } } n++; }); persistir(); return { ok: true, n: n }; },
     webValidar: function (tok, tabla, ids) { var u = sesion(tok); req(u, ["ADMIN"]); var t = ahoraISO(), n = 0, out = []; DB.tablas[tabla].forEach(function (f) { if (ids.indexOf(f.ID) === -1) return; if (esPend(f)) n++; f.Validado = true; f.Validado_por = u.email; f.Validado_en = t; f.Previo_JSON = ""; f.Actualizado_en = t; out.push(f); }); persistir(); return { ok: true, n: n, filas: out }; },
@@ -158,6 +171,67 @@
     webEnviarReposicion: function (tok, exp) { var u = sesion(tok); req(u, ["ADMIN"]); var mats = DB.tablas.Material.filter(function (m) { return m.Borrado !== true; }).map(function (m) { var s = (C.num(m.Stock_inicial) || 0); DB.tablas.Movimientos.forEach(function (x) { if (x.Material === m.ID && x.Borrado !== true) s += C.num(x.Cantidad) || 0; }); return Object.assign({}, m, { Stock_actual: s }); });
       var cfg = (DB.tablas.Config.filter(function (c) { return c.ID === "reposicion"; })[0] || {}).Valor_JSON, dest = []; try { dest = (JSON.parse(cfg || "{}").destinatarios) || []; } catch (e) { } if (!dest.length) dest = DB.tablas.Usuarios.filter(function (x) { return normRol(x.Rol) === "ADMIN" && x.Activo !== false; }).map(function (x) { return x.Email; });
       return { ok: true, n: C.reposicion(mats).length, destinatarios: dest, nota: "Modo demostración: no se envía ningún correo." }; },
+    // ---- v0.3 · acceso rápido (en demostración solo se simula el estado)
+    webEntrarPassword: function () { throw new Error("En el modo demostración se entra con los botones de abajo."); },
+    webPasswordEstado: function (tok) { sesion(tok); return { tiene: false }; }, webPasswordDefinir: function () { throw new Error("No disponible en el modo demostración."); }, webPasswordQuitar: function () { return { ok: true }; },
+    webPasskeys: function (tok) { sesion(tok); return { credenciales: [] }; }, webPasskeyOpcionesAlta: function () { throw new Error("No disponible en el modo demostración."); }, webPasskeyOpcionesEntrar: function () { throw new Error("No disponible en el modo demostración."); },
+    // ---- v0.3 · dieta por QR
+    webDietaQRClave: function (tok) { var u = sesion(tok); req(u, ["ADMIN"]); DB.qr = DB.qr || "demo"; return { clave: DB.qr }; },
+    webDietaQRRegenerar: function (tok) { var u = sesion(tok); req(u, ["ADMIN"]); DB.qr = "demo-" + Math.random().toString(36).slice(2, 10); persistir(); return { clave: DB.qr }; },
+    webDietaQR: function (clave) {
+      if (clave !== (DB.qr || "demo")) throw new Error("Código QR no válido. Pide uno nuevo al equipo.");
+      var hoy = C.diaISO(new Date()), es = vivas("Experimentos").filter(function (e) { return e.Estado !== "Cancelado" && e.Fecha_cirugia; }), cfgD = null; DB.tablas.Config.forEach(function (c) { if (c.ID === "dieta" && c.Borrado !== true) { try { cfgD = JSON.parse(c.Valor_JSON); } catch (e) { } } });
+      function ll(e) { return e.Fecha_llegada ? C.diaISO(C.aDia(e.Fecha_llegada)) : C.sumarDias(e.Fecha_cirugia, -7); }
+      var act = es.filter(function (e) { return e.Programacion !== "Provisional" && ll(e) <= hoy && hoy <= C.diaISO(C.aDia(e.Fecha_cirugia)); })[0];
+      var prox = es.filter(function (e) { return C.diaISO(C.aDia(e.Fecha_cirugia)) >= hoy; }).sort(function (a, b) { return C.aDia(a.Fecha_cirugia) - C.aDia(b.Fecha_cirugia); })[0];
+      var o = { ok: true, ahora: ahoraISO(), hoy: hoy, activo: !!act, proximo: prox ? { experimento: prox.ID, fecha: C.diaISO(C.aDia(prox.Fecha_cirugia)), confirmado: prox.Programacion !== "Provisional" } : null, experimento: null, dia: null, animales: [], registros: [], dieta: cfgD };
+      if (act) { var an = vivas("Animales").filter(function (a) { return a.Experimento === act.ID; }), ids = an.map(function (a) { return a.ID; }), ayer = C.sumarDias(hoy, -1), reg = vivas("Dieta").filter(function (d) { return ids.indexOf(d.Animal) !== -1; });
+        o.experimento = { ID: act.ID, Fecha_llegada: ll(act), Fecha_cirugia: C.diaISO(C.aDia(act.Fecha_cirugia)) }; o.dia = C.diasEntre(ll(act), hoy) + 1;
+        o.animales = an.map(function (a) { var p = reg.filter(function (d) { return d.Animal === a.ID && C.num(d.Peso_kg); }).sort(function (x, y) { return String(y.Fecha).localeCompare(String(x.Fecha)); })[0]; return { ID: a.ID, Rol: a.Rol, Crotal: a.Crotal, Sexo: a.Sexo, Castrado: a.Castrado, Peso_kg: p ? p.Peso_kg : a.Peso_llegada_kg }; });
+        o.registros = reg.filter(function (d) { var f = String(d.Fecha).slice(0, 10); return f === hoy || f === ayer; }); }
+      return o;
+    },
+    webDietaQRRegistrar: function (clave, r) {
+      var d = API.webDietaQR(clave); r = r || {}; if (!d.activo) throw new Error("Ahora no hay ningún procedimiento en curso.");
+      if (!d.animales.some(function (a) { return a.ID === r.Animal; })) throw new Error("Ese animal no pertenece al procedimiento en curso.");
+      if (!/^(1ª toma|2ª toma)$/.test(r.Toma || "")) throw new Error("Toma no válida."); if (!r.Responsable || String(r.Responsable).trim().length < 2) throw new Error("Escribe tu nombre.");
+      if (r.Fecha !== d.hoy && r.Fecha !== C.sumarDias(d.hoy, -1)) throw new Error("Solo se pueden registrar tomas de hoy o de ayer.");
+      var id = d.experimento.ID + "|qr|" + r.Animal + "|" + r.Fecha + "|" + (r.Toma === "1ª toma" ? 1 : 2), l = DB.tablas.Dieta, prev = l.filter(function (x) { return x.ID === id; })[0], t = ahoraISO();
+      if (prev && !esPend(prev) && prev.Borrado !== true) throw new Error("Esa toma ya está validada. Avisa a un investigador.");
+      var o = Object.assign(prev || { ID: id, Experimento: d.experimento.ID }, { Animal: r.Animal, Fecha: r.Fecha, Hora: r.Hora || "", Toma: r.Toma, Ofrecido_g: C.num(r.Ofrecido_g), Sobrante_g: C.num(r.Sobrante_g), Consumido_g: C.num(r.Consumido_g), Peso_kg: C.num(r.Peso_kg), Temperatura_C: C.num(r.Temperatura_C), Humedad_pct: C.num(r.Humedad_pct), Agua_ok: r.Agua_ok === true, Enriquecimiento_ok: r.Enriquecimiento_ok === true, Responsable: String(r.Responsable).trim(), Observaciones: r.Observaciones || "", Origen: "qr", Borrado: false, Validado: false, Validado_por: "", Validado_en: "", Previo_JSON: "" });
+      meta(o, "qr:" + o.Responsable, t); if (!prev) l.push(o); persistir(); return { ok: true, fila: o };
+    },
+    // ---- v0.3 · pedidos (solo ADMIN)
+    webPedidosGenerar: function (tok) {
+      var u = sesion(tok); req(u, ["ADMIN"]); var t = ahoraISO(), grupos = {}, out = [];
+      var enviados = {}; vivas("Pedidos").forEach(function (p) { if (p.Estado === "Enviado") JSON.parse(p.Lineas_JSON || "[]").forEach(function (x) { enviados[x.Material] = (enviados[x.Material] || 0) + (C.num(x.Cantidad) || 0); }); });
+      C.reposicion(vivas("Material"), stockDemo).forEach(function (m) { if (!/^(Contrato menor|Licitación)$/.test(m.Via)) return; var c = Math.max(0, m.a_reponer - (enviados[m.ID] || 0)); if (!c) return; var mat = DB.tablas.Material.filter(function (x) { return x.ID === m.ID; })[0], k = [mat.Proveedor, mat.Email_proveedor, mat.Expediente].join("|"); (grupos[k] = grupos[k] || { mat: mat, lineas: [] }).lineas.push({ Material: m.ID, Nombre: m.Nombre, Referencia: m.Referencia, Cantidad: c, Unidad: m.Unidad }); });
+      Object.keys(grupos).forEach(function (k) { var g = grupos[k], ex = vivas("Pedidos").filter(function (p) { return p.Estado === "Borrador" && p.Origen === "auto" && [p.Proveedor, p.Email_proveedor, p.Expediente].join("|") === k; })[0];
+        var o = ex || { ID: "PED-" + String(DB.tablas.Pedidos.length + 1).padStart(4, "0"), Fecha: t, Via: g.mat.Via, Expediente: g.mat.Expediente, Proveedor: g.mat.Proveedor, Email_proveedor: g.mat.Email_proveedor, Estado: "Borrador", Origen: "auto" };
+        o.Lineas_JSON = JSON.stringify(g.lineas); meta(o, u.email, t); if (!ex) DB.tablas.Pedidos.push(o); out.push(o); });
+      persistir(); return { ok: true, n: out.length, pedidos: out };
+    },
+    webPedidoEnviar: function (tok, id, o) {
+      var u = sesion(tok); req(u, ["ADMIN"]); var p = vivas("Pedidos").filter(function (x) { return x.ID === id; })[0], t = ahoraISO(); o = o || {}; if (!p) throw new Error("Pedido no encontrado."); if (p.Estado !== "Borrador") throw new Error("El pedido ya está " + String(p.Estado).toLowerCase() + ".");
+      if (!p.Email_proveedor) throw new Error("Falta el correo del proveedor."); var ls = JSON.parse(p.Lineas_JSON || "[]"); if (!ls.length) throw new Error("El pedido no tiene líneas.");
+      ls.forEach(function (x) { var m = DB.tablas.Material.filter(function (y) { return y.ID === x.Material; })[0]; if (!m) return; var uc = C.num(m.Unidades_contrato), up = C.num(m.Unidades_pedidas) || 0; if (uc !== null && up + x.Cantidad > uc && !o.forzar) throw new Error("Supera las unidades del expediente: quedan " + Math.max(0, uc - up) + " de " + m.Nombre + "."); });
+      ls.forEach(function (x) { var m = DB.tablas.Material.filter(function (y) { return y.ID === x.Material; })[0]; if (m) { m.Unidades_pedidas = (C.num(m.Unidades_pedidas) || 0) + x.Cantidad; meta(m, u.email, t); } });
+      p.Estado = "Enviado"; p.Enviado_por = u.email; p.Enviado_en = t; p.Asunto = o.asunto || p.Asunto || ""; p.Texto = o.texto || ""; meta(p, u.email, t); persistir(); return { ok: true, pedido: p, nota: "Modo demostración: no se envía ningún correo." };
+    },
+    webPedidoRecibir: function (tok, id) {
+      var u = sesion(tok); req(u, ["ADMIN"]); var p = vivas("Pedidos").filter(function (x) { return x.ID === id; })[0], t = ahoraISO(); if (!p) throw new Error("Pedido no encontrado."); if (p.Estado !== "Enviado") throw new Error("Solo se reciben los pedidos enviados.");
+      var movs = JSON.parse(p.Lineas_JSON || "[]").map(function (x, i) { var m = meta({ ID: id + "-in" + i, Material: x.Material, Fecha: t, Cantidad: x.Cantidad, Motivo: "Pedido " + id, Experimento: "", Nota: "Entrada del pedido " + id }, u.email, t); DB.tablas.Movimientos.push(m); return m; });
+      p.Estado = "Recibido"; p.Recibido_en = t; meta(p, u.email, t); persistir(); return { ok: true, pedido: p, movimientos: movs };
+    },
+    // ---- v0.3 · fotos del injerto (en demostración se guardan en este navegador)
+    webFotoSubir: function (tok, f) {
+      var u = sesion(tok); req(u, ["ADMIN", "INVESTIGADOR"]); f = f || {}; if (!f.ID || !f.Experimento || !f.base64) throw new Error("Foto incompleta."); if (f.base64.length > 5.5e6) throw new Error("La imagen supera los 4 MB.");
+      var t = ahoraISO(), l = DB.tablas.Fotos, prev = l.filter(function (x) { return x.ID === f.ID; })[0], o = Object.assign(prev || {}, { ID: f.ID, Experimento: f.Experimento, Fecha_hora: f.Fecha_hora || t, T_real_h: C.num(f.T_real_h), Tipo: f.Tipo || "injerto", Archivo_ID: "demo-" + f.ID, Nombre: f.Nombre || "foto.jpg", Ancho: f.Ancho || null, Alto: f.Alto || null, Bytes: Math.round(f.base64.length * 0.75), Miniatura: f.Miniatura || "", Nota: f.Nota || "", Borrado: false });
+      meta(o, u.email, t); o.Validado = u.rol === "ADMIN"; o.Validado_por = u.rol === "ADMIN" ? u.email : ""; o.Validado_en = u.rol === "ADMIN" ? t : ""; o.Previo_JSON = ""; if (!prev) l.push(o);
+      DB.fotos = DB.fotos || {}; DB.fotos[f.ID] = { mime: f.mime || "image/jpeg", base64: f.base64 }; persistir(); return { ok: true, fila: o };
+    },
+    webFoto: function (tok, id) { sesion(tok); var x = (DB.fotos || {})[id], f = DB.tablas.Fotos.filter(function (y) { return y.ID === id; })[0]; if (x) return { ok: true, mime: x.mime, base64: x.base64, nombre: f ? f.Nombre : "" };
+      if (f && /^data:image\/svg\+xml;utf8,/.test(f.Miniatura || "")) return { ok: true, mime: "image/svg+xml", base64: btoa(decodeURIComponent(f.Miniatura.slice(24))), nombre: f.Nombre }; throw new Error("La imagen no está disponible en el modo demostración."); },
     webProgramarAvisos: function (tok, exp, avisos, tipos) { var u = sesion(tok); req(u, ["ADMIN", "INVESTIGADOR"]); var t = ahoraISO(); DB.tablas.Avisos.forEach(function (a) { if (a.Experimento === exp && a.Estado === "Pendiente" && tipos.indexOf(a.Tipo) !== -1) { a.Estado = "Cancelado"; meta(a, u.email, t); } }); var l = DB.tablas.Avisos; avisos.forEach(function (a) { var o = meta(Object.assign({}, a, { Estado: "Pendiente" }), u.email, t), i = -1; l.forEach(function (x, j) { if (x.ID === a.ID) i = j; }); if (i === -1) l.push(o); else l[i] = Object.assign({}, l[i], o); }); persistir(); return { ok: true, n: avisos.length }; },
     webCancelarAvisos: function (tok, exp, tipos) { var u = sesion(tok), n = 0, t = ahoraISO(); DB.tablas.Avisos.forEach(function (a) { if (a.Experimento === exp && a.Estado === "Pendiente" && (!tipos.length || tipos.indexOf(a.Tipo) !== -1)) { a.Estado = "Cancelado"; meta(a, u.email, t); n++; } }); persistir(); return { ok: true, n: n }; },
     webNotificar: function (tok) { sesion(tok); return { ok: true, enviados: 0 }; },

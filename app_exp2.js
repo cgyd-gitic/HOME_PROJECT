@@ -22,7 +22,7 @@
     Object.keys(cats).sort().forEach(function (c) {
       html += "<section class=\"tarjeta\"><div class=\"cabecera\"><h3>" + esc(c) + "</h3></div><div class=\"tabla-env\"><table class=\"t\"><thead><tr><th style=\"width:40px\"><span class=\"sr\">Comprobado</span></th><th>Material</th><th class=\"num\">Cantidad para esta perfusión</th><th class=\"num\">Stock</th><th>Estado</th></tr></thead><tbody>" +
         cats[c].map(function (m) {
-          var it = d.items[m.ID] || {}, cant = it.cant !== undefined ? it.cant : C.num(m.Por_perfusion) || 0, st = H.stockDe(m), min = C.num(m.Stock_minimo), quedan = st - (d.confirmado_en ? 0 : cant);
+          var it = d.items[m.ID] || {}, cant = m.Tipo === "Inventariable" ? 0 : it.cant !== undefined ? it.cant : C.num(m.Por_perfusion) || 0, st = H.stockDe(m), min = C.num(m.Stock_minimo), quedan = st - (d.confirmado_en ? 0 : cant);
           var est = st < cant && !d.confirmado_en ? "<span class=\"chip al\">Stock insuficiente</span>" : min !== null && quedan < min ? "<span class=\"chip aj\">Quedará bajo mínimo</span>" : "<span class=\"chip ok\">OK</span>";
           if (st < cant && !d.confirmado_en) falta.push(m.Nombre);
           return "<tr><td><input type=\"checkbox\" aria-label=\"Comprobado: " + esc(m.Nombre) + "\" data-cambio=\"chkItem\" data-id=\"" + esc(m.ID) + "\"" + (it.ok ? " checked" : "") + (puedo && !d.confirmado_en ? "" : " disabled") + "></td><td>" + esc(m.Nombre) + (m.Referencia ? " <span class=\"muy-tenue\">" + esc(m.Referencia) + "</span>" : "") + "</td>" +
@@ -37,7 +37,7 @@
   H.acc.chkTodo = function () { var exp = H.ruta().partes[1], d = H.usarForm(exp, "checklist", ""); d.items = d.items || {}; H.filas("Material").forEach(function (m) { (d.items[m.ID] = d.items[m.ID] || {}).ok = true; }); H.guardarForm(exp, "checklist", "", d); H.repintar(); };
   H.acc.chkConfirmar = function (el) {
     var exp = el.getAttribute("data-exp"), d = H.usarForm(exp, "checklist", ""), movs = [];
-    H.filas("Material").forEach(function (m) { var it = (d.items || {})[m.ID] || {}, cant = it.cant !== undefined ? it.cant : C.num(m.Por_perfusion) || 0; if (it.ok && cant > 0) movs.push({ ID: H.uid(), Material: m.ID, Fecha: new Date().toISOString(), Cantidad: -cant, Motivo: "Consumo perfusión", Experimento: exp, Nota: "Checklist " + exp }); });
+    H.filas("Material").forEach(function (m) { var it = (d.items || {})[m.ID] || {}, cant = m.Tipo === "Inventariable" ? 0 : it.cant !== undefined ? it.cant : C.num(m.Por_perfusion) || 0; if (it.ok && cant > 0) movs.push({ ID: H.uid(), Material: m.ID, Fecha: new Date().toISOString(), Cantidad: -cant, Motivo: "Consumo perfusión", Experimento: exp, Nota: "Checklist " + exp }); });
     if (!movs.length) { H.toast("Marca al menos un material con cantidad mayor que 0.", "error"); return; }
     H.confirmar("Descontar del inventario", "Se registrarán " + movs.length + " salidas de material asociadas a " + exp + ". Si un material queda por debajo del mínimo se avisará a los administradores.", "Descontar").then(function (ok) {
       if (!ok) return; d.confirmado_en = new Date().toISOString(); d.confirmado_por = (S.usuario || {}).nombre; d.movimientos = movs.map(function (m) { return m.ID; });
@@ -191,8 +191,8 @@
       cambios.Estado = "Perfusión"; cambios.Inicio_perfusion = iso; H.guardar("Experimentos", [cambios], { sinRepintar: true });
       var g = S.cfg.general, av = C.avisosRecalentamiento(exp, iso, S.cfg.recalentamiento).concat(C.avisosMuestreo(exp, iso, g.dias_perfusion, S.cfg.muestreo, g.aviso_muestra_min));
       if (!/no circadiano/i.test(e.Protocolo || "")) av = av.concat(C.avisosCircadianos(exp, iso, g.dias_perfusion, S.cfg.circadiano, g.aviso_antelacion_min));
-      H.programarAvisos(exp, av, ["recalentamiento", "circadiano", "muestra"]);
-      H.toast("Perfusión iniciada a las " + H.horaS(iso) + ". " + av.length + " avisos programados (recalentamiento, horario circadiano y muestras).");
+      av = av.concat(C.avisosFoto(exp, iso, g.dias_perfusion, (S.cfg.foto || {}).hora)); H.programarAvisos(exp, av, ["recalentamiento", "circadiano", "muestra", "foto"]);
+      H.toast("Perfusión iniciada a las " + H.horaS(iso) + ". " + av.length + " avisos programados (recalentamiento, horario circadiano, muestras y foto diaria).");
       if (window.Notification && Notification.permission === "default" && H.pushSoportado()) setTimeout(function () { H.confirmar("Notificaciones", "¿Activar las notificaciones en este dispositivo para recibir los avisos aunque la pantalla esté bloqueada?", "Activar").then(function (ok) { if (ok) H.pushActivar().then(function () { H.toast("Notificaciones activadas."); }).catch(function (x) { H.toast(x.message, "error"); }); }); }, 600);
     } else {
       if (Object.keys(cambios).length > 1) H.guardar("Experimentos", [cambios], { sinRepintar: true });
@@ -230,9 +230,9 @@
   H.acc.prefSonido = function (el) { H.pref("sinSonido", !el.checked); };
 
   // ============================================================================ SEGUIMIENTO
-  var SUBS = [["gas", "Gasometría"], ["bq", "Bioquímica"], ["flujos", "Flujos y O₂"], ["bilis", "Bilis"], ["hdf", "HDF"], ["inmuno", "Inmunología"], ["pre", "Basales"], ["registro", "Registro"], ["plan", "Plan y avisos"]];
+  var SUBS = [["registrar", "Registrar"], ["gas", "Gasometría"], ["bq", "Bioquímica"], ["flujos", "Flujos y O₂"], ["bilis", "Bilis"], ["hdf", "HDF"], ["inmuno", "Inmunología"], ["pre", "Basales"], ["fotos", "Fotos"], ["registro", "Eventos"], ["plan", "Plan y avisos"]];
   H.tabsExp.seguimiento = function (e, p, q) {
-    var s = p[0] || "gas", t0 = H.inicioPerf(e.ID), prox = H.proximoPunto(e.ID), rv = C.ritmosVigentes(S.cfg.circadiano, new Date()), todos = q.todos === "1";
+    var s = p[0] || (H.segExtra && t0x(e) ? "registrar" : "gas"), t0 = H.inicioPerf(e.ID), prox = H.proximoPunto(e.ID), rv = C.ritmosVigentes(S.cfg.circadiano, new Date()), todos = q.todos === "1";
     var tira = "<div class=\"cronos\" style=\"margin-bottom:12px\"><div class=\"crono " + (t0 ? "activo" : "") + "\"><div class=\"et\">Perfusión" + (t0 ? " · día " + (Math.floor(C.horasEntre(t0, new Date()) / 24) + 1) : "") + "</div><div class=\"t\"" + (t0 ? " data-crono=\"" + esc(t0) + "\"" : "") + ">--:--:--</div></div>" +
       (prox ? "<div class=\"crono\"><div class=\"et\">Próxima muestra · " + esc(prox.etiqueta) + " · " + esc(H.hora(prox.fecha)) + "</div><div class=\"t\" data-cuenta=\"" + prox.fecha.toISOString() + "\">--:--</div></div>" : "") +
       (t0 && !/no circadiano/i.test(e.Protocolo || "") ? "<div class=\"crono\"><div class=\"et\">Próximo cambio de ritmo · " + esc(rv.proxima_hora || "") + "</div><div style=\"font-size:13px\">" + rv.proximos.map(function (c) { return esc(c.linea) + " → <b>" + H.n(c.valor, 1) + " " + esc(c.unidad) + "</b>"; }).join("<br>") + "</div></div>" : "") + "</div>";
@@ -241,18 +241,20 @@
       (H.puede("registrar") ? "<button class=\"bt mini\" data-act=\"añadirPunto\" data-exp=\"" + esc(e.ID) + "\" data-m=\"__M__\">" + ico("plus", "s") + "Punto fuera de protocolo</button>" : "") + "<span class=\"muy-tenue\">Enter / ↓ pasa a la celda de abajo · los valores fuera de objetivo se marcan en rojo</span></div>";
     function hoja(m, opc) { return pie.replace("__M__", m) + H.hojaHTML(e.ID, m, Object.assign({ todos: todos }, opc || {})); }
     var cuerpo;
-    if (s === "gas") cuerpo = asesorPanel(e) + ["ART", "POR", "CAV"].map(function (m) { return "<details class=\"plegable\"" + (m === "ART" ? " open" : "") + "><summary>" + esc(C.MUESTRAS[m].nombre) + "</summary><div class=\"dentro\">" + hoja(m) + "</div></details>"; }).join("");
+    if (H.segExtra && H.segExtra[s]) cuerpo = H.segExtra[s](e, p, q);
+    else if (s === "gas") cuerpo = asesorPanel(e) + ["ART", "POR", "CAV"].map(function (m) { return "<details class=\"plegable\"" + (m === "ART" ? " open" : "") + "><summary>" + esc(C.MUESTRAS[m].nombre) + "</summary><div class=\"dentro\">" + hoja(m) + "</div></details>"; }).join("");
     else if (s === "bq") cuerpo = hoja("PERF");
     else if (s === "flujos") cuerpo = hoja("FLUJO", { filasDerivadas: ["Q_total", "Q_100g", "R_AH", "R_VP", "VO2", "VO2_100g", "DO2", "EO2"].map(function (k) { return C.DERIVADAS.filter(function (d) { return d.id === k; })[0]; }), derivadas: function (p) { return derivadasFlujo(e, p.punto); } }) +
       "<p class=\"muy-tenue\" style=\"margin-top:8px\">VO₂ = [Q_AH·(CaO₂ − CvO₂) + Q_VP·(CpO₂ − CvO₂)] / 100, con CxO₂ = " + S.cfg.o2.k_hb + "·Hb·sO₂ + " + S.cfg.o2.k_disuelto + "·pO₂. Se calcula en los puntos con gasometría arterial, portal y de cava y flujos registrados (la pestaña Gasometría guarda los flujos en el mismo punto). Si falta la sO₂ se estima con la curva de Hill (P50 " + S.cfg.o2.p50 + " mmHg, n " + S.cfg.o2.hill_n + ").</p>";
     else if (s === "bilis") cuerpo = hoja("BILIS", { filasDerivadas: [C.variable("BILIS", "Densidad"), C.variable("BILIS", "Produccion_mLh"), C.DERIVADAS.filter(function (d) { return d.id === "Bilis_mLh_100g"; })[0]], derivadas: function (p) { return derivadasBilis(e, p); } });
-    else if (s === "hdf") cuerpo = hdfConfig(e) + hoja("HDF");
+    else if (s === "hdf") cuerpo = (H.hdfPanel ? H.hdfPanel(e) : "") + hdfConfig(e) + hoja("HDF");
     else if (s === "inmuno") cuerpo = hoja("INMUNO");
     else if (s === "pre") cuerpo = ["PRE", "BASAL_LD", "BASAL_BD"].map(function (m) { return "<details class=\"plegable\"" + (m === "PRE" ? " open" : "") + "><summary>" + esc(C.MUESTRAS[m].nombre) + "</summary><div class=\"dentro\">" + H.hojaHTML(e.ID, m, { extraCol: [{ punto: m === "PRE" ? "Pre" : "Basal", t_h: null, fecha: null, conDatos: true }] }) + "</div></details>"; }).join("");
     else if (s === "registro") cuerpo = registro(e);
     else cuerpo = plan(e);
     return tira + sub(e, "seguimiento", SUBS, s) + cuerpo;
   };
+  function t0x(e) { return !!H.inicioPerf(e.ID); }
   H.acc.verTodos = function (el) { var r = H.ruta(); H.ir(r.partes.join("/") + (el.checked ? "?todos=1" : "")); };
   function gasEn(exp, punto) { var o = {}; ["ART", "POR", "CAV"].forEach(function (m) { var g = {}; ["pO2", "sO2", "Hb", "pH", "pCO2"].forEach(function (v) { var x = H.valor(exp, m, punto, v); g[v] = x ? C.num(x.Valor) : null; }); o[m] = g.pO2 !== null ? g : null; }); return o; }
   function flujoEn(exp, punto) { var o = {}; C.MUESTRAS.FLUJO.vars.forEach(function (v) { var x = H.valor(exp, "FLUJO", punto, v.id); o[v.id] = x ? C.num(x.Valor) : null; }); return o; }
@@ -352,7 +354,7 @@
   H.acc.reprogramar = function (el) {
     var exp = el.getAttribute("data-exp"), t0 = H.inicioPerf(exp), g = S.cfg.general, e = H.exp(exp), ev = H.eventos(exp);
     var av = C.avisosMuestreo(exp, t0, g.dias_perfusion, S.cfg.muestreo, g.aviso_muestra_min); if (!/no circadiano/i.test(e.Protocolo || "")) av = av.concat(C.avisosCircadianos(exp, t0, g.dias_perfusion, S.cfg.circadiano, g.aviso_antelacion_min));
-    var tipos = ["circadiano", "muestra"]; if (!ev.fin_recalentamiento) { av = av.concat(C.avisosRecalentamiento(exp, t0, S.cfg.recalentamiento)); tipos.push("recalentamiento"); }
+    av = av.concat(C.avisosFoto(exp, t0, g.dias_perfusion, (S.cfg.foto || {}).hora)); var tipos = ["circadiano", "muestra", "foto"]; if (!ev.fin_recalentamiento) { av = av.concat(C.avisosRecalentamiento(exp, t0, S.cfg.recalentamiento)); tipos.push("recalentamiento"); }
     av = av.filter(function (a) { return C.aFecha(a.Fecha_hora).getTime() > Date.now(); }); H.programarAvisos(exp, av, tipos); H.toast(av.length + " avisos futuros regenerados."); H.repintar();
   };
   H.acc.cancelarAv = function (el) { var exp = el.getAttribute("data-exp"); H.confirmar("Cancelar avisos", "Se cancelarán todos los avisos pendientes de " + exp + ".", "Cancelar avisos", true).then(function (ok) { if (ok) { H.cancelarAvisos(exp, []); H.repintar(); } }); };

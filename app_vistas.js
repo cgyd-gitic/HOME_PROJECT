@@ -137,7 +137,7 @@
     var filtro = q.estado || "", txt = (q.q || "").toLowerCase();
     var l = H.listaExp().filter(function (e) { return (!filtro || e.Estado === filtro) && (!txt || JSON.stringify(e).toLowerCase().indexOf(txt) !== -1); });
     var estados = ["", "Planificado", "Aclimatación", "Cirugía", "Perfusión", "Finalizado", "Cancelado"];
-    return "<div class=\"ancho\"><div class=\"titulo-pag\"><h1>Experimentos</h1>" + (H.puede("registrar") ? "<button class=\"bt pri\" data-act=\"nuevoExp\">" + ico("plus") + "Nuevo experimento</button>" : "") + "</div>" +
+    return "<div class=\"ancho\"><div class=\"titulo-pag\"><h1>Experimentos</h1>" + (H.esAdmin() ? "<button class=\"bt pri\" data-act=\"nuevoExp\">" + ico("plus") + "Programar experimento</button>" : "") + "</div>" +
       "<div class=\"fila-flex\" style=\"margin-bottom:12px\"><div style=\"flex:1;min-width:200px\"><label class=\"sr\" for=\"buscaExp\">Buscar</label><input id=\"buscaExp\" type=\"search\" placeholder=\"Buscar por ID, crotal, notas…\" value=\"" + esc(q.q || "") + "\" data-cambio=\"filtrarExp\" autocomplete=\"off\"></div>" +
       "<div><label class=\"sr\" for=\"estExp\">Estado</label><select id=\"estExp\" data-cambio=\"filtrarExp\">" + estados.map(function (s) { return "<option value=\"" + s + "\"" + (s === filtro ? " selected" : "") + ">" + (s || "Todos los estados") + "</option>"; }).join("") + "</select></div>" +
       "<a class=\"bt\" href=\"#/exportar\">" + ico("download") + "Exportar</a></div>" +

@@ -110,7 +110,11 @@
     farmacos: { melatonina_CL_mL_min: 500, hidrocortisona_stock_mL_75: 0.7, hidrocortisona_stock_vol_mL: 50, taurocolato_ref_mg_h: 7.7 },
     // NRC 2012 (Kil 2013, PMID 25049902): EMm = 197·PV^0,60 · TCI = 17,9 − 0,0375·PV y +7,425 % de EMm por °C bajo la TCI (Rahimifar 2026, PMID 41410523)
     // Ración = múltiplo × EMm (2,5×: elección del revisor, a validar; 3× en ensayos de digestibilidad, Kong & Adeola 2014) · macho entero 1,05: empírico del grupo
-    dieta: { modelo: "NRC2012", multiplo: 2.5, tomas: 2, em_pienso_kcal_kg: 3300, nombre_pienso: "(por definir)",
+    // Pienso: Altromin 9010 «Breeding diet for mini pig» (ficha 2024): EM = 343 (grasa) + 626 (proteína) + 2158 (hidratos) = 3127 kcal/kg; 2 raciones/día restringidas
+    // Día 1 (llegada): animales juntos y SIN patrón de alimentación (estrés); el patrón empieza el día 2. Agua y enriquecimiento ambiental a libre disposición.
+    dieta: { modelo: "NRC2012", multiplo: 2.5, tomas: 2, em_pienso_kcal_kg: 3127, nombre_pienso: "Altromin 9010 · Breeding diet for mini pig", dia_inicio_patron: 2,
+      pienso: { fabricante: "Altromin Spezialfutter GmbH & Co. KG", referencia: "9010 (9011 polvo · 9013 pellet 4 mm · 9019 extrusionado)", em_grasa_kcal_kg: 343, em_proteina_kcal_kg: 626, em_hidratos_kcal_kg: 2158,
+        proteina_bruta_pct: 15.7, grasa_bruta_pct: 3.8, fibra_bruta_pct: 7.1, cenizas_pct: 6.7, humedad_pct: 11.1, lisina_g_kg: 5.672, calcio_g_kg: 10.314, fosforo_g_kg: 7.085 },
       f_sexo: { M_entero: 1.05, M_castrado: 1.0, H: 1.0 }, f_actividad: 1.0, f_termico_por_grado: 0.07425, tci_C: null, tci_aviso_C: 24, horas_tomas: ["09:30", "18:00"], ayuno_h: 12 },
     perfusato: {
       objetivos_correccion: { K: 4.5, Ca: 1.1, HCO3: 24, Albumina: 3.0 },
@@ -184,8 +188,15 @@
       { h: "20:00", linea: "Melatonina", valor: 5, unidad: "mL/h", nota: "Inicio (objetivo 100–200 pg/mL)" },
       { h: "20:30", linea: "Melatonina", valor: 7, unidad: "mL/h", nota: "Mantenimiento nocturno" }] },
     // Pantalla de inicio (v0.2): fecha de la próxima perfusión (vacío = la Fecha_cirugia más próxima), «Últimos valores» y muestras que alimentan las alertas
-    inicio: { proxima_perfusion: "", ultimos_valores: ["PERF:Lactato", "ART:pH", "PERF:Glucosa", "PERF:ALT", "PERF:AST", "PERF:LDH", "PERF:BilT", "PERF:ActPT", "PERF:Amonio", "PERF:K", "BILIS:Volumen_mL", "FLUJO:Q_AH", "FLUJO:Q_VP", "ART:pO2"],
+    inicio: { proxima_perfusion: "", ultimos_valores: ["PERF:Lactato", "ART:pH", "PERF:Glucosa", "PERF:ALT", "PERF:AST", "PERF:LDH", "PERF:BilT", "PERF:ActPT", "PERF:Amonio", "PERF:K", "BILIS:Volumen_mL", "FLUJO:Q_AH", "FLUJO:Q_VP", "FLUJO:P_AH", "FLUJO:P_VP", "ART:pO2", "FLUJO:Temp"],
       alertas_muestras: ["ART", "POR", "CAV", "PERF", "FLUJO"] },
+    // Programación (v0.3): la perfusión dura 7 días y el seguimiento postrasplante 5; los animales llegan 7 días antes de la cirugía
+    programacion: { dias_perfusion: 7, dias_seguimiento: 5, dias_llegada_antes: 7, confirmar_dias_antes: 21, recordatorio_dias_antes: 7, hora: "08:00" },
+    // HDF (v0.3): la extracción solo se programa en pasos de 10 mL/h. Balance = infusiones − bilis − muestras − extracción.
+    // muestra_mL_*: volumen que se saca en cada muestra (pendiente de indicar por el grupo: null = no se descuenta)
+    hdf: { paso_mL_h: 10, max_mL_h: 200, horizonte_h: 4, muestra_mL_dia1: null, muestra_mL_despues: null, otras_infusiones_mL_h: 3, lineas_excluidas: ["HDF"] },
+    pedidos: { envio_automatico: false, cc: [], asunto: "Pedido · expediente {expediente} · GITIC, Hospital Universitario La Paz", texto: "", firma: "" },
+    foto: { hora: "10:00" },
     // Reposición de material (v0.2; la usa también el servidor): aviso N días antes y después de cada procedimiento
     reposicion: { dias_antes: 14, dias_despues: 7, hora: "08:00", destinatarios: [] },
     // Muestreo (memoria PI26/00141): día 1 a 30 min y 2-4-6-8-12-16-20-24 h; después a las 10, 14, 16 y 20 h. Biopsia cada 24 h.
@@ -447,9 +458,9 @@
   }
   // Reposición (idéntica al servidor): a_reponer = max(0, mínimo + por perfusión − stock); solo > 0; orden Categoria, Nombre
   function reposicion(materiales, stockDe) {
-    return (materiales || []).filter(function (m) { return m && m.Borrado !== true && m.Borrado !== "TRUE" && m.Activo !== false && m.Activo !== "FALSE"; }).map(function (m) {
+    return (materiales || []).filter(function (m) { return m && m.Borrado !== true && m.Borrado !== "TRUE" && m.Activo !== false && m.Activo !== "FALSE" && m.Tipo !== "Inventariable"; }).map(function (m) {
       var st = stockDe ? stockDe(m) : num(m.Stock_actual), mn = num(m.Stock_minimo) || 0, pp = num(m.Por_perfusion) || 0; st = st || 0;
-      return { ID: m.ID, Nombre: m.Nombre, Categoria: m.Categoria || "", Unidad: m.Unidad || "", Referencia: m.Referencia || "", Proveedor: m.Proveedor || "", stock: st, minimo: mn, por_perfusion: pp, a_reponer: r(Math.max(0, mn + pp - st), 3) };
+      return { ID: m.ID, Nombre: m.Nombre, Tipo: m.Tipo || "Fungible", Via: m.Via || "", Expediente: m.Expediente || "", Email_proveedor: m.Email_proveedor || "", Categoria: m.Categoria || "", Unidad: m.Unidad || "", Referencia: m.Referencia || "", Proveedor: m.Proveedor || "", stock: st, minimo: mn, por_perfusion: pp, a_reponer: r(Math.max(0, mn + pp - st), 3) };
     }).filter(function (x) { return x.a_reponer > 0; }).sort(function (a, b) { return String(a.Categoria).localeCompare(String(b.Categoria), "es") || String(a.Nombre).localeCompare(String(b.Nombre), "es"); });
   }
   // Ritmo vigente de cada línea a una hora dada (para el panel «ahora mismo»)
@@ -524,13 +535,113 @@
   // peso (lb) = HG(in)² · L(in) / 400 → kg = HG(cm)² · L(cm) / 400 / 2,54³ · 0,45359. Orientativa (error ±5–10 %).
   function pesoMorfometrico(perimCm, longCm) { var h = num(perimCm), l = num(longCm); if (!h || !l) return null; return h * h * l / 400 / Math.pow(2.54, 3) * 0.45359; }
 
+  // ------------------------------------------------------------------------------------------------
+  // 8. Programación de procedimientos (v0.3)
+  // ------------------------------------------------------------------------------------------------
+  function p2(n) { return (n < 10 ? "0" : "") + n; }
+  function diaISO(d) { return d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate()); }
+  function aDia(v) { if (!v) return null; var m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/); if (m && String(v).length <= 10) return new Date(+m[1], +m[2] - 1, +m[3]); var d = aFecha(v); return d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null; }
+  function sumarDias(v, n) { var d = aDia(v); if (!d) return ""; return diaISO(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)); }
+  function diasEntre(a, b) { a = aDia(a); b = aDia(b); return a && b ? Math.round((b - a) / 864e5) : null; }
+  // A partir de la fecha de hepatectomía + perfusión: llegada (−7), trasplante (+7) y sacrificio (+7+5)
+  function fechasPrograma(fechaCirugia, cfg) {
+    cfg = cfg || DEF.programacion; if (!aDia(fechaCirugia)) return null;
+    var c = diaISO(aDia(fechaCirugia));
+    return { llegada: sumarDias(c, -cfg.dias_llegada_antes), cirugia: c, trasplante: sumarDias(c, cfg.dias_perfusion), sacrificio: sumarDias(c, cfg.dias_perfusion + cfg.dias_seguimiento) };
+  }
+  // Hitos de un experimento para el calendario
+  function hitosExperimento(e, cfg) {
+    cfg = cfg || DEF.programacion; var out = [], fc = e.Fecha_cirugia ? diaISO(aDia(e.Fecha_cirugia)) : "";
+    var ll = e.Fecha_llegada ? diaISO(aDia(e.Fecha_llegada)) : (fc ? sumarDias(fc, -cfg.dias_llegada_antes) : "");
+    if (ll) out.push({ tipo: "llegada", nombre: "Llegada de los animales", fecha: ll });
+    if (fc) out.push({ tipo: "cirugia", nombre: "Hepatectomía e inicio de la perfusión", fecha: fc });
+    if (e.Fecha_trasplante) out.push({ tipo: "trasplante", nombre: "Trasplante del injerto", fecha: diaISO(aDia(e.Fecha_trasplante)) });
+    if (e.Fecha_sacrificio) out.push({ tipo: "sacrificio", nombre: "Sacrificio", fecha: diaISO(aDia(e.Fecha_sacrificio)) });
+    return out;
+  }
+  // Fase de un día concreto dentro de un experimento (para pintar el calendario)
+  function faseDia(e, dia, cfg) {
+    cfg = cfg || DEF.programacion; var d = aDia(dia), fc = aDia(e.Fecha_cirugia); if (!d || !fc) return null;
+    var ll = aDia(e.Fecha_llegada) || aDia(sumarDias(e.Fecha_cirugia, -cfg.dias_llegada_antes)), tr = aDia(e.Fecha_trasplante), sa = aDia(e.Fecha_sacrificio), finP = tr || aDia(sumarDias(e.Fecha_cirugia, cfg.dias_perfusion));
+    if (d < ll || (sa ? d > sa : d > finP)) return null;
+    if (d.getTime() === fc.getTime()) return "cirugia"; if (tr && d.getTime() === tr.getTime()) return "trasplante"; if (sa && d.getTime() === sa.getTime()) return "sacrificio";
+    if (d < fc) return d.getTime() === ll.getTime() ? "llegada" : "aclimatacion"; if (d < finP) return "perfusion"; return sa ? "seguimiento" : null;
+  }
+  function icsExperimento(e, cfg, ahora) {
+    var est = e.Programacion === "Provisional" ? " (provisional)" : "", sello = (ahora || new Date()).toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+    var ev = hitosExperimento(e, cfg).map(function (h) {
+      var d = h.fecha.replace(/-/g, ""), f = sumarDias(h.fecha, 1).replace(/-/g, "");
+      return ["BEGIN:VEVENT", "UID:" + e.ID + "-" + h.tipo + "@home", "DTSTAMP:" + sello, "DTSTART;VALUE=DATE:" + d, "DTEND;VALUE=DATE:" + f, "SUMMARY:" + e.ID + " · " + h.nombre + est, "DESCRIPTION:Proyecto HOME · perfusión hepática extendida", "END:VEVENT"].join("\r\n");
+    });
+    return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//GITIC//HOME//ES", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"].concat(ev).concat(["END:VCALENDAR"]).join("\r\n") + "\r\n";
+  }
+  // Día de aclimatación (1 = día de llegada) y si ya toca el patrón de alimentación
+  function diaAclimatacion(fechaLlegada, hoy, cfgDieta) {
+    var n = diasEntre(fechaLlegada, hoy); if (n === null) return null; n += 1;
+    return { dia: n, patron: n >= ((cfgDieta || DEF.dieta).dia_inicio_patron || 2) };
+  }
+
+  // ------------------------------------------------------------------------------------------------
+  // 9. Balance de volumen y extracción de la HDF (v0.3)
+  // ------------------------------------------------------------------------------------------------
+  // Ritmo total de infusión (mL/h) a una hora del día: líneas del horario circadiano (salvo las excluidas, p. ej. HDF) + infusiones continuas
+  function infusionA(circ, fecha, cfg) {
+    cfg = cfg || DEF.hdf; var rv = ritmosVigentes(circ, fecha), tot = 0, det = [];
+    Object.keys(rv.vigentes).forEach(function (k) { var c = rv.vigentes[k]; if ((cfg.lineas_excluidas || []).indexOf(k) !== -1 || c.unidad !== "mL/h") return; var v = num(c.valor) || 0; if (v) { tot += v; det.push({ nombre: k, mL_h: v }); } });
+    var otras = num(cfg.otras_infusiones_mL_h) || 0; if (otras) { tot += otras; det.push({ nombre: "Otras infusiones continuas (heparina)", mL_h: otras }); }
+    return { mL_h: tot, detalle: det };
+  }
+  // Volumen infundido entre dos instantes (integra el horario en pasos exactos: corta en cada hora de cambio)
+  function volumenInfundido(circ, desde, hasta, cfg) {
+    desde = aFecha(desde); hasta = aFecha(hasta); if (!desde || !hasta || hasta <= desde) return 0;
+    var cortes = {}; (circ || DEF.circadiano).cambios.forEach(function (c) { cortes[c.h] = 1; });
+    var horas = Object.keys(cortes), pts = [desde.getTime(), hasta.getTime()];
+    for (var d = -1; d <= Math.ceil((hasta - desde) / 864e5) + 1; d++) horas.forEach(function (h) { var t = enHora(desde, h, d).getTime(); if (t > desde.getTime() && t < hasta.getTime()) pts.push(t); });
+    pts.sort(function (a, b) { return a - b; }); var v = 0;
+    for (var i = 0; i < pts.length - 1; i++) { if (pts[i + 1] === pts[i]) continue; v += infusionA(circ, new Date((pts[i] + pts[i + 1]) / 2), cfg).mL_h * (pts[i + 1] - pts[i]) / 36e5; }
+    return v;
+  }
+  // Extraído por la HDF: integra la extracción programada (escalones desde cada registro hasta el siguiente)
+  function volumenExtraido(registros, hasta) {
+    hasta = aFecha(hasta); var l = (registros || []).map(function (x) { return { t: aFecha(x.t), v: num(x.mL_h) }; }).filter(function (x) { return x.t && x.v !== null && x.t <= hasta; }).sort(function (a, b) { return a.t - b.t; }), v = 0;
+    for (var i = 0; i < l.length; i++) { var fin = i + 1 < l.length ? l[i + 1].t : hasta; v += l[i].v * (fin - l[i].t) / 36e5; }
+    return v;
+  }
+  // o = { circ, inicio, ahora, bilis:[{t, mL}], muestras:[{t, mL}], extraccion:[{t, mL_h}], cfg }
+  function balanceHDF(o) {
+    var cfg = o.cfg || DEF.hdf, t0 = aFecha(o.inicio), t1 = aFecha(o.ahora) || new Date(); if (!t0) return null;
+    function suma(l) { return (l || []).reduce(function (a, x) { var t = aFecha(x.t); return a + (t && t >= t0 && t <= t1 ? (num(x.mL) || 0) : 0); }, 0); }
+    var inf = volumenInfundido(o.circ, t0, t1, cfg), bil = suma(o.bilis), mue = suma(o.muestras), ext = volumenExtraido(o.extraccion, t1);
+    var ult = (o.extraccion || []).map(function (x) { return { t: aFecha(x.t), v: num(x.mL_h) }; }).filter(function (x) { return x.t && x.v !== null && x.t <= t1; }).sort(function (a, b) { return b.t - a.t; })[0];
+    return { infundido_mL: inf, bilis_mL: bil, muestras_mL: mue, extraido_mL: ext, balance_mL: inf - bil - mue - ext, extraccion_actual: ult ? ult.v : null, horas: (t1 - t0) / 36e5 };
+  }
+  // Extracción para dejar el balance en cero al final del horizonte. Como la máquina solo admite pasos de 10,
+  // devuelve el valor exacto, el redondeado y el reparto en el tiempo entre los dos escalones que lo consiguen exactamente.
+  // o = { balance_mL, infusion_mL (prevista en el horizonte), bilis_mL (prevista), muestras_mL (previstas), horizonte_h, cfg }
+  function recomendarExtraccion(o) {
+    var cfg = o.cfg || DEF.hdf, h = num(o.horizonte_h) || cfg.horizonte_h || 4, paso = num(cfg.paso_mL_h) || 10, max = num(cfg.max_mL_h) || 1e9;
+    var objetivo = (num(o.balance_mL) || 0) + (num(o.infusion_mL) || 0) - (num(o.bilis_mL) || 0) - (num(o.muestras_mL) || 0);   // mL a retirar en el horizonte
+    var exacta = clamp(objetivo / h, 0, max), bajo = Math.floor(exacta / paso + 1e-9) * paso, alto = Math.min(max, bajo + paso), red = Math.round(exacta / paso) * paso;
+    var fAlto = alto > bajo ? (exacta - bajo) / (alto - bajo) : 0, minAlto = Math.round(fAlto * h * 60);
+    return { objetivo_mL: objetivo, exacta_mL_h: exacta, redondeada_mL_h: red, bajo_mL_h: bajo, alto_mL_h: alto, min_alto: minAlto, min_bajo: Math.round(h * 60) - minAlto,
+      residuo_redondeo_mL: objetivo - red * h, horizonte_h: h, limitada: objetivo / h > max || objetivo < 0 };
+  }
+  // Aviso diario para la foto del injerto
+  function avisosFoto(expId, inicioISO, dias, hora) {
+    var t0 = aFecha(inicioISO); if (!t0) return []; dias = num(dias) || 7; var out = [], fin = t0.getTime() + dias * 864e5;
+    for (var d = 0; d <= dias + 1; d++) { var t = enHora(t0, hora || DEF.foto.hora, d); if (t <= t0 || t.getTime() > fin) continue;
+      out.push({ ID: expId + "|foto|" + diaISO(t), Experimento: expId, Fecha_hora: t.toISOString(), Tipo: "foto", Destino: "equipo", Vista: "exp:" + expId + ":seguimiento", Titulo: "Foto diaria del injerto", Texto: "Haz la foto del estado del injerto y súbela desde Seguimiento → Registrar." }); }
+    return out;
+  }
+
   return { KPA: KPA, num: num, r: r, clamp: clamp, media: media, de: de, MUESTRAS: MUESTRAS, DERIVADAS: DERIVADAS, variable: variable, DEF: DEF, MODELOS_DIETA: MODELOS_DIETA,
     aFecha: aFecha, horasEntre: horasEntre, minutosEntre: minutosEntre, hm: hm, enHora: enHora, duracionTxt: duracionTxt, cronoTxt: cronoTxt, etiquetaPunto: etiquetaPunto,
     energiaDieta: energiaDieta, compararModelosDieta: compararModelosDieta, factorSexo: factorSexo,
     volumenPerfusato: volumenPerfusato, correccionesPerfusato: correccionesPerfusato, heparina: heparina, cortisolBolo: cortisolBolo,
     enRango: enRango, asesorGas: asesorGas, sO2Hill: sO2Hill, sO2Estimada: sO2Estimada, p50Corregida: p50Corregida, contenidoO2: contenidoO2, consumoO2: consumoO2, hemodinamica: hemodinamica, produccionBilis: produccionBilis,
     tiempos: tiempos, pasoRecalentamiento: pasoRecalentamiento, cambiosRecal: cambiosRecal, NOMBRES_RECAL: NOMBRES_RECAL, UNIDAD_RECAL: UNIDAD_RECAL, avisosRecalentamiento: avisosRecalentamiento,
-    avisosCircadianos: avisosCircadianos, puntosMuestreo: puntosMuestreo, avisosMuestreo: avisosMuestreo, ritmosVigentes: ritmosVigentes, reposicion: reposicion,
+    avisosCircadianos: avisosCircadianos, puntosMuestreo: puntosMuestreo, avisosMuestreo: avisosMuestreo, ritmosVigentes: ritmosVigentes, reposicion: reposicion, sumarDias: sumarDias, diasEntre: diasEntre, aDia: aDia, diaISO: diaISO, fechasPrograma: fechasPrograma, hitosExperimento: hitosExperimento, faseDia: faseDia, icsExperimento: icsExperimento, diaAclimatacion: diaAclimatacion,
+    infusionA: infusionA, volumenInfundido: volumenInfundido, volumenExtraido: volumenExtraido, balanceHDF: balanceHDF, recomendarExtraccion: recomendarExtraccion, avisosFoto: avisosFoto,
     serie: serie, xDe: xDe, bandaHistorica: bandaHistorica, zScore: zScore, agregarSeries: agregarSeries, pivotAncho: pivotAncho, tablaPrismXY: tablaPrismXY,
     PALETA: PALETA, pesoMorfometrico: pesoMorfometrico };
 });

@@ -2,10 +2,10 @@
 (function () {
   "use strict";
   var C = window.HOMECalc, H = window.HOME = window.HOME || {};
-  var VERSION = "0.2.0";
+  var VERSION = "0.3.0";
   var S = H.S = { token: null, usuario: null, demo: false, cfg: null, t: {}, med: {}, medCargada: {}, cola: [], enviando: false, online: navigator.onLine !== false,
     ultima: null, pref: {}, avisosVistos: {}, pendienteRepintar: false, errores: [] };
-  var TABLAS = ["Experimentos", "Animales", "Dieta", "Formularios", "Eventos", "Avisos", "Material", "Movimientos", "Solicitudes", "Personal", "Usuarios", "Config"];
+  var TABLAS = ["Experimentos", "Animales", "Dieta", "Formularios", "Eventos", "Avisos", "Material", "Movimientos", "Solicitudes", "Personal", "Usuarios", "Config", "Solicitudes_Acceso", "Fotos", "Pedidos"];
   H.TABLAS = TABLAS; H.VERSION = VERSION;
 
   // ---------------------------------------------------------------- utilidades
@@ -183,10 +183,10 @@
     return true;
   };
   // Tablas cuyos registros de un INVESTIGADOR quedan pendientes de validación
-  H.VALIDABLES = ["Experimentos", "Animales", "Dieta", "Formularios", "Mediciones", "Eventos"];
+  H.VALIDABLES = ["Experimentos", "Animales", "Dieta", "Formularios", "Mediciones", "Eventos", "Fotos"];
   H.pendiente = function (f) { return !!f && (f.Validado === false || f.Validado === "FALSE" || f.Validado === "false"); };
   H.requiereValidacion = function (tabla) { return H.rol() === "INVESTIGADOR" && H.VALIDABLES.indexOf(tabla) !== -1; };
-  var SOLO_ADMIN = { Material: 1, Movimientos: 1, Config: 1, Usuarios: 1, Solicitudes_Acceso: 1 };
+  var SOLO_ADMIN = { Material: 1, Movimientos: 1, Config: 1, Usuarios: 1, Solicitudes_Acceso: 1, Pedidos: 1 };
   function permisoTabla(tabla) { return SOLO_ADMIN[tabla] ? "admin" : tabla === "Solicitudes" ? "solicitar" : "registrar"; }
   H.permisoTabla = permisoTabla;
 
@@ -212,24 +212,33 @@
       "<label class=\"check\" style=\"display:flex;margin:6px 0 12px\"><input type=\"checkbox\" id=\"alOk\"> <span class=\"tenue\">Acepto que se guarden estos datos para gestionar mi acceso a la aplicación del proyecto.</span></label>" +
       "<div class=\"msg-error\" id=\"errAcc\" role=\"alert\"></div><button class=\"bt pri grande\" style=\"width:100%\" type=\"submit\">Enviar solicitud</button></form><p style=\"margin-top:12px\"><button class=\"bt texto\" id=\"volver\">Volver al acceso</button></p>";
     else if (paso === "alta_ok") cuerpo = "<h1>Solicitud enviada</h1><div class=\"aviso ok\">" + H.ico("circle-check") + "<div>" + esc(email || "Solicitud recibida. Un administrador revisará tu alta y te avisará por correo.") + "</div></div><p style=\"margin-top:12px\"><button class=\"bt\" id=\"volver\">Volver al acceso</button></p>";
-    else cuerpo = "<h1 class=\"sr\">Acceso</h1><p class=\"tenue\">Escribe tu correo y te enviaremos un código de acceso.</p>" +
-      "<form id=\"fEmail\" novalidate><div class=\"campo\"><label class=\"et\" for=\"email\">Correo</label><input id=\"email\" type=\"email\" name=\"email\" autocomplete=\"email\" spellcheck=\"false\" placeholder=\"nombre@salud.madrid.org…\" required></div>" +
-      "<div class=\"msg-error\" id=\"errAcc\" role=\"alert\"></div><button class=\"bt pri grande\" style=\"width:100%\" type=\"submit\">Enviar código</button></form>" +
+    else cuerpo = "<h1 class=\"sr\">Acceso</h1>" +
+      "<form id=\"fEmail\" novalidate><div class=\"campo\"><label class=\"et\" for=\"email\">Correo</label><input id=\"email\" type=\"email\" name=\"username\" autocomplete=\"username webauthn\" spellcheck=\"false\" placeholder=\"nombre@salud.madrid.org…\" value=\"" + esc(email || localStorage.getItem("home_email") || "") + "\" required></div>" +
+      "<div class=\"campo\"><label class=\"et\" for=\"clave\">Contraseña <span class=\"muy-tenue\">(solo si la has definido)</span></label><input id=\"clave\" type=\"password\" name=\"password\" autocomplete=\"current-password\"><div class=\"ayuda\">Déjala vacía y te enviaremos un código de un solo uso al correo.</div></div>" +
+      "<div class=\"msg-error\" id=\"errAcc\" role=\"alert\"></div><button class=\"bt pri grande\" style=\"width:100%\" type=\"submit\">Continuar</button></form>" +
+      (H.passkeySoportado() ? "<button class=\"bt grande\" style=\"width:100%;margin-top:10px\" id=\"btPasskey\">" + H.ico("fingerprint") + "Entrar con Face ID, huella o llave del dispositivo</button>" : "") +
       "<div class=\"alta-enlace\"><span class=\"tenue\">¿Aún no tienes acceso?</span> <button class=\"bt texto\" id=\"irAlta\">" + H.ico("user-plus", "s") + "Solicitar alta</button></div>" +
       "<details class=\"plegable\" style=\"margin-top:16px\"" + (sinServidor() ? " open" : "") + "><summary>Modo demostración (sin servidor)</summary><div class=\"dentro\"><p class=\"tenue\">Datos simulados guardados solo en este navegador. Sirve para probar la app antes de instalar el servidor.</p>" +
       "<div class=\"fila-flex\">" + H.ROLES.map(function (r) { return "<button class=\"bt\" data-demo=\"" + r[0] + "\">" + esc(r[1]) + "</button>"; }).join("") + "</div></div></details>";
     document.body.innerHTML = "<div id=\"toasts\" class=\"toasts\" aria-live=\"polite\"></div><main class=\"acceso\"><div class=\"caja" + (paso === "alta" ? " ancha" : "") + "\">" + H.marcaAccesoHTML() + cuerpo +
-      "<p class=\"pie\">GITIC · Hospital Universitario La Paz / IdiPAZ · PI23/00364 · PI26/00141 · v" + VERSION + "</p></div></main>";
+      "<p class=\"pie\">Grupo de Investigación Traslacional e Innovación en Cirugía (GITIC)<br>Hospital Universitario La Paz/IdiPAZ<br>Versión " + VERSION + "</p></div></main>";
     H.cargarIconos();
     var fE = H.$("#fEmail"), fC = H.$("#fCodigo"), fA = H.$("#fAlta");
     H.$$("[data-demo]").forEach(function (b) { b.addEventListener("click", function () { H.entrarDemo(b.getAttribute("data-demo")); }); });
     if (H.$("#volver")) H.$("#volver").addEventListener("click", function () { H.pantallaAcceso("email"); });
     if (H.$("#irAlta")) H.$("#irAlta").addEventListener("click", function () { H.pantallaAcceso("alta", (H.$("#email") || {}).value || ""); });
     if (fE) fE.addEventListener("submit", function (e) {
-      e.preventDefault(); var em = H.$("#email").value.trim().toLowerCase(), err = H.$("#errAcc"), bt = fE.querySelector("button[type=submit]");
+      e.preventDefault(); var em = H.$("#email").value.trim().toLowerCase(), cl = H.$("#clave") ? H.$("#clave").value : "", err = H.$("#errAcc"), bt = fE.querySelector("button[type=submit]");
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { err.textContent = "Escribe un correo válido, por ejemplo nombre@salud.madrid.org."; H.$("#email").focus(); return; }
-      bt.disabled = true; bt.classList.add("cargando-bt"); err.textContent = "";
-      H.servidor("webSolicitarCodigo", [em]).then(function (r) { if (r && r.ok === false) throw new Error(r.mensaje || "No se ha podido enviar el código."); H.pantallaAcceso("codigo", em); }).catch(function (x) { err.textContent = x.message || "No se ha podido contactar con el servidor. Comprueba la conexión y vuelve a intentarlo."; bt.disabled = false; bt.classList.remove("cargando-bt"); });
+      bt.disabled = true; bt.classList.add("cargando-bt"); err.textContent = ""; localStorage.setItem("home_email", em);
+      var fallo = function (x) { err.textContent = x.message || "No se ha podido contactar con el servidor. Comprueba la conexión y vuelve a intentarlo."; bt.disabled = false; bt.classList.remove("cargando-bt"); };
+      if (cl) H.servidor("webEntrarPassword", [em, cl, nombreDispositivo()]).then(function (r) { if (r && r.ok === false) throw new Error(r.mensaje || "Correo o contraseña incorrectos."); sesionIniciada(r, "password"); }).catch(fallo);
+      else H.servidor("webSolicitarCodigo", [em]).then(function (r) { if (r && r.ok === false) throw new Error(r.mensaje || "No se ha podido enviar el código."); H.pantallaAcceso("codigo", em); }).catch(fallo);
+    });
+    if (H.$("#btPasskey")) H.$("#btPasskey").addEventListener("click", function () {
+      var bt = this, err = H.$("#errAcc"), em = H.$("#email").value.trim().toLowerCase(); bt.disabled = true; err.textContent = "";
+      H.passkeyEntrar(em).then(function (r) { if (em) localStorage.setItem("home_email", em); sesionIniciada(r, "passkey"); })
+        .catch(function (x) { bt.disabled = false; err.textContent = x && x.name === "NotAllowedError" ? "Se ha cancelado o este dispositivo no tiene una llave de acceso de HOME. Entra con el código y créala en «Mi cuenta»." : (x.message || "No se ha podido entrar con la llave de acceso."); });
     });
     if (fA) fA.addEventListener("submit", function (e) {
       e.preventDefault(); var err = H.$("#errAcc"), bt = fA.querySelector("button[type=submit]"), v = function (id) { return H.$(id).value.trim(); };
@@ -247,13 +256,38 @@
         if (c.length !== 6) { err.textContent = "El código tiene 6 dígitos."; return; }
         bt.disabled = true; bt.classList.add("cargando-bt");
         H.servidor("webVerificarCodigo", [email, c, nombreDispositivo()]).then(function (r) {
-          S.token = r.token; S.usuario = r.usuario; S.demo = false; localStorage.setItem("home_sesion", JSON.stringify({ token: r.token, usuario: r.usuario }));
-          H.arrancar();
+          sesionIniciada(r, "codigo");
         }).catch(function (x) { err.textContent = x.message || "Código incorrecto."; bt.disabled = false; bt.classList.remove("cargando-bt"); });
       });
     }
     var primero = H.$("#email") || H.$("#codigo") || H.$("#alN"); if (primero && window.matchMedia && window.matchMedia("(pointer: fine)").matches) primero.focus();
   };
+  function sesionIniciada(r, metodo) {
+    S.token = r.token; S.usuario = r.usuario; S.demo = false; localStorage.setItem("home_sesion", JSON.stringify({ token: r.token, usuario: r.usuario }));
+    if (S.usuario && S.usuario.email) localStorage.setItem("home_email", S.usuario.email);
+    S.metodoAcceso = metodo; H.arrancar();
+  }
+  // ---- llaves de acceso (WebAuthn): Face ID, huella, Windows Hello o llave del dispositivo
+  function u8aB64(buf) { var u = new Uint8Array(buf), t = ""; for (var i = 0; i < u.length; i++) t += String.fromCharCode(u[i]); return btoa(t).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+  H.passkeySoportado = function () { return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.get) && !sinServidor() && !S.demo; };
+  H.passkeyEntrar = function (email) {
+    return H.servidor("webPasskeyOpcionesEntrar", [email || ""]).then(function (o) {
+      return navigator.credentials.get({ publicKey: { challenge: b64aU8(o.challenge), rpId: o.rpId, userVerification: o.userVerification || "preferred", timeout: o.timeout || 60000,
+        allowCredentials: (o.allowCredentials || []).map(function (c) { var x = { type: "public-key", id: b64aU8(c.id) }; if (c.transports && c.transports.length) x.transports = c.transports; return x; }) } });
+    }).then(function (c) {
+      var r = c.response; return H.servidor("webPasskeyEntrar", [{ id: c.id, clientDataJSON: u8aB64(r.clientDataJSON), authenticatorData: u8aB64(r.authenticatorData), signature: u8aB64(r.signature), userHandle: r.userHandle ? u8aB64(r.userHandle) : "" }, nombreDispositivo()]);
+    });
+  };
+  H.passkeyCrear = function (nombre) {
+    return H.api("webPasskeyOpcionesAlta").then(function (o) {
+      return navigator.credentials.create({ publicKey: { challenge: b64aU8(o.challenge), rp: o.rp, user: { id: b64aU8(o.user.id), name: o.user.name, displayName: o.user.displayName || o.user.name }, pubKeyCredParams: o.pubKeyCredParams,
+        excludeCredentials: (o.excludeCredentials || []).map(function (c) { return { type: "public-key", id: b64aU8(c.id) }; }), authenticatorSelection: o.authenticatorSelection, attestation: "none", timeout: o.timeout || 60000 } });
+    }).then(function (c) {
+      var r = c.response; if (!r.getPublicKey || !r.getPublicKey()) throw new Error("Este navegador no permite crear la llave de acceso. Actualízalo o define una contraseña.");
+      return H.api("webPasskeyAlta", { id: c.id, clientDataJSON: u8aB64(r.clientDataJSON), publicKey: u8aB64(r.getPublicKey()), alg: r.getPublicKeyAlgorithm ? r.getPublicKeyAlgorithm() : -7, transports: r.getTransports ? r.getTransports() : [], nombre: nombre || nombreDispositivo() });
+    });
+  };
+  H.nombreDispositivo = function () { return nombreDispositivo(); };
   function sinServidor() { return !window.HOME_API || /PEGA_AQUI/.test(window.HOME_API); }
   function nombreDispositivo() { var u = navigator.userAgent; return (/iPhone/.test(u) ? "iPhone" : /iPad/.test(u) ? "iPad" : /Android/.test(u) ? "Android" : /Mac/.test(u) ? "Mac" : /Windows/.test(u) ? "Windows" : "Navegador") + " · " + (/Edg\//.test(u) ? "Edge" : /Chrome\//.test(u) ? "Chrome" : /Firefox\//.test(u) ? "Firefox" : /Safari\//.test(u) ? "Safari" : ""); }
   H.entrarDemo = function (rol) {
@@ -322,7 +356,7 @@
     return "<a class=\"marca\" href=\"#/inicio\" aria-label=\"HOME, inicio\"><svg viewBox=\"0 0 32 32\" aria-hidden=\"true\"><rect width=\"32\" height=\"32\" rx=\"8\" fill=\"var(--pri)\"/><path d=\"M4 14C4 9 9 7 15 7.5S27 8 28 10.5S24 15 20 17.5S11 23 7.5 21.5S4 17.5 4 14z\" fill=\"#fff\"/><path d=\"M15 7.6C13.5 10 13.2 12.5 14 15.5\" stroke=\"var(--pri)\" stroke-width=\"1.3\" fill=\"none\" stroke-linecap=\"round\"/></svg><b>HOME</b><span>Perfusión hepática extendida</span></a>";
   };
   var NAV = [
-    { r: "inicio", n: "Inicio", i: "house" }, { r: "experimentos", n: "Experimentos", i: "flask-conical" }, { r: "graficos", n: "Gráficos", i: "chart-line" },
+    { r: "inicio", n: "Inicio", i: "house" }, { r: "experimentos", n: "Experimentos", i: "flask-conical" }, { r: "calendario", n: "Calendario", i: "calendar-days" }, { r: "graficos", n: "Gráficos", i: "chart-line" },
     { r: "inventario", n: "Inventario", i: "package" }, { r: "exportar", n: "Exportar", i: "download" }, { r: "validar", n: "Validar", i: "badge-check", admin: true }, { r: "config", n: "Configuración", i: "settings", admin: true }];
   H.pintarMarco = function () {
     var u = S.usuario || {}, ini = String(u.nombre || u.email || "?").trim().charAt(0).toUpperCase();
@@ -357,7 +391,7 @@
     if (mismo) window.scrollTo(0, y); else { window.scrollTo(0, 0); H._ultimaRuta = location.hash; }
   };
   H.trasPintar = function (f) { var a = H._postPintar; H._postPintar = a ? function () { a(); f(); } : f; };
-  window.addEventListener("hashchange", function () { if (S.usuario) H.repintar(); });
+  window.addEventListener("hashchange", function () { if (/^#\/?qr-dieta/.test(location.hash) && H.pantallaQR && !H.$("#principal")) { H.pantallaQR(); return; } if (S.usuario) H.repintar(); });
 
   // ---------------------------------------------------------------- acciones por delegación
   H.acc = {};
@@ -449,6 +483,7 @@
   function iniciar() {
     leerPref(); aplicarTema();
     if (window.matchMedia) { var mq = window.matchMedia("(prefers-color-scheme: dark)"); if (mq.addEventListener) mq.addEventListener("change", aplicarTema); }
+    if (/^#\/?qr-dieta/.test(location.hash) && H.pantallaQR) { H.pantallaQR(); return; }
     var ses = null; try { ses = JSON.parse(localStorage.getItem("home_sesion") || "null"); } catch (e) { }
     var q = location.search; if (/[?&]demo=1/.test(q) && (!ses || !ses.demo)) { H.entrarDemo((q.match(/rol=(\w+)/) || [0, "ADMIN"])[1].toUpperCase()); return; }
     if (ses && ses.token) { S.token = ses.token; S.usuario = ses.usuario; S.demo = !!ses.demo; if (S.demo) window.HOMEDemo.iniciar(); H.arrancar(); }

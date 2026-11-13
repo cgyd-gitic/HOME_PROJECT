@@ -44,9 +44,9 @@
     var exps = H.listaExp(), act = exps.filter(function (e) { return e.Estado === "Perfusión"; }).sort(function (a, b) { return String(b.Inicio_perfusion || "").localeCompare(String(a.Inicio_perfusion || "")); })[0];
     var qx = exps.filter(function (e) { return e.Estado === "Cirugía"; })[0];
     var html = "<div class=\"ancho\"><div class=\"titulo-pag\"><h1>Inicio</h1><span id=\"indDirecto\" class=\"muy-tenue\">En directo · se actualiza cada 20 s</span>" +
-      (H.puede("registrar") ? "<button class=\"bt pri\" data-act=\"nuevoExp\">" + ico("plus") + "Nuevo experimento</button>" : "") + "</div>";
-    html += avisosRol();
-    html += act ? tarjetaPerfusion(act) : tarjetaSinPerfusion(qx);
+      (H.esAdmin() ? "<button class=\"bt pri\" data-act=\"nuevoExp\">" + ico("plus") + "Programar experimento</button>" : "") + "</div>";
+    html += avisosRol() + (H.avisosInicioExtra ? H.avisosInicioExtra() : "");
+    html += act ? (H.tarjetaPerfusion || tarjetaPerfusion)(act) : tarjetaSinPerfusion(qx);
     html += "<div class=\"columnas\" style=\"margin-top:14px\">" + tarjetaInventario() + tarjetaProximas() + "</div></div>";
     return html;
   };
@@ -67,7 +67,7 @@
     var pp = proximaPerfusion(), d = pp ? diasHasta(pp.fecha) : null;
     return "<section class=\"tarjeta perf-vacia\" aria-label=\"Perfusión en curso\"><div class=\"cabecera\"><h2>Perfusión en curso</h2><span class=\"chip\">Sin perfusión</span></div>" +
       "<div class=\"vacio\">" + ico("calendar-days", "l") + "<p><b>No hay ninguna perfusión en curso.</b></p>" +
-      (pp ? "<p class=\"proxima\">La próxima perfusión está programada para el <b>" + esc(H.fechaDMA(pp.fecha)) + "</b>" + (pp.exp ? " · " + esc(pp.exp.ID) : "") + (d === 0 ? " (hoy)" : d === 1 ? " (mañana)" : " (en " + d + " días)") + ".</p>"
+      (pp ? "<p class=\"proxima\">La próxima perfusión está programada para el <b>" + esc(H.fechaDMA(pp.fecha)) + "</b>" + (pp.exp ? " · " + esc(pp.exp.ID) : "") + (d === 0 ? " (hoy)" : d === 1 ? " (mañana)" : " (en " + d + " días)") + (pp.exp ? (pp.exp.Programacion === "Provisional" ? " · <span class=\"chip aj\">fecha provisional</span>" : " · <span class=\"chip ok\">confirmada</span>") : "") + ".</p>"
         : "<p class=\"proxima tenue\">La fecha de la próxima perfusión está pendiente de programar." + (H.esAdmin() ? " <a href=\"#/config/inicio\">Programar</a>" : "") + "</p>") +
       (qx ? "<p class=\"tenue\">" + esc(qx.ID) + " está en quirófano. <a href=\"#/exp/" + encodeURIComponent(qx.ID) + "/quirofano\">Abrir quirófano</a></p>" : "") + "</div></section>";
   }
@@ -110,10 +110,10 @@
     var l = H.listaExp().filter(function (e) { return ["Planificado", "Aclimatación", "Cirugía"].indexOf(e.Estado) !== -1; }).sort(function (a, b) { var x = diaLocal(a.Fecha_cirugia), y = diaLocal(b.Fecha_cirugia); return (x ? x.getTime() : 9e15) - (y ? y.getTime() : 9e15); });
     var man = cfgIni().proxima_perfusion, hayMan = man && diasHasta(man) >= 0 && !l.some(function (e) { return diasHasta(e.Fecha_cirugia) === diasHasta(man); });
     var filas = (hayMan ? "<tr><td class=\"tenue\">Programada</td><td>" + esc(H.fechaDMA(man)) + "</td><td class=\"num\">" + diasHasta(man) + "</td><td><span class=\"chip\">Sin experimento creado</span></td></tr>" : "") +
-      l.map(function (e) { var d = diasHasta(e.Fecha_cirugia); return "<tr class=\"clic\" data-act=\"abrirExp\" data-id=\"" + esc(e.ID) + "\"><td><span class=\"punto-color\" style=\"background:" + esc(H.colorExp(e.ID)) + "\"></span> <a href=\"#/exp/" + encodeURIComponent(e.ID) + "\">" + esc(e.ID) + "</a></td><td>" + (e.Fecha_cirugia ? esc(H.fechaDMA(e.Fecha_cirugia)) : "<span class=\"muy-tenue\">sin fecha</span>") + "</td><td class=\"num\">" + (d === null ? "—" : d < 0 ? "<span class=\"chip aj\">pasada</span>" : d) + "</td><td>" + H.estadoChip(e.Estado) + "</td></tr>"; }).join("");
-    return "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>Próximas perfusiones</h2><a class=\"bt texto\" href=\"#/experimentos\">Experimentos" + ico("chevron-right", "s") + "</a></div>" +
+      l.map(function (e) { var d = diasHasta(e.Fecha_cirugia); return "<tr class=\"clic\" data-act=\"abrirExp\" data-id=\"" + esc(e.ID) + "\"><td><span class=\"punto-color\" style=\"background:" + esc(H.colorExp(e.ID)) + "\"></span> <a href=\"#/exp/" + encodeURIComponent(e.ID) + "\">" + esc(e.ID) + "</a></td><td>" + (e.Fecha_cirugia ? esc(H.fechaDMA(e.Fecha_cirugia)) : "<span class=\"muy-tenue\">sin fecha</span>") + "</td><td class=\"num\">" + (d === null ? "—" : d < 0 ? "<span class=\"chip aj\">pasada</span>" : d) + "</td><td>" + (e.Programacion === "Provisional" ? "<span class=\"chip aj\">Provisional</span>" : "<span class=\"chip ok\">Confirmado</span>") + " " + H.estadoChip(e.Estado) + "</td></tr>"; }).join("");
+    return "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>Próximas perfusiones</h2><a class=\"bt texto\" href=\"#/calendario\">Calendario" + ico("chevron-right", "s") + "</a></div>" +
       (filas ? "<div class=\"tabla-env\"><table class=\"t\"><thead><tr><th>Experimento</th><th>Cirugía</th><th class=\"num\">Días</th><th>Estado</th></tr></thead><tbody>" + filas + "</tbody></table></div>" : "<p class=\"tenue\">No hay perfusiones programadas.</p>") +
-      "<p class=\"muy-tenue\" style=\"margin-top:8px\">" + ico("calendar", "s") + " El calendario de perfusiones llegará en una próxima versión.</p></section>";
+      "<p class=\"muy-tenue\" style=\"margin-top:8px\">" + ico("calendar", "s") + " Hepatectomía y perfusión, trasplante y sacrificio de cada experimento están en el <a href=\"#/calendario\">calendario</a>.</p></section>";
   }
 
   // ============================================================== VALIDACIÓN
@@ -228,7 +228,7 @@
     var c = cfgIni(), sel = c.ultimos_valores || [], pp = proximaPerfusion();
     return "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>Próxima perfusión</h2></div><div class=\"rejilla dos\"><div class=\"campo\"><label class=\"et\" for=\"iniFecha\">Fecha programada (manual)</label><input id=\"iniFecha\" type=\"date\" value=\"" + esc(c.proxima_perfusion || "") + "\" data-cambio=\"iniFecha\"></div>" +
       "<div class=\"campo\"><span class=\"et\">Se muestra ahora</span><div style=\"padding-top:8px\">" + (pp ? "<b>" + esc(H.fechaDMA(pp.fecha)) + "</b> " + (pp.manual ? "(fecha manual)" : "(Fecha de cirugía de " + esc(pp.exp.ID) + ")") : "<span class=\"tenue\">Ninguna</span>") + "</div></div></div>" +
-      "<p class=\"muy-tenue\">Si la dejas vacía se usa la fecha de cirugía más próxima de los experimentos planificados. El calendario de perfusiones se desarrollará más adelante.</p></section>" +
+      "<p class=\"muy-tenue\">Si la dejas vacía se usa la fecha de cirugía más próxima de los experimentos planificados. Las fechas de cada experimento se programan en el <a href=\"#/calendario\">calendario</a>.</p></section>" +
       "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>Alertas de la perfusión en curso</h2></div><p class=\"tenue\">Se listan los valores fuera del rango objetivo del <b>último registro</b> de cada muestra marcada.</p><div class=\"fila-flex\">" +
       ["ART", "POR", "CAV", "PERF", "FLUJO", "BILIS", "HDF"].map(function (m) { return "<label class=\"check\"><input type=\"checkbox\" data-cambio=\"iniAlerta\" data-m=\"" + m + "\"" + ((c.alertas_muestras || []).indexOf(m) !== -1 ? " checked" : "") + "> " + esc(NOMBRE_M[m]) + "</label>"; }).join("") + "</div></section>" +
       "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>Últimos valores</h2><button class=\"bt\" data-act=\"iniRestaurar\">" + ico("undo-2") + "Valores por defecto</button></div><p class=\"tenue\">Orden actual: " + esc(sel.map(function (k) { var p = k.split(":"), d = C.variable(p[0], p[1]); return d ? d.nombre + " (" + (NOMBRE_M[p[0]] || p[0]) + ")" : k; }).join(" · ")) + ". Las variables nuevas se añaden al final.</p>" +
