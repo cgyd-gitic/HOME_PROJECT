@@ -2,7 +2,7 @@
    Los datos son SINTÉTICOS (generador con semilla) y se guardan solo en este navegador (IndexedDB). */
 (function () {
   "use strict";
-  var C = window.HOMECalc, DB = null, listo = null, VERSION_DEMO = 5;
+  var C = window.HOMECalc, DB = null, listo = null, VERSION_DEMO = 6;
   var TABLAS = ["Experimentos", "Animales", "Dieta", "Formularios", "Mediciones", "Eventos", "Avisos", "Material", "Movimientos", "Solicitudes", "Personal", "Usuarios", "Config", "Solicitudes_Acceso", "Fotos", "Pedidos"];
   function idb(op, v) { return new Promise(function (ok) { try { var r = indexedDB.open("home-demo", 1); r.onupgradeneeded = function () { r.result.createObjectStore("kv"); }; r.onsuccess = function () { var tx = r.result.transaction("kv", op === "get" ? "readonly" : "readwrite"), st = tx.objectStore("kv"); if (op === "get") { var q = st.get("db"); q.onsuccess = function () { ok(q.result); }; q.onerror = function () { ok(null); }; } else { st.put(v, "db"); tx.oncomplete = function () { ok(true); }; } }; r.onerror = function () { ok(null); }; } catch (e) { ok(null); } }); }
   var tGuardar = null; function persistir() { clearTimeout(tGuardar); tGuardar = setTimeout(function () { idb("put", DB); }, 400); }
@@ -40,7 +40,9 @@
       var fin = ini && x.dias ? new Date(ini.getTime() + x.dias * 864e5) : null, est = x.n <= 3 ? "Finalizado" : x.n === 4 ? "Perfusión" : "Planificado";
       var fqx = ini ? new Date(ini.getTime() - 3.2 * H0) : C.enHora(new Date(ahora), "08:00", x.en_dias);
       var fcx = C.diaISO(fqx), fll = x.llegada !== undefined ? C.sumarDias(C.diaISO(new Date(ahora)), x.llegada) : C.sumarDias(fcx, -7);
-      add("Experimentos", { ID: id, Numero: x.n, Codigo_PM: "HOME-PM-" + s, Fase: "Fase 2 · 7 días de perfusión", Protocolo: "CHRONO-LIVER (circadiano)", Estado: est, Fecha_llegada: fll, Fecha_cirugia: fcx, Fecha_trasplante: C.sumarDias(fcx, 7), Fecha_sacrificio: C.sumarDias(fcx, 12), Programacion: x.prov ? "Provisional" : "Confirmado", Participantes: JSON.stringify(["demo-admin@home.demo", "demo-investigador@home.demo"]),
+      var txd = x.n === 2 || x.n === 5 || x.n === 6;
+      add("Experimentos", { ID: id, Numero: x.n, Codigo_PM: "HOME-PM-" + s, Fase: txd ? "Perfusión con trasplante" : "Perfusión", Protocolo: ["V5", "V6", "V7", "V8", "V8", "V9"][x.n - 1], Estado: est, Fecha_llegada: fll, Fecha_cirugia: fcx, Fecha_trasplante: txd ? C.sumarDias(fcx, 7) : "", Fecha_sacrificio: txd ? C.sumarDias(fcx, 12) : "", Programacion: x.prov ? "Provisional" : "Confirmado",
+        Participantes: JSON.stringify([{ Categoria: "Cirujanos (F.E.A.)", Nombre: "Administrador demo", Email: "demo-admin@home.demo", Usuario_ID: "USR-D0" }, { Categoria: "Cirujanos (residentes)", Nombre: "Investigador demo", Email: "demo-investigador@home.demo", Usuario_ID: "USR-D1" }].concat(x.n === 6 ? [{ Categoria: "Alumnos de Medicina", Nombre: "Estudiante externo", Email: "", Usuario_ID: "" }] : [])),
         Inicio_perfusion: ini ? ini.toISOString() : "", Fin_perfusion: fin ? fin.toISOString() : "", Peso_higado_inicial_g: x.hig || null, Peso_higado_final_g: fin ? Math.round(x.hig * (x.fallo ? 1.18 : 1.06)) : null, Volumen_perfusato_mL: 2390, Color: C.PALETA[(x.n - 1) % C.PALETA.length], Responsable: "Investigador demo", Notas: x.fallo ? "Datos sintéticos de demostración. Fin anticipado por deterioro del injerto (lactato y transaminasas en ascenso desde el día 4)." : "Datos sintéticos de demostración." });
       [["BD", 61, "M"], ["LD", x.peso, x.sexo]].forEach(function (a) { add("Animales", { ID: "HOME-" + a[0] + "-" + s, Experimento: id, Rol: a[0], Crotal: "ES" + (10000 + x.n * 7 + (a[0] === "BD" ? 1 : 2)), Sexo: a[2], Castrado: a[2] === "M" ? "Sí" : "No", Raza: "Landrace × Large White", Fecha_llegada: new Date(fqx.getTime() - 6 * 864e5).toISOString(), Hora_llegada: "10:00", Peso_llegada_kg: x.prov ? null : C.r(a[1] - 1.2, 1) }); });
       if (x.n === 5) { var hoyD = C.diaISO(new Date(ahora)); ["BD", "LD"].forEach(function (rol) { var pk = rol === "BD" ? 59.8 : x.peso - 1.2, en = C.energiaDieta(pk, rol === "BD" ? "M" : x.sexo, rol === "BD" ? "Sí" : "No", C.DEF.dieta);
@@ -120,18 +122,21 @@
   function esPend(f) { return f.Validado === false || f.Validado === "FALSE"; }
 
   // ------------------------------------------------------------------ API simulada
-  function sesion(token) { var s = DB.sesiones[token]; if (!s) throw new Error("Sesión caducada. Vuelve a entrar."); var u = DB.tablas.Usuarios.filter(function (x) { return x.Email === s; })[0]; if (!u || u.Activo === false) throw new Error("Sesión caducada. Vuelve a entrar."); return { email: u.Email, nombre: u.Nombre, rol: normRol(u.Rol), id: u.ID }; }
+  function sesion(token) { var s = DB.sesiones[token]; if (!s) throw new Error("Sesión caducada. Vuelve a entrar."); var u = DB.tablas.Usuarios.filter(function (x) { return x.Email === s; })[0]; if (!u || u.Activo === false) throw new Error("Sesión caducada. Vuelve a entrar."); return { email: u.Email, nombre: u.Nombre, rol: normRol(u.Rol), id: u.ID, foto: u.Foto || "" }; }
   function req(u, roles) { if (roles.indexOf(u.rol) === -1) throw new Error("Tu rol (" + u.rol + ") no permite esta acción."); }
   function vivas(t, admin) { return DB.tablas[t].filter(function (f) { return f.Borrado !== true || (admin && esPend(f)); }); }
   function stockDemo(m) { var s2 = C.num(m.Stock_inicial) || 0; DB.tablas.Movimientos.forEach(function (x) { if (x.Material === m.ID && x.Borrado !== true) s2 += C.num(x.Cantidad) || 0; }); return s2; }
   var API = {
     webSolicitarCodigo: function () { return { ok: true, mensaje: "Si el correo tiene acceso, recibirás un código." }; },
-    webVerificarCodigo: function (email) { var u = DB.tablas.Usuarios.filter(function (x) { return x.Email === email; })[0]; if (!u) throw new Error("Código incorrecto o caducado."); var tok = "demo-" + Math.random().toString(36).slice(2) + Date.now(); DB.sesiones[tok] = email; u.Ultimo_acceso = ahoraISO(); persistir(); return { ok: true, token: tok, usuario: { email: u.Email, nombre: u.Nombre, rol: normRol(u.Rol), personalId: "", id: u.ID } }; },
+    webVerificarCodigo: function (email) { var u = DB.tablas.Usuarios.filter(function (x) { return x.Email === email; })[0]; if (!u) throw new Error("Código incorrecto o caducado."); var tok = "demo-" + Math.random().toString(36).slice(2) + Date.now(); DB.sesiones[tok] = email; u.Ultimo_acceso = ahoraISO(); persistir(); return { ok: true, token: tok, usuario: { email: u.Email, nombre: u.Nombre, rol: normRol(u.Rol), personalId: "", id: u.ID, foto: u.Foto || "" } }; },
     webSesion: function (tok) { return { usuario: sesion(tok) }; },
     webSalir: function (tok) { delete DB.sesiones[tok]; persistir(); return { ok: true }; },
-    webCargar: function (tok) { var u = sesion(tok), o = {}, ad = u.rol === "ADMIN"; TABLAS.forEach(function (t) { if (t !== "Mediciones") o[t] = vivas(t, ad); }); if (!ad) { o.Usuarios = []; o.Solicitudes_Acceso = []; o.Pedidos = []; } return { usuario: u, ahora: ahoraISO(), config: {}, tablas: o }; },
+    webCargar: function (tok) { var u = sesion(tok), o = {}, ad = u.rol === "ADMIN"; TABLAS.forEach(function (t) { if (t !== "Mediciones") o[t] = vivas(t, ad); }); if (!ad) { o.Usuarios = []; o.Solicitudes_Acceso = []; o.Pedidos = []; } if (u.rol === "COLABORADOR") { o.Material = []; o.Movimientos = []; o.Solicitudes = []; o.Pedidos = []; }
+      o.Equipo = DB.tablas.Usuarios.filter(function (x) { return x.Activo !== false && x.Borrado !== true; }).map(function (x) { var q = { ID: x.ID, Nombre: x.Nombre, Rol: normRol(x.Rol), Foto: x.Foto || "" }; if (u.rol !== "COLABORADOR") q.Email = x.Email; return q; });
+      return { usuario: u, ahora: ahoraISO(), config: {}, tablas: o }; },
+    webPerfilFoto: function (tok, url) { var u = sesion(tok); url = String(url || ""); if (url && (!/^data:image\/(jpeg|webp);base64,[A-Za-z0-9+\/=]+$/.test(url) || url.length > 20000)) throw new Error("La foto no es válida o es demasiado grande."); var f = DB.tablas.Usuarios.filter(function (x) { return x.Email === u.email; })[0]; f.Foto = url; meta(f, u.email, ahoraISO()); persistir(); return { ok: true, usuario: sesion(tok) }; },
     webMediciones: function (tok, exps) { var u = sesion(tok); return { filas: vivas("Mediciones", u.rol === "ADMIN").filter(function (m) { return exps.indexOf(m.Experimento) !== -1; }) }; },
-    webCambios: function (tok, desde) { var u = sesion(tok), o = {}; TABLAS.forEach(function (t) { if ((t === "Usuarios" || t === "Solicitudes_Acceso" || t === "Pedidos") && u.rol !== "ADMIN") return; var f = DB.tablas[t].filter(function (x) { return String(x.Actualizado_en) > String(desde); }); if (f.length) o[t] = f; }); return { ahora: ahoraISO(), tablas: o }; },
+    webCambios: function (tok, desde) { var u = sesion(tok), o = {}; TABLAS.forEach(function (t) { if ((t === "Usuarios" || t === "Solicitudes_Acceso" || t === "Pedidos") && u.rol !== "ADMIN") return; if (u.rol === "COLABORADOR" && /^(Material|Movimientos|Solicitudes)$/.test(t)) return; var f = DB.tablas[t].filter(function (x) { return String(x.Actualizado_en) > String(desde); }); if (f.length) o[t] = f; }); return { ahora: ahoraISO(), tablas: o }; },
     webGuardar: function (tok, tabla, filas) {
       var u = sesion(tok); if (TABLAS.indexOf(tabla) === -1) throw new Error("Tabla no válida: " + tabla);
       if (/^(Config|Usuarios|Material|Movimientos|Pedidos)$/.test(tabla)) req(u, ["ADMIN"]); else if (/^(Avisos|Solicitudes_Acceso)$/.test(tabla)) throw new Error("Sin permiso: " + tabla + " no se escribe con webGuardar."); else req(u, ["ADMIN", "INVESTIGADOR"]);
@@ -187,19 +192,29 @@
       var o = { ok: true, ahora: ahoraISO(), hoy: hoy, activo: !!act, proximo: prox ? { experimento: prox.ID, fecha: C.diaISO(C.aDia(prox.Fecha_cirugia)), confirmado: prox.Programacion !== "Provisional" } : null, experimento: null, dia: null, animales: [], registros: [], dieta: cfgD };
       if (act) { var an = vivas("Animales").filter(function (a) { return a.Experimento === act.ID; }), ids = an.map(function (a) { return a.ID; }), ayer = C.sumarDias(hoy, -1), reg = vivas("Dieta").filter(function (d) { return ids.indexOf(d.Animal) !== -1; });
         o.experimento = { ID: act.ID, Fecha_llegada: ll(act), Fecha_cirugia: C.diaISO(C.aDia(act.Fecha_cirugia)) }; o.dia = C.diasEntre(ll(act), hoy) + 1;
-        o.animales = an.map(function (a) { var p = reg.filter(function (d) { return d.Animal === a.ID && C.num(d.Peso_kg); }).sort(function (x, y) { return String(y.Fecha).localeCompare(String(x.Fecha)); })[0]; return { ID: a.ID, Rol: a.Rol, Crotal: a.Crotal, Sexo: a.Sexo, Castrado: a.Castrado, Peso_kg: p ? p.Peso_kg : a.Peso_llegada_kg }; });
+        o.animales = an.map(function (a) { return { ID: a.ID, Rol: a.Rol, Crotal: a.Crotal, Sexo: a.Sexo, Castrado: a.Castrado, Peso_llegada_kg: a.Peso_llegada_kg }; });
         o.registros = reg.filter(function (d) { var f = String(d.Fecha).slice(0, 10); return f === hoy || f === ayer; }); }
       return o;
     },
     webDietaQRRegistrar: function (clave, r) {
       var d = API.webDietaQR(clave); r = r || {}; if (!d.activo) throw new Error("Ahora no hay ningún procedimiento en curso.");
-      if (!d.animales.some(function (a) { return a.ID === r.Animal; })) throw new Error("Ese animal no pertenece al procedimiento en curso.");
-      if (!/^(1ª toma|2ª toma)$/.test(r.Toma || "")) throw new Error("Toma no válida."); if (!r.Responsable || String(r.Responsable).trim().length < 2) throw new Error("Escribe tu nombre.");
+      var ids = Array.isArray(r.Animales) ? r.Animales : [r.Animal]; if (!ids.length || ids.some(function (a) { return !d.animales.some(function (x) { return x.ID === a; }); })) throw new Error("Ese animal no pertenece al procedimiento en curso.");
+      if (!/^(1ª toma|2ª toma|Control)$/.test(r.Toma || "")) throw new Error("Toma no válida."); if (r.Toma === "Control" && [r].concat(Object.keys(r.Por_animal || {}).map(function (k) { return r.Por_animal[k] || {}; })).some(function (o) { return ["Ofrecido_g", "Sobrante_g", "Consumido_g"].some(function (k) { return o[k] !== undefined && o[k] !== null && o[k] !== ""; }); })) throw new Error("La toma «Control» no lleva pienso: solo agua, juguetes y sala (sin Ofrecido_g, Sobrante_g ni Consumido_g)."); if (!r.Responsable || String(r.Responsable).trim().length < 2) throw new Error("Escribe tu nombre.");
       if (r.Fecha !== d.hoy && r.Fecha !== C.sumarDias(d.hoy, -1)) throw new Error("Solo se pueden registrar tomas de hoy o de ayer.");
-      var id = d.experimento.ID + "|qr|" + r.Animal + "|" + r.Fecha + "|" + (r.Toma === "1ª toma" ? 1 : 2), l = DB.tablas.Dieta, prev = l.filter(function (x) { return x.ID === id; })[0], t = ahoraISO();
-      if (prev && !esPend(prev) && prev.Borrado !== true) throw new Error("Esa toma ya está validada. Avisa a un investigador.");
-      var o = Object.assign(prev || { ID: id, Experimento: d.experimento.ID }, { Animal: r.Animal, Fecha: r.Fecha, Hora: r.Hora || "", Toma: r.Toma, Ofrecido_g: C.num(r.Ofrecido_g), Sobrante_g: C.num(r.Sobrante_g), Consumido_g: C.num(r.Consumido_g), Peso_kg: C.num(r.Peso_kg), Temperatura_C: C.num(r.Temperatura_C), Humedad_pct: C.num(r.Humedad_pct), Agua_ok: r.Agua_ok === true, Enriquecimiento_ok: r.Enriquecimiento_ok === true, Responsable: String(r.Responsable).trim(), Observaciones: r.Observaciones || "", Origen: "qr", Borrado: false, Validado: false, Validado_por: "", Validado_en: "", Previo_JSON: "" });
-      meta(o, "qr:" + o.Responsable, t); if (!prev) l.push(o); persistir(); return { ok: true, fila: o };
+      var l = DB.tablas.Dieta, t = ahoraISO(), CAMPOS = ["Hora", "Ofrecido_g", "Sobrante_g", "Consumido_g", "Temperatura_C", "Humedad_pct", "Agua_ok", "Enriquecimiento_ok", "Observaciones"], nuevas = [];
+      function vacio(v) { return v === null || v === undefined || v === ""; }
+      ids.forEach(function (a) {
+        var por = (r.Por_animal || {})[a] || {}, ent = {}; CAMPOS.forEach(function (k) { var v = por[k] !== undefined ? por[k] : r[k]; if (k === "Hora" && vacio(v)) v = t.slice(11, 16); if (/_g$|_C$|_pct$/.test(k)) v = C.num(v); if (!vacio(v)) ent[k] = v; });
+        var id = d.experimento.ID + "|qr|" + a + "|" + r.Fecha + "|" + (r.Toma === "1ª toma" ? 1 : r.Toma === "2ª toma" ? 2 : "c"), prev = l.filter(function (x) { return x.ID === id && x.Borrado !== true; })[0] || l.filter(function (x) { return x.Experimento === d.experimento.ID && x.Animal === a && String(x.Fecha).slice(0, 10) === r.Fecha && x.Toma === r.Toma && x.Borrado !== true; })[0];
+        if (prev) Object.keys(ent).forEach(function (k) { if (!vacio(prev[k]) && String(prev[k]) !== String(ent[k]) && k !== "Hora" && k !== "Agua_ok" && k !== "Enriquecimiento_ok") throw new Error("Ese dato ya está registrado (" + k + "). Solo un investigador o un administrador puede modificarlo."); });
+        nuevas.push({ id: id, prev: prev, ent: ent, a: a });
+      });
+      var filas = nuevas.map(function (x) {
+        var o = x.prev || { ID: x.id, Experimento: d.experimento.ID, Animal: x.a, Fecha: r.Fecha, Toma: r.Toma, Responsable: String(r.Responsable).trim(), Origen: "qr" };
+        Object.keys(x.ent).forEach(function (k) { if (vacio(o[k]) || !x.prev || k === "Agua_ok" || k === "Enriquecimiento_ok") o[k] = x.ent[k]; });
+        o.Borrado = false; o.Validado = false; o.Validado_por = ""; o.Validado_en = ""; meta(o, "qr:" + String(r.Responsable).trim(), t); if (!x.prev) l.push(o); return o;
+      });
+      persistir(); return { ok: true, filas: filas, fila: filas[0] };
     },
     // ---- v0.3 · pedidos (solo ADMIN)
     webPedidosGenerar: function (tok) {

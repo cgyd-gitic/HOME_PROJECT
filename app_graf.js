@@ -17,18 +17,26 @@
   var DEF_G = { exps: [], colores: {}, muestra: "PERF", vars: ["Lactato"], eje: "real", modo: "individual", puntos: true, lineas: true, log: false, objetivo: true, historica: false, noche: true,
     xmin: "", xmax: "", titulo: "", fuente: 13, ancho: 1000, alto: 560, leyenda: "derecha", rejilla: true, estilo: "pantalla", grosor: 2, tam_punto: 6 };
   var G = null;
-  function cargarG() { if (G) return G; try { G = H.mezclar(DEF_G, JSON.parse(localStorage.getItem("home_graf") || "{}")); } catch (e) { G = H.copia(DEF_G); } return G; }
+  function cargarG() { if (G) return G; try { G = H.mezclar(DEF_G, JSON.parse(localStorage.getItem("home_graf") || "{}")); } catch (e) { G = H.copia(DEF_G); } G.log = false; if (MUESTRAS_G.every(function (x) { return x[0] !== G.muestra; })) { G.muestra = "PERF"; G.vars = ["Lactato"]; } if (G.muestra === "PERF") G.vars = G.vars.filter(function (v) { return GAS_IDS.indexOf(v) === -1; }); if (!G.vars.length) G.vars = [varsDe(G.muestra)[0].id]; return G; }
   function guardarG() { localStorage.setItem("home_graf", JSON.stringify(G)); }
-  var MUESTRAS_G = [["PERF", "Perfusato · bioquímica"], ["ART", "Gasometría arterial"], ["POR", "Gasometría portal"], ["CAV", "Gasometría cava"], ["FLUJO", "Presiones, flujos y mezcladores"], ["DERIV", "Derivadas (VO₂, resistencias, flujo/100 g)"],
-    ["BILIS", "Bilis"], ["HDF", "Hemodiafiltración"], ["INMUNO", "Inmunología y hormonas"], ["RECAL", "Recalentamiento (valores reales)"]];
-  function varsDe(m) { if (m === "DERIV") return C.DERIVADAS.filter(function (d) { return d.id !== "Bilis_mLh_100g"; }); return C.MUESTRAS[m].vars.concat(m === "BILIS" ? [C.DERIVADAS.filter(function (d) { return d.id === "Bilis_mLh_100g"; })[0]] : []); }
+  // v0.5: bioquímica (sin lo que mide la gasometría), las tres gasometrías, parámetros calculados, inmunología y receptor post-trasplante
+  var MUESTRAS_G = [["PERF", "Bioquímica del perfusato"], ["ART", "Gasometría arterial"], ["POR", "Gasometría portal"], ["CAV", "Gasometría cava"], ["DERIV", "Parámetros calculados (VO₂, resistencias, flujo/100 g, bilis)"],
+    ["INMUNO", "Inmunología"], ["REC", "Receptor · seguimiento post-trasplante"], ["REC_EVAL", "Receptor · evaluación funcional"]];
+  var GAS_IDS = ["pH", "pO2", "pCO2", "sO2", "HCO3", "BE", "Hb", "Lactato", "Glucosa", "Na", "K", "Ca", "Cl"];
+  function varsDe(m) {
+    if (MUESTRAS_G.every(function (x) { return x[0] !== m; })) m = "PERF";
+    if (m === "DERIV") return C.DERIVADAS.concat([C.variable("BILIS", "Produccion_mLh")]);
+    if (m === "PERF") return C.MUESTRAS.PERF.vars.filter(function (v) { return GAS_IDS.indexOf(v.id) === -1; });
+    return C.MUESTRAS[m].vars;
+  }
   function colorDe(id, i) { return G.colores[id] || H.colorExp(id, i); }
 
   // serie de puntos (x, y) para un experimento, incluidas las variables derivadas
   function serieExp(exp, m, v) {
     var e = H.exp(exp), t0 = H.inicioPerf(exp);
-    var calc = (m === "DERIV") || (m === "BILIS" && /^(Densidad|Produccion_mLh|Bilis_mLh_100g)$/.test(v));
-    if (!calc) return C.serie(H.med(exp), exp, m, v, G.eje, t0);
+    if (m === "DERIV" && /^(Produccion_mLh|Bilis_mLh_100g)$/.test(v)) m = "BILIS";
+    var calc = (m === "DERIV") || (m === "BILIS" && /^(Produccion_mLh|Bilis_mLh_100g)$/.test(v));
+    if (!calc) { var s0 = C.serie(H.med(exp), exp, m, v, G.eje, t0); if (m === "PERF" && v === "Cefalina") s0 = s0.concat(C.serie(H.med(exp), exp, "INMUNO", v, G.eje, t0)).sort(function (a, b) { return a.x - b.x; }); return s0; }
     var base = m === "DERIV" ? "FLUJO" : "BILIS", puntos = {};
     H.med(exp).forEach(function (x) { if (x.Muestra === base && !puntos[x.Punto]) puntos[x.Punto] = x; });
     return Object.keys(puntos).map(function (p) {
@@ -57,7 +65,7 @@
       "<h3 style=\"margin:14px 0 8px\">Presentación</h3>" + sel("eje", "Eje X", [["real", "Tiempo real (h)"], ["nominal", "Tiempo nominal del protocolo (h)"], ["dia", "Día de perfusión"], ["hora", "Hora del día (circadiano)"]]) +
       sel("modo", "Modo", [["individual", "Cada perfusión"], ["media_de", "Media ± DE"], ["media_eem", "Media ± EEM"], ["ind_media", "Cada perfusión + media"]]) +
       "<div class=\"rejilla estrecha\">" + num("xmin", "X desde", "") + num("xmax", "X hasta", "") + "</div>" +
-      "<div style=\"display:flex;flex-direction:column;gap:2px\">" + chk("puntos", "Puntos") + chk("lineas", "Líneas") + chk("log", "Escala logarítmica en Y") + chk("objetivo", "Banda de objetivo") + chk("historica", "Banda histórica (media ± 2 DE del resto)") + chk("noche", "Sombrear la noche (20–8 h)") + chk("rejilla", "Cuadrícula") + "</div>" +
+      "<div style=\"display:flex;flex-direction:column;gap:2px\">" + chk("puntos", "Puntos") + chk("lineas", "Líneas") + chk("objetivo", "Banda de objetivo") + chk("historica", "Banda histórica (media ± 2 DE del resto)") + chk("noche", "Sombrear la noche (20–8 h)") + chk("rejilla", "Cuadrícula") + "</div>" +
       "<details class=\"plegable\" style=\"margin-top:10px\"><summary>Formato y exportación</summary><div class=\"dentro\"><div class=\"campo\"><label class=\"et\" for=\"g_titulo\">Título</label><input id=\"g_titulo\" value=\"" + esc(G.titulo) + "\" data-cambio=\"gOpc\" data-k=\"titulo\" placeholder=\"Automático…\" autocomplete=\"off\"></div>" +
       sel("estilo", "Estilo", [["pantalla", "Pantalla"], ["publicacion", "Publicación (fondo blanco, ejes negros)"]]) + sel("leyenda", "Leyenda", [["derecha", "Derecha"], ["abajo", "Abajo"], ["oculta", "Oculta"]]) +
       "<div class=\"rejilla estrecha\">" + num("fuente", "Tamaño de letra", "pt") + num("grosor", "Grosor de línea", "px") + num("tam_punto", "Tamaño de punto", "px") + num("ancho", "Ancho exportado", "px") + num("alto", "Alto exportado", "px") + "</div></div></details>" +
@@ -69,6 +77,7 @@
       G.vars.map(function (v, i) { return "<div class=\"tarjeta graf-tarjeta\"><div id=\"gr_" + i + "\" class=\"graf-lienzo\" role=\"img\" aria-label=\"Gráfico de " + esc(C.variable(G.muestra === "DERIV" ? "FLUJO" : G.muestra, v).nombre) + "\"><div class=\"graf-carga\"><span class=\"giro\"></span>Cargando el gráfico de " + esc(C.variable(G.muestra === "DERIV" ? "FLUJO" : G.muestra, v).nombre) + "…</div></div></div>"; }).join("") + "</div>" +
       (G.vars.length ? "" : "<div class=\"vacio\">Elige al menos una variable.</div>") + "<div id=\"gTabla\"></div></div></div></div>";
   };
+  function oscuro() { return document.documentElement.classList.contains("tema-oscuro") && G.estilo !== "publicacion"; }
   function trazas(v) {
     var tr = [], seriesSel = [], vd = C.variable(G.muestra === "DERIV" ? "FLUJO" : G.muestra, v), modo = (G.lineas ? "lines" : "") + (G.puntos ? (G.lineas ? "+" : "") + "markers" : "") || "markers";
     G.exps.forEach(function (id, i) {
@@ -80,7 +89,7 @@
       var src = G.eje === "real" ? seriesSel.map(function (s) { return s.map(function (p) { return { x: p.tn !== null && p.tn !== undefined ? p.tn : C.r(p.x, 1), y: p.y }; }); }) : seriesSel;   // en tiempo real se agrupa por punto nominal
       var ag = C.agregarSeries(src), err = G.modo === "media_eem" ? "eem" : "de";
       tr.push({ type: "scatter", mode: "lines+markers", name: "Media ± " + (err === "eem" ? "EEM" : "DE") + " (n = " + seriesSel.length + ")", x: ag.map(function (a) { return a.x; }), y: ag.map(function (a) { return a.media; }),
-        error_y: { type: "data", array: ag.map(function (a) { return a[err] || 0; }), visible: true, thickness: 1.2, width: 4, color: "#222" }, line: { color: G.estilo === "publicacion" ? "#000" : "#172026", width: (C.num(G.grosor) || 2) + 0.5 }, marker: { size: (C.num(G.tam_punto) || 6) + 1, color: "#172026" },
+        error_y: { type: "data", array: ag.map(function (a) { return a[err] || 0; }), visible: true, thickness: 1.2, width: 4, color: oscuro() ? "#cbd5dc" : "#222" }, line: { color: G.estilo === "publicacion" ? "#000" : oscuro() ? "#e5ecef" : "#172026", width: (C.num(G.grosor) || 2) + 0.5 }, marker: { size: (C.num(G.tam_punto) || 6) + 1, color: "#172026" },
         text: ag.map(function (a) { return "n = " + a.n; }), hovertemplate: "Media %{y:.3g}<br>%{text}<extra></extra>" });
     }
     if (G.historica && G.muestra !== "DERIV") {
@@ -99,10 +108,11 @@
     var titulo = G.titulo ? (G.vars.length > 1 ? G.titulo + " · " + vd.nombre : G.titulo) : vd.nombre + (G.muestra !== "PERF" && G.muestra !== "DERIV" ? " · " + C.MUESTRAS[G.muestra].corto : "");
     var leg = G.leyenda === "oculta" ? { showlegend: false } : G.leyenda === "abajo" ? { showlegend: true, legend: { orientation: "h", y: -0.22 } } : { showlegend: true, legend: { x: 1.02, y: 1 } };
     var lx = C.num(G.xmin), ux = C.num(G.xmax);
+    var extraOsc = osc ? { hoverlabel: { bgcolor: "#13242a", bordercolor: "#3b4b53", font: { color: "#e5ecef" } }, legend: Object.assign({}, leg.legend || {}, { bgcolor: "rgba(0,0,0,0)", font: { color: "#e5ecef" } }), modebar: { bgcolor: "rgba(0,0,0,0)", color: "#9fb1ba", activecolor: "#e5ecef" } } : {};
     return Object.assign({ title: { text: titulo, font: { size: f + 3 } }, font: { family: "Roboto, Arial, sans-serif", size: f, color: pub ? "#000" : col }, paper_bgcolor: pub ? "#fff" : "rgba(0,0,0,0)", plot_bgcolor: pub ? "#fff" : "rgba(0,0,0,0)",
       margin: { l: 64, r: 20, t: 46, b: 56 }, shapes: shapes, hovermode: "closest",
       xaxis: { title: { text: tituloX() }, showgrid: !!G.rejilla, gridcolor: grid, zeroline: false, linecolor: pub ? "#000" : grid, showline: true, ticks: "outside", range: lx !== null || ux !== null ? [lx, ux] : undefined, dtick: G.eje === "hora" ? 4 : undefined },
-      yaxis: { title: { text: vd.nombre + (vd.unidad ? " (" + H.unidadVisible(vd.id, vd.unidad) + ")" : "") }, type: G.log ? "log" : "linear", showgrid: !!G.rejilla, gridcolor: grid, zeroline: false, linecolor: pub ? "#000" : grid, showline: true, ticks: "outside" } }, leg);
+      yaxis: { title: { text: vd.nombre + (vd.unidad ? " (" + H.unidadVisible(vd.id, vd.unidad) + ")" : "") }, type: G.log ? "log" : "linear", showgrid: !!G.rejilla, gridcolor: grid, zeroline: false, linecolor: pub ? "#000" : grid, showline: true, ticks: "outside" } }, leg, extraOsc);
   }
   function dibujar() {
     if (!G.vars.length) return;

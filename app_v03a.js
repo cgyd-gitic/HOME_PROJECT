@@ -238,7 +238,7 @@
   };
   H.acc.pwQuitar = function () { H.confirmar("Quitar la contraseña", "Seguirás pudiendo entrar con el código por correo o con una llave de acceso.", "Quitar", true).then(function (ok) { if (ok) H.api("webPasswordQuitar").then(function () { cargarCred(true); H.toast("Contraseña quitada."); }).catch(function (e) { H.toast(e.message, "error"); }); }); };
   H.recargarCredenciales = function () { cargarCred(true); };
-  H.ARCHIVOS_WEB = ["index.html", "app.css", "config.js", "sprite.js", "qrcode.js", "calc.js", "demo.js", "app_core.js", "app_vistas.js", "app_exp.js", "app_exp2.js", "app_graf.js", "app_inv.js", "app_v02.js", "app_v03a.js", "app_v03b.js", "app_v03c.js", "app_v04.js",
+  H.ARCHIVOS_WEB = ["index.html", "app.css", "config.js", "sprite.js", "qrcode.js", "calc.js", "demo.js", "app_core.js", "app_vistas.js", "app_exp.js", "app_exp2.js", "app_graf.js", "app_inv.js", "app_v02.js", "app_v03a.js", "app_v03b.js", "app_v03c.js", "app_v04.js", "app_v05a.js", "app_v05b.js", "app_v05c.js", "app_v05d.js",
     "plotly-cartesian.min.js", "xlsx.full.min.js", "sw.js", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png", "roboto-latin-400-normal.woff2", "roboto-latin-500-normal.woff2", "roboto-latin-700-normal.woff2", "roboto-mono-latin-500-normal.woff2"];
   H.acc.diagWeb = function (el) {
     var c = H.$("#diagRes"); if (!c) return; if (location.protocol === "file:" || window.HOME_PREVIEW) { c.innerHTML = '<div class="aviso info">' + ico("info") + "<div>Estás en la vista previa de un solo archivo: aquí todas las librerías van dentro. La comprobación sirve para la web publicada en GitHub.</div></div>"; return; }

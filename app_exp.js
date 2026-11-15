@@ -41,6 +41,8 @@
   H.formActivo = function (alCambiar) { FA.alCambiar = alCambiar; };
   H.recargarForm = function () { FA.datos = null; };
   H.usarForm = usarForm;
+  H.formEnUso = function () { return FA.datos; };
+  H.guardarFormEnUso = function () { return FA.datos ? H.guardarForm(FA.exp, FA.tipo, FA.animal, FA.datos) : Promise.resolve(); };
   function ponerRuta(o, k, v) { var p = k.split("."), x = o; for (var i = 0; i < p.length - 1; i++) { if (typeof x[p[i]] !== "object" || x[p[i]] === null) x[p[i]] = {}; x = x[p[i]]; } x[p[p.length - 1]] = v; }
   function leerRuta(o, k) { return k.split(".").reduce(function (x, p) { return x && x[p] !== undefined ? x[p] : null; }, o); }
   H.leerRuta = leerRuta;

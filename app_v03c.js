@@ -126,6 +126,7 @@
     return '<div class="foto-hoy">' + (hoy ? miniatura(hoy, true) + '<div><span class="chip ok">Foto de hoy hecha</span><div class="muy-tenue">' + esc(H.hora(hoy.Fecha_hora)) + (hoy.Nota ? " · " + esc(hoy.Nota) : "") + "</div></div>" : '<div class="foto-falta">' + ico("camera", "l") + '</div><div><span class="chip aj">Falta la foto de hoy</span><div class="muy-tenue">Una foto del injerto al día.</div></div>') +
       '<div class="fila-flex">' + sube + (compacto ? '<a class="bt texto" href="#/exp/' + encodeURIComponent(e.ID) + '/seguimiento/fotos">Ver todas</a>' : "") + "</div></div>";
   }
+  H.bloqueFotoHTML = function (e) { return bloqueFoto(e, true); };
   function miniatura(f, peq) { return '<button class="foto-mini' + (peq ? " peq" : "") + (H.pendiente(f) ? " pend" : "") + '" data-act="fotoVer" data-id="' + esc(f.ID) + '" aria-label="Ver la foto del ' + esc(H.fechaHora(f.Fecha_hora)) + '">' + (f.Miniatura ? '<img src="' + esc(f.Miniatura) + '" alt="" loading="lazy">' : ico("image", "l")) + "</button>"; }
   H.acc.fotoElegida = function (el) {
     var f = el.files && el.files[0], exp = el.getAttribute("data-exp"); if (!f) return;

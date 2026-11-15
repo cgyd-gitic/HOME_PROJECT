@@ -28,11 +28,10 @@
   var BQ = [
     V("ALT", "ALT", "U/L", 0, null, { grupo: "Daño hepatocelular" }), V("AST", "AST", "U/L", 0, null, { grupo: "Daño hepatocelular" }), V("LDH", "LDH", "U/L", 0, null, { grupo: "Daño hepatocelular" }),
     V("GGT", "GGT", "U/L", 0, null, { grupo: "Daño biliar" }), V("BilT", "Bilirrubina total", "mg/dL", 2, null, { grupo: "Daño biliar" }), V("FA", "Fosfatasa alcalina", "U/L", 0, null, { grupo: "Daño biliar" }),
-    V("Glucosa", "Glucosa", "mg/dL", 0, "Glucosa", { grupo: "Metabolismo" }), V("Lactato", "Lactato", "mmol/L", 2, "Lactato", { grupo: "Metabolismo" }), V("Colesterol", "Colesterol total", "mg/dL", 0, null, { grupo: "Metabolismo" }),
-    V("HDL", "HDL", "mg/dL", 0, null, { grupo: "Metabolismo" }), V("LDL", "LDL", "mg/dL", 0, null, { grupo: "Metabolismo" }),
-    V("TG", "Triglicéridos", "mg/dL", 0, null, { grupo: "Metabolismo" }), V("ProtT", "Proteínas totales", "g/dL", 1, null, { grupo: "Metabolismo" }),
+    V("Glucosa", "Glucosa", "mg/dL", 0, "Glucosa", { grupo: "Metabolismo" }), V("Lactato", "Lactato", "mmol/L", 2, "Lactato", { grupo: "Metabolismo" }), V("TG", "Triglicéridos", "mg/dL", 0, null, { grupo: "Metabolismo" }), V("ProtT", "Proteínas totales", "g/dL", 1, null, { grupo: "Metabolismo" }),
     V("Albumina", "Albúmina", "g/dL", 2, "Albumina", { grupo: "Función hepática" }), V("ActPT", "Actividad de protrombina", "%", 0, null, { grupo: "Función hepática" }), V("TP", "Tiempo de protrombina", "s", 1, null, { grupo: "Función hepática" }),
-    V("Fibrinogeno", "Fibrinógeno", "mg/dL", 0, null, { grupo: "Función hepática" }), V("Insulina", "Insulina", "µU/mL", 1, null, { grupo: "Hormonas" }), V("Cortisol", "Cortisol", "nmol/L", 0, "Cortisol", { grupo: "Hormonas" }),
+    V("Fibrinogeno", "Fibrinógeno", "mg/dL", 0, null, { grupo: "Función hepática" }), V("Cefalina", "Tiempo de cefalina (TTPa)", "s", 1, null, { grupo: "Función hepática" }),
+    V("Insulina", "Insulina", "µU/mL", 1, null, { grupo: "Hormonas (pendiente de confirmar)", pendiente: true }), V("Cortisol", "Cortisol", "nmol/L", 0, "Cortisol", { grupo: "Hormonas (pendiente de confirmar)", pendiente: true }),
     V("Creatinina", "Creatinina", "mg/dL", 2, null, { grupo: "Renal / medio interno" }), V("HCO3", "HCO₃⁻", "mmol/L", 1, "HCO3", { grupo: "Renal / medio interno" }), V("BE", "BE", "mmol/L", 1, "BE", { grupo: "Renal / medio interno" }),
     V("Ca", "Ca²⁺ iónico", "mmol/L", 2, "Ca", { grupo: "Renal / medio interno" }), V("Na", "Na⁺", "mmol/L", 0, "Na", { grupo: "Renal / medio interno" }), V("K", "K⁺", "mmol/L", 1, "K", { grupo: "Renal / medio interno" }),
     V("Cl", "Cl⁻", "mmol/L", 0, null, { grupo: "Renal / medio interno" }), V("P", "Fosfato", "mg/dL", 1, "P", { grupo: "Renal / medio interno" }), V("Mg", "Magnesio", "mg/dL", 2, "Mg", { grupo: "Renal / medio interno" }),
@@ -41,17 +40,21 @@
   var BILIS = [V("pH", "pH", "", 2), V("BilT", "Bilirrubina total", "mg/dL", 2), V("LDH", "LDH", "U/L", 0), V("Glucosa", "Glucosa", "mg/dL", 0), V("Lactato", "Lactato", "mmol/L", 2),
     V("Hb", "Hemoglobina", "g/dL", 1), V("Hto", "Hematocrito", "%", 1), V("Colesterol", "Colesterol", "mg/dL", 0), V("HCO3", "HCO₃⁻", "mmol/L", 1), V("BE", "BE", "mmol/L", 1),
     V("Ca", "Ca²⁺", "mmol/L", 2), V("Na", "Na⁺", "mmol/L", 0), V("K", "K⁺", "mmol/L", 1), V("Cl", "Cl⁻", "mmol/L", 0),
-    V("Peso_g", "Peso", "g", 2), V("Volumen_mL", "Volumen", "mL", 1), V("Densidad", "Densidad (calculada)", "g/mL", 3, null, { calculada: true }), V("Produccion_mLh", "Producción (calculada)", "mL/h", 2, null, { calculada: true })];
-  var FLUJO = [V("P_VP", "Presión VP", "mmHg", 1, "P_VP"), V("Q_VP", "Flujo VP", "mL/min", 0), V("P_AH", "Presión media AH", "mmHg", 0, "P_AH"), V("P_AH_sis", "Presión sistólica AH", "mmHg", 0),
-    V("P_AH_dia", "Presión diastólica AH", "mmHg", 0), V("Q_AH", "Flujo AH", "mL/min", 0), V("Temp", "Temperatura", "°C", 1, "Temp"),
-    V("FiO2_ART", "FiO₂ mezclador arterial", "%", 0), V("Barrido_ART", "Flujo de aire arterial", "mL/min", 0), V("FiO2_POR", "FiO₂ mezclador portal", "%", 0), V("Barrido_POR", "Flujo de aire portal", "mL/min", 0),
-    V("Glucosa_CGM", "Glucosa (monitor continuo)", "mg/dL", 0)];
+    V("Volumen_mL", "Volumen", "mL", 1), V("Produccion_mLh", "Producción (calculada)", "mL/h", 2, null, { calculada: true })];
+  var FLUJO = [V("P_VP", "Presión VP", "mmHg", 0, "P_VP", { grupo: "Máquina de perfusión" }), V("Q_VP", "Flujo VP", "mL/min", 0, null, { grupo: "Máquina de perfusión" }),
+    V("P_AH", "Presión media AH", "mmHg", 0, "P_AH", { grupo: "Máquina de perfusión" }), V("Q_AH", "Flujo AH", "mL/min", 0, null, { grupo: "Máquina de perfusión" }), V("Temp", "Temperatura", "°C", 1, "Temp", { grupo: "Máquina de perfusión" }),
+    V("FiO2_ART", "FiO₂ arterial", "%", 0, null, { grupo: "Mezcladores" }), V("Barrido_ART", "Flujo de aire arterial", "mL/min", 0, null, { grupo: "Mezcladores" }),
+    V("FiO2_POR", "FiO₂ portal", "%", 0, null, { grupo: "Mezcladores" }), V("Barrido_POR", "Flujo de aire portal", "mL/min", 0, null, { grupo: "Mezcladores" })];
   var HDF = [V("Q_sangre", "Flujo de sangre", "mL/min", 0), V("Q_dialisis", "Flujo de diálisis", "mL/h", 0), V("Extraccion", "Extracción", "mL/h", 0), V("Reposicion", "Volumen de reemplazo", "mL/h", 0),
     V("P_acceso", "P. acceso", "mmHg", 0), V("P_retorno", "P. retorno", "mmHg", 0), V("TMP", "PTM", "mmHg", 0), V("Caida_P", "Caída de presión", "mmHg", 0),
     V("P_efluente", "P. efluente", "mmHg", 0), V("P_prefiltro", "P. prefiltro", "mmHg", 0), V("Temp", "Temperatura", "°C", 1)];
   var INMUNO = [V("C3", "C3", "mg/dL", 0), V("C4", "C4", "mg/dL", 1), V("C5", "C5", "mg/dL", 1), V("IgA", "IgA", "mg/dL", 0), V("IgG", "IgG", "mg/dL", 0), V("IgM", "IgM", "mg/dL", 0),
     V("PCR", "PCR", "mg/L", 1), V("Testosterona", "Testosterona", "ng/mL", 2), V("Estradiol", "Estradiol", "pg/mL", 1), V("Progesterona", "Progesterona", "ng/mL", 2),
-    V("Prostaglandina", "Prostaglandina", "pg/mL", 1), V("Cefalina", "Tiempo de cefalina (TTPa)", "s", 1)];
+    V("Prostaglandina", "Prostaglandina", "pg/mL", 1)];
+  // Receptor (hoja «Seguimiento BQ», página 3): bioquímica completa + gasometría arterial
+  var REC_VARS = BQ.filter(function (v) { return !v.pendiente; }).concat([V("pH", "pH arterial", "", 3, "pH", { grupo: "Gasometría arterial" }), V("pO2", "pO₂ arterial", "mmHg", 0, "pO2", { grupo: "Gasometría arterial" }), V("pCO2", "pCO₂ arterial", "mmHg", 1, "pCO2", { grupo: "Gasometría arterial" })]);
+  // Evaluación funcional post-trasplante (1 = normal · 2 = alterado · 3 = nulo); 12 en dos evaluaciones seguidas → sacrificio
+  var REC_EVAL = [V("Respiracion", "Respiración", "", 0), V("Estimulos", "Respuesta a estímulos", "", 0), V("Postura", "Postura al manejo", "", 0), V("Ingesta", "Ingesta", "", 0), V("Total", "Puntuación final", "", 0, null, { calculada: true })];
   var RECAL = FLUJO.filter(function (v) { return /^(Temp|P_VP|P_AH|FiO2_ART|Barrido_ART|FiO2_POR|Barrido_POR|Q_VP|Q_AH)$/.test(v.id); });
   var PANEL_COMPLETO = BQ.concat(GAS.filter(function (g) { return !BQ.some(function (b) { return b.id === g.id; }); })).concat(INMUNO);
 
@@ -67,7 +70,10 @@
     RECAL: { nombre: "Recalentamiento (valores reales)", corto: "Recalent.", vars: RECAL, tipo: "flujo" },
     PRE: { nombre: "Muestra pre-perfusión (perfusato)", corto: "Pre-perfusión", vars: PANEL_COMPLETO, tipo: "bq" },
     BASAL_LD: { nombre: "Basal in vivo · donante de hígado", corto: "Basal LD", vars: PANEL_COMPLETO, tipo: "bq" },
-    BASAL_BD: { nombre: "Basal in vivo · donante de sangre", corto: "Basal BD", vars: PANEL_COMPLETO, tipo: "bq" }
+    BASAL_BD: { nombre: "Basal in vivo · donante de sangre", corto: "Basal BD", vars: PANEL_COMPLETO, tipo: "bq" },
+    PRE_HDF: { nombre: "HDF antes de la perfusión", corto: "HDF pre", vars: HDF, tipo: "hdf" },
+    REC: { nombre: "Receptor · sangre post-trasplante", corto: "Receptor", vars: REC_VARS, tipo: "bq" },
+    REC_EVAL: { nombre: "Receptor · evaluación funcional", corto: "Evaluación", vars: REC_EVAL, tipo: "eval" }
   };
   // Variables derivadas (se calculan, no se registran)
   var DERIVADAS = [
@@ -95,7 +101,7 @@
       // Lactato ≤ 2,5 (viabilidad; < 1,7 óptimo): van Leeuwen 2019, Mergental 2020 · Glucosa ≥ 90 y K 3–5 y Hb ≥ 5,5: Lau 2023 (PMID 37553343)
       // HCO3, BE e iCa: rangos humanos (fuente secundaria, a validar) · Na, Mg, P, osmolalidad: sin referencia verificada → rango de trabajo del laboratorio
       PERF: { HCO3: [23, 28], BE: [-2, 3], Lactato: [0, 2.5], Glucosa: [90, 180], Na: [135, 150], K: [3.0, 5.0], Ca: [1.15, 1.30], Cl: [95, 115],
-              Mg: [1.8, 2.6], P: [3, 7], Hb: [5.5, 12], Hto: [17, 36], Albumina: [2.5, 3.5], Osm: [280, 310], Amonio: [0, 100], Cortisol: [100, 300] },
+              Mg: [1.8, 2.6], P: [3, 7], Hb: [5.5, 12], Hto: [17, 36], Albumina: [2.5, 3.5], Osm: [280, 310], Amonio: [0, 100], Cortisol: [100, 300], Urea: [10, 60] },   // Urea 10–60 mg/dL: rango de trabajo (v0.5), a validar
       FLUJO: { P_AH: [55, 65], P_VP: [2, 4], Temp: [36.5, 38.0] }
     },
     gases: {
@@ -188,13 +194,17 @@
       { h: "20:00", linea: "Melatonina", valor: 5, unidad: "mL/h", nota: "Inicio (objetivo 100–200 pg/mL)" },
       { h: "20:30", linea: "Melatonina", valor: 7, unidad: "mL/h", nota: "Mantenimiento nocturno" }] },
     // Pantalla de inicio (v0.2): fecha de la próxima perfusión (vacío = la Fecha_cirugia más próxima), «Últimos valores» y muestras que alimentan las alertas
-    inicio: { proxima_perfusion: "", ultimos_valores: ["PERF:Lactato", "ART:pH", "PERF:Glucosa", "PERF:ALT", "PERF:AST", "PERF:LDH", "PERF:BilT", "PERF:ActPT", "PERF:Amonio", "PERF:K", "BILIS:Volumen_mL", "FLUJO:Q_AH", "FLUJO:Q_VP", "FLUJO:P_AH", "FLUJO:P_VP", "ART:pO2", "FLUJO:Temp"],
+    inicio: { proxima_perfusion: "", ultimos_valores: ["PERF:Lactato", "PERF:Glucosa", "PERF:Fibrinogeno", "PERF:ActPT", "PERF:Amonio", "BILIS:Volumen_mL", "PERF:Albumina", "DERIV:VO2", "PERF:ALT", "PERF:AST", "PERF:LDH", "PERF:GGT", "PERF:FA", "PERF:BilT", "FLUJO:Q_AH", "FLUJO:Q_VP", "FLUJO:P_AH", "FLUJO:P_VP", "FLUJO:Temp", "ART:pH", "PERF:HCO3", "PERF:BE", "PERF:Na", "PERF:K", "PERF:Ca", "PERF:Cl", "PERF:P", "PERF:Mg", "PERF:Urea", "PERF:Creatinina", "PERF:Osm"],
       alertas_muestras: ["ART", "POR", "CAV", "PERF", "FLUJO"] },
     // Programación (v0.3): la perfusión dura 7 días y el seguimiento postrasplante 5; los animales llegan 7 días antes de la cirugía
     programacion: { dias_perfusion: 7, dias_seguimiento: 5, dias_llegada_antes: 7, confirmar_dias_antes: 21, recordatorio_dias_antes: 7, hora: "08:00" },
     // HDF (v0.3): la extracción solo se programa en pasos de 10 mL/h. Balance = infusiones − bilis − muestras − extracción.
     // muestra_mL_*: volumen que se saca en cada muestra (pendiente de indicar por el grupo: null = no se descuenta)
-    hdf: { paso_mL_h: 10, max_mL_h: 200, horizonte_h: 4, muestra_mL_dia1: null, muestra_mL_despues: null, otras_infusiones_mL_h: 3, lineas_excluidas: ["HDF"] },
+    hdf: { paso_mL_h: 10, max_mL_h: 200, horizonte_h: 4, muestra_mL_dia1: null, muestra_mL_despues: null, otras_infusiones_mL_h: 3, lineas_excluidas: ["HDF"],
+      // v0.5: configuración fija de la HDF (set pediátrico HF03 de Aquaset en Aquarius) y dializado Accusol 35 K2 + fosfato dipotásico 1 M (Fresenius) 5 mL por bolsa de 5 L
+      parametros: { set: "HF03 pediátrico (Aquaset)", liquido: "Accusol 35 K2 + 5 mL de fosfato dipotásico 1 M (Fresenius) por bolsa de 5 L", Q_sangre: 80, Q_dialisis: 250, Reposicion: 100, Reposicion_modo: "post", Temp_min: 37, Temp_max: 38 },
+      dializado: { Na: 140, K: 2, Ca: 1.75, Mg: 0.5, Cl: 111.3, HCO3: 35, Glucosa_mg_dL: 100, fosfato_mL_bolsa: 5, fosfato_M: 1, bolsa_L: 5 },
+      consejo: { urea_max: 60, urea_subida_pct: 20, K_max: 5.5, K_min: 3.5, Na_max: 150, Na_min: 130, HCO3_max: 32, HCO3_min: 20, BE_max: 5, BE_min: -5, Ca_min: 1.0, P_max: 7, P_min: 2.5, Mg_min: 1.8, Glucosa_max: 250, Q_dialisis_alto: 500, Reposicion_baja: 50 } },
     pedidos: { envio_automatico: false, cc: [], asunto: "Pedido · expediente {expediente} · GITIC, Hospital Universitario La Paz", texto: "", firma: "" },
     foto: { hora: "10:00" },
     // Reposición de material (v0.2; la usa también el servidor): aviso N días antes y después de cada procedimiento
@@ -431,7 +441,7 @@
       var t = enHora(t0, h, d); if (t <= t0 || t > fin) return;
       var ev = porHora[h], aviso = new Date(t.getTime() - antelMin * 6e4);
       out.push({ ID: expId + "|circ|" + t.toISOString().slice(0, 16), Experimento: expId, Fecha_hora: aviso.toISOString(), Tipo: "circadiano", Destino: "equipo", Vista: "exp:" + expId + ":seguimiento",
-        Titulo: h + " · cambio de ritmo (día " + (Math.floor((t - t0) / 864e5) + 1) + ")", Texto: ev.map(function (c) { return c.linea + " → " + String(c.valor).replace(".", ",") + " " + c.unidad + (c.nota ? " (" + c.nota + ")" : ""); }).join(" · ") });
+        Titulo: h + " · cambio de ritmo (día " + (Math.floor((t - t0) / 864e5) + 1) + ")", Texto: ev.map(function (c) { return nombreLinea(c.linea) + " → " + String(c.valor).replace(".", ",") + " " + c.unidad + (c.nota ? " (" + c.nota + ")" : ""); }).join(" · ") });
     });
     return out;
   }
@@ -551,21 +561,24 @@
   }
   // Hitos de un experimento para el calendario
   function hitosExperimento(e, cfg) {
-    cfg = cfg || DEF.programacion; var out = [], fc = e.Fecha_cirugia ? diaISO(aDia(e.Fecha_cirugia)) : "";
+    cfg = cfg || DEF.programacion; var out = [], fc = e.Fecha_cirugia ? diaISO(aDia(e.Fecha_cirugia)) : "", tx = tipoProc(e) === "trasplante";
     var ll = e.Fecha_llegada ? diaISO(aDia(e.Fecha_llegada)) : (fc ? sumarDias(fc, -cfg.dias_llegada_antes) : "");
     if (ll) out.push({ tipo: "llegada", nombre: "Llegada de los animales", fecha: ll });
     if (fc) out.push({ tipo: "cirugia", nombre: "Hepatectomía e inicio de la perfusión", fecha: fc });
-    if (e.Fecha_trasplante) out.push({ tipo: "trasplante", nombre: "Trasplante del injerto", fecha: diaISO(aDia(e.Fecha_trasplante)) });
-    if (e.Fecha_sacrificio) out.push({ tipo: "sacrificio", nombre: "Sacrificio", fecha: diaISO(aDia(e.Fecha_sacrificio)) });
+    if (tx) {
+      var ft = e.Fecha_trasplante ? diaISO(aDia(e.Fecha_trasplante)) : (fc ? sumarDias(fc, cfg.dias_perfusion) : "");
+      if (ft) out.push({ tipo: "trasplante", nombre: "Trasplante del injerto", fecha: ft });
+      if (e.Fecha_sacrificio) out.push({ tipo: "sacrificio", nombre: "Sacrificio", fecha: diaISO(aDia(e.Fecha_sacrificio)) });
+    } else if (fc) out.push({ tipo: "fin", nombre: "Fin de la perfusión prevista", fecha: finPerfusionPrevista(e, cfg) });
     return out;
   }
   // Fase de un día concreto dentro de un experimento (para pintar el calendario)
   function faseDia(e, dia, cfg) {
     cfg = cfg || DEF.programacion; var d = aDia(dia), fc = aDia(e.Fecha_cirugia); if (!d || !fc) return null;
-    var ll = aDia(e.Fecha_llegada) || aDia(sumarDias(e.Fecha_cirugia, -cfg.dias_llegada_antes)), tr = aDia(e.Fecha_trasplante), sa = aDia(e.Fecha_sacrificio), finP = tr || aDia(sumarDias(e.Fecha_cirugia, cfg.dias_perfusion));
+    var tx = tipoProc(e) === "trasplante", ll = aDia(e.Fecha_llegada) || aDia(sumarDias(e.Fecha_cirugia, -cfg.dias_llegada_antes)), tr = tx ? (aDia(e.Fecha_trasplante) || aDia(sumarDias(e.Fecha_cirugia, cfg.dias_perfusion))) : null, sa = tx ? aDia(e.Fecha_sacrificio) : null, finP = tr || aDia(sumarDias(e.Fecha_cirugia, cfg.dias_perfusion));
     if (d < ll || (sa ? d > sa : d > finP)) return null;
     if (d.getTime() === fc.getTime()) return "cirugia"; if (tr && d.getTime() === tr.getTime()) return "trasplante"; if (sa && d.getTime() === sa.getTime()) return "sacrificio";
-    if (d < fc) return d.getTime() === ll.getTime() ? "llegada" : "aclimatacion"; if (d < finP) return "perfusion"; return sa ? "seguimiento" : null;
+    if (d < fc) return d.getTime() === ll.getTime() ? "llegada" : "aclimatacion"; if (d < finP) return "perfusion"; if (!tx) return d.getTime() === finP.getTime() ? "fin" : null; return sa ? "seguimiento" : null;
   }
   function icsExperimento(e, cfg, ahora) {
     var est = e.Programacion === "Provisional" ? " (provisional)" : "", sello = (ahora || new Date()).toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
@@ -634,6 +647,130 @@
     return out;
   }
 
+
+  // ------------------------------------------------------------------------------------------------
+  // 10. v0.5 · tipo de procedimiento, versiones del protocolo, nombres del horario circadiano, HDF (Accusol), receptor
+  // ------------------------------------------------------------------------------------------------
+  var TIPOS_PROC = ["Puesta a punto de protocolo", "Perfusión", "Perfusión con trasplante"];
+  // Normaliza Experimentos.Fase (acepta los valores antiguos «Fase 2 · …», «Fase 3 · …», «Piloto / puesta a punto»)
+  function tipoProc(e) {
+    var f = String((e && e.Fase) || "");
+    if (/trasplante/i.test(f)) return "trasplante"; if (/puesta a punto|piloto/i.test(f)) return "puesta"; if (/perfusi/i.test(f)) return "perfusion";
+    return e && e.Fecha_trasplante ? "trasplante" : "perfusion";
+  }
+  function nombreTipo(e) { return { puesta: TIPOS_PROC[0], perfusion: TIPOS_PROC[1], trasplante: TIPOS_PROC[2] }[tipoProc(e)]; }
+  function finPerfusionPrevista(e, cfg) { cfg = cfg || DEF.programacion; return e && e.Fecha_cirugia ? sumarDias(e.Fecha_cirugia, cfg.dias_perfusion) : ""; }
+  // Fin del recalentamiento según la tabla: inicio de la perfusión + último escalón + duración del escalón
+  function finRecalentamiento(inicioISO, cfg) { var t0 = aFecha(inicioISO); cfg = cfg || DEF.recalentamiento; if (!t0 || !cfg.pasos.length) return null; return new Date(t0.getTime() + (cfg.pasos[cfg.pasos.length - 1].t + cfg.paso_min) * 6e4); }
+
+  // Nombres visibles de las líneas del horario circadiano (los datos guardados conservan el nombre interno)
+  var NOMBRE_LINEA = { "NP (glucosa + AA)": "Nutrición", "NP (lípidos)": "Lípidos", "Profilaxis": "Antifúngico", "Profilaxis (bolo)": "Antibióticos", "Ácidos biliares": "Ácidos biliares", "HDF": "HDF (extracción)" };
+  function nombreLinea(l) { return NOMBRE_LINEA[l] || l; }
+  var LINEAS_OCULTAS = ["HDF"];   // la extracción de la HDF se registra en su propia pestaña
+
+  // Versiones del protocolo (PROTOCOLO_HOME_anotado.xlsx). Solución madre de cada componente por línea de infusión.
+  // V4 = HOME-PM-04 y HOME-PM-05 (misma pauta). V9 = «PROTOCOLO PROPUESTO». null = concentración no indicada en el protocolo.
+  function cp(n, v, u) { return { nombre: n, madre: v, unidad: u }; }
+  var GLU = cp("Glucosa", 93.8, "mg/mL"), AA = cp("Aminoácidos", 31.5, "mg/mL"), LIP = cp("Lípidos", 150, "mg/mL");
+  var ANTIB = { producto: "Metronidazol + cefoxitina", componentes: [cp("Metronidazol", null, "mg/mL"), cp("Cefoxitina", null, "mg/mL")] };
+  function prot(o) {
+    var L = {};
+    L["Hidrocortisona"] = { producto: "Hidrocortisona (Actocortina)", componentes: [cp("Hidrocortisona", o.hc, "mg/mL")] };
+    L["Ácidos biliares"] = { producto: o.biliar_prod || "Ácidos biliares conjugados", componentes: o.biliares };
+    L["NP (glucosa + AA)"] = { producto: o.np3 ? "Nutrición parenteral (las 3 cámaras juntas: glucosa, aminoácidos y lípidos)" : "Nutrición parenteral (cámara de glucosa y aminoácidos" + (o.extra_np ? " con " + o.extra_np.map(function (c) { return c.nombre.toLowerCase(); }).join(", ") : "") + ")", componentes: [GLU, AA].concat(o.extra_np || []).concat(o.np3 ? [LIP] : []) };
+    if (!o.np3) L["NP (lípidos)"] = { producto: "Nutrición parenteral (cámara de lípidos, por separado)", componentes: [LIP] };
+    L["Insulina"] = { producto: "Insulina de acción rápida", componentes: [cp("Insulina", o.ins, "U/mL")] };
+    if (o.fluc) L["Profilaxis"] = { producto: "Fluconazol", componentes: [cp("Fluconazol", 2, "mg/mL")] };
+    L["Profilaxis (bolo)"] = ANTIB;
+    L["Melatonina"] = { producto: "Melatonina", componentes: [cp("Melatonina", o.mel, "mg/mL")] };
+    L["Heparina"] = { producto: "Heparina sódica (infusión continua, fuera del horario circadiano)", componentes: [cp("Heparina", o.hep, "U/mL")] };
+    (o.otras || []).forEach(function (x) { L[x.linea] = x; });
+    return L;
+  }
+  var TAURO5 = [cp("Ácido taurocólico", 5, "mg/mL")], TAURO10 = [cp("Ácido taurocólico", 10, "mg/mL")];
+  var PROTOCOLOS = {
+    V1: { ref: "HOME-PM-01", fecha: "2025-11-17", lineas: prot({ hc: 0.05, biliares: TAURO5, np3: true, ins: 0.05, mel: 0.1, hep: 500 }), notas: "Nutrición parenteral con las 3 cámaras juntas. Duración 3 días: aumento de la resistencia portal." },
+    V2: { ref: "HOME-PM-02", fecha: "2025-12-09", lineas: prot({ hc: 0.0105, biliares: TAURO5, np3: true, ins: 0.1, mel: 0.0002, hep: 1250, otras: [{ linea: "Albúmina", producto: "Albúmina (bolo único de 10 g)", componentes: [cp("Albúmina", null, "g")] }] }), notas: "Duración 7 días: objetivo alcanzado." },
+    V3: { ref: "HOME-PM-03", fecha: "2026-01-13", lineas: prot({ hc: 0.105, biliares: TAURO5, ins: 0.1, mel: 0.0002, hep: 1250 }), notas: "Glucosa + aminoácidos por un lado y lípidos por otro. Volumen de perfusato fijo de 2200 mL." },
+    V4: { ref: "HOME-PM-04 y HOME-PM-05", fecha: "2026-02-10", lineas: prot({ hc: 0.105, biliares: TAURO10, ins: 0.1, mel: 0.0002, hep: 1250 }), notas: "Hidrocortisona basal 8 mL/h. Misma pauta en HOME-PM-04 y HOME-PM-05." },
+    V5: { ref: "HOME-PM-06", fecha: "2026-04-28", lineas: prot({ hc: 0.105, biliares: TAURO10, ins: 0.1, mel: 0.0002, hep: 1250 }), notas: "Glucosa + aminoácidos 15/30 mL/h; heparina 2 mL/h. Primera perfusión con trasplante." },
+    V6: { ref: "HOME-PM-07", fecha: "2026-06-02", lineas: prot({ hc: 0.105, biliares: TAURO10.concat([cp("Ácido glicólico", 3.5, "mg/mL")]), extra_np: [cp("Taurina", 4, "mg/mL")], ins: 0.1, mel: 0.0002, hep: 1000 }), notas: "Taurina en la cámara y ácido glicólico; heparina 1000 U/mL a 3 mL/h." },
+    V7: { ref: "HOME-PM-08", fecha: "2026-07-09", lineas: prot({ hc: 0.105, biliares: TAURO10.concat([cp("Ácido glicólico", 3.5, "mg/mL")]), extra_np: [cp("Taurina", 4, "mg/mL")], ins: 0.1, mel: 0.0002, hep: 1000, fluc: true }), notas: "Añade fluconazol 2 mL/h; ácidos biliares nocturnos a 2 mL/h." },
+    V8: { ref: "HOME-PM-09", fecha: "2026-09-21", lineas: prot({ hc: 0.105, biliares: TAURO10.concat([cp("Ácido glicólico", 9.5, "mg/mL")]), extra_np: [cp("L-carnitina", 0.75, "mg/mL"), cp("Taurina", 1.25, "mg/mL")], ins: 1, mel: 0.0002, hep: 1000, fluc: true,
+      otras: [{ linea: "N-acetilcisteína", producto: "N-acetilcisteína (continua)", componentes: [cp("N-acetilcisteína", 9.26, "mg/mL")] }] }), notas: "Oxigenador portal Capiox Neonato y mezcladores de aire independientes." },
+    V9: { ref: "PROTOCOLO PROPUESTO", fecha: "", propuesto: true, lineas: prot({ hc: 0.105, biliar_prod: "Mezcla biliar (4 componentes)", biliares: [cp("Mezcla biliar", 60.3, "mg/mL")], extra_np: [cp("L-carnitina", null, "mg/mL"), cp("Taurina", null, "mg/mL"), cp("Cloruro de colina", null, "mg/mL")], ins: 1, mel: 0.0002, hep: 1000, fluc: true,
+      otras: [{ linea: "N-acetilcisteína", producto: "N-acetilcisteína (continua)", componentes: [cp("N-acetilcisteína", 9.26, "mg/mL")] }, { linea: "T3", producto: "Triyodotironina (días 1–2)", componentes: [cp("T3", 2.4, "ng/mL")] }, { linea: "Secretina", producto: "Secretina (pulsos)", componentes: [cp("Secretina", 20, "ng/mL")] }] }), notas: "Protocolo propuesto (borrador): carnitina, taurina y colina en bolsa única de la cámara." }
+  };
+  var VERSIONES = Object.keys(PROTOCOLOS);
+  function versionActual() { var l = VERSIONES.filter(function (k) { return !PROTOCOLOS[k].propuesto; }); return l[l.length - 1]; }   // la última pauta usada (el propuesto no es la actual)
+  // Aporte de una línea al ritmo indicado: masa por hora y aumento esperado de concentración en el perfusato (sin aclaramiento)
+  function aporteLinea(comp, mL_h, Vml) {
+    var m = num(comp.madre), v = num(mL_h), V = num(Vml) || 2200; if (m === null || v === null) return null;
+    var masaU = String(comp.unidad || "").split("/")[0], porH = m * v;
+    return { por_h: porH, unidad_h: masaU + "/h", por_L_h: porH / (V / 1000), unidad_L_h: masaU + "/L por hora" };
+  }
+
+  // HDF (Aquarius + set pediátrico HF03 de Aquaset): dializado Accusol 35 K2 suplementado con 5 mL de fosfato dipotásico 1 M por bolsa de 5 L
+  // Accusol 35 K2 por litro: Na 140, K 2, Ca 1,75, Mg 0,5, HCO3 35 mmol/L y glucosa 1 g/L (5,55 mmol/L); Cl ≈ 111,3 (109,3 + 2 del KCl)
+  // Suplemento: 5 mmol HPO4²⁻ y 10 mmol K⁺ en 5 L → +1 mmol/L de fosfato (3,1 mg/dL) y +2 mmol/L de K⁺ → K efectivo ≈ 4 mmol/L
+  function dializado(cfgH) {
+    var c = (cfgH || DEF.hdf).dializado || DEF.hdf.dializado, sup = num(c.fosfato_mL_bolsa) || 0, L = num(c.bolsa_L) || 5, M = num(c.fosfato_M) || 1, P = sup * M / L;
+    return { Na: c.Na, K: c.K + 2 * P, Ca: c.Ca, Mg: c.Mg, Cl: c.Cl, HCO3: c.HCO3, Glucosa_mg_dL: c.Glucosa_mg_dL, P_mmol: P, P_mg_dL: r(P * 3.097, 2) };
+  }
+  // Recomendaciones de la HDF según urea e iones del perfusato (solo con el injerto en normotermia)
+  function consejoHDF(v, ctx) {
+    ctx = ctx || {}; var out = [], cfg = ctx.cfg || DEF.hdf, u = cfg.consejo || DEF.hdf.consejo, D = dializado(cfg), pm = cfg.parametros || DEF.hdf.parametros, n = function (k) { return num(v[k]); };
+    if (!ctx.normotermia) return [{ nivel: "info", texto: "Las recomendaciones de la HDF se calculan cuando el injerto está en normotermia (al terminar el recalentamiento)." }];
+    var urea = n("Urea"), up = num(ctx.urea_previa);
+    if (urea !== null && (urea > u.urea_max || (up && urea > up * (1 + u.urea_subida_pct / 100)))) out.push({ nivel: "ajuste", texto: "Urea " + r(urea, 0) + " mg/dL" + (urea > u.urea_max ? " (por encima de " + u.urea_max + ")" : " (sube más de un " + u.urea_subida_pct + " % respecto a la anterior)") + " en normotermia: aumenta el aclaramiento subiendo el flujo de diálisis de " + pm.Q_dialisis + " a " + u.Q_dialisis_alto + " mL/h. Comprueba también la PTM y que el filtro no esté coagulado." });
+    var K = n("K");
+    if (K !== null && K > u.K_max) out.push({ nivel: "ajuste", texto: "K⁺ " + r(K, 1) + " mmol/L, por encima del dializado efectivo (≈" + r(D.K, 1) + " mmol/L con el fosfato dipotásico): indica liberación celular (lisis del hepatocito o hemólisis). Sube el flujo de diálisis a " + u.Q_dialisis_alto + " mL/h; si persiste, valora bolsas sin el suplemento de fosfato dipotásico (aporta 2 mmol/L de K⁺)." });
+    else if (K !== null && K < u.K_min) out.push({ nivel: "ajuste", texto: "K⁺ " + r(K, 1) + " mmol/L pese a un dializado de ≈" + r(D.K, 1) + ": comprueba que se han añadido los 5 mL de fosfato dipotásico a cada bolsa y corrige con KCl (Preperfusión → Cálculos del perfusato)." });
+    var Na = n("Na");
+    if (Na !== null && (Na > u.Na_max || Na < u.Na_min)) out.push({ nivel: "ajuste", texto: "Na⁺ " + r(Na, 0) + " mmol/L: la HDF lo lleva hacia " + D.Na + " si hay intercambio suficiente; sube el flujo de diálisis a " + u.Q_dialisis_alto + " mL/h y revisa los bolos de bicarbonato (aportan Na⁺)." });
+    var HCO3 = n("HCO3"), BE = n("BE");
+    if ((HCO3 !== null && HCO3 > u.HCO3_max) || (BE !== null && BE > u.BE_max)) out.push({ nivel: "ajuste", texto: "Alcalosis metabólica" + (HCO3 !== null ? " (HCO₃⁻ " + r(HCO3, 1) + ")" : "") + ": el dializado y la reposición post aportan HCO₃⁻ " + D.HCO3 + " mmol/L. No administres bicarbonato y valora bajar la reposición post de " + pm.Reposicion + " a " + u.Reposicion_baja + " mL/h." });
+    else if ((HCO3 !== null && HCO3 < u.HCO3_min) || (BE !== null && BE < u.BE_min)) out.push({ nivel: "ajuste", texto: "Acidosis metabólica" + (HCO3 !== null ? " (HCO₃⁻ " + r(HCO3, 1) + ")" : "") + ": el dializado (HCO₃⁻ " + D.HCO3 + ") tiende a corregirla; sube el flujo de diálisis a " + u.Q_dialisis_alto + " mL/h. Si el pH es < 7,30 con BE < −5, sigue el asesor de gasometría para el bicarbonato." });
+    var Ca = n("Ca");
+    if (Ca !== null && Ca < u.Ca_min) out.push({ nivel: "ajuste", texto: "Ca²⁺ iónico " + r(Ca, 2) + " mmol/L: el dializado aporta " + D.Ca + " mmol/L de calcio total. Corrige con CaCl₂ (Cálculos del perfusato)." });
+    var P = n("P");
+    if (P !== null && P > u.P_max) out.push({ nivel: "ajuste", texto: "Fosfato " + r(P, 1) + " mg/dL: valora suprimir el fosfato dipotásico del dializado (aporta ≈" + D.P_mg_dL + " mg/dL)." });
+    else if (P !== null && P < u.P_min) out.push({ nivel: "ajuste", texto: "Fosfato " + r(P, 1) + " mg/dL: comprueba que el suplemento de fosfato dipotásico está en todas las bolsas." });
+    var Mg = n("Mg");
+    if (Mg !== null && Mg < u.Mg_min) out.push({ nivel: "info", texto: "Mg " + r(Mg, 2) + " mg/dL: el Accusol solo tiene " + D.Mg + " mmol/L (≈1,2 mg/dL) y lo arrastra hacia abajo; valora suplementar magnesio." });
+    var G = n("Glucosa");
+    if (G !== null && G > u.Glucosa_max) out.push({ nivel: "info", texto: "Glucosa " + r(G, 0) + " mg/dL: la HDF la acerca a " + D.Glucosa_mg_dL + " mg/dL (glucosa del Accusol); si sigue alta, revisa la nutrición y la insulina." });
+    if (!out.length) out.push({ nivel: "ok", texto: "Urea e iones compatibles con los parámetros fijos de la HDF: no hace falta cambiar nada." });
+    return out.map(function (x) { x.texto = x.texto.replace(/(\d)\.(\d)/g, "$1,$2"); return x; });
+  }
+
+  // Receptor: supervisión post-trasplante (hoja «Seguimiento postquirúrgico», p. 3) y evaluación funcional (p. 4)
+  var SUPERVISION_REC = [3, 6, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 132, 144, 156, 168].map(function (h) {
+    var dia = h % 24 === 0, met = { 24: "125 mg (IV)", 48: "100 mg (IV)", 72: "75 mg (IV)" }[h] || (dia ? "50 mg (IV)" : null);
+    return { h: h, tacrolimus: dia ? "0,04 mg/kg (IV)" : null, metpret: met, cefoxitina: h >= 12 ? "1 g (IV)" : null };
+  });
+  var PUNTOS_REC = [0, 3, 6, 12, 24, 48, 72, 96, 120, 144, 168];
+  var EVAL_REC = { items: [["Respiracion", "Respiración", ["Normal", "Taquipnea", "Bradipnea"]], ["Estimulos", "Respuesta a estímulos", ["Normal", "Disminuida", "Nula"]], ["Postura", "Postura al manejo", ["De pie", "Parcialmente de pie", "No se sostiene"]], ["Ingesta", "Ingesta", ["Autónoma", "Asistida", "Nula"]]], limite: 12 };
+  function sacrificioPorEvaluacion(totales) { for (var i = 1; i < totales.length; i++) if (num(totales[i]) >= EVAL_REC.limite && num(totales[i - 1]) >= EVAL_REC.limite) return true; return false; }
+
+  // Morfometría (hoja de información general): cómo se mide cada variable
+  var MORFO = [
+    { id: "OBL", nombre: "Longitud del cuerpo", sigla: "OBL", como: "Del punto entre las orejas (nuca) a la base de la cola, siguiendo la línea dorsal." },
+    { id: "NL", nombre: "Longitud del cuello", sigla: "NL", como: "De la nuca a la cruz (punto más alto de las escápulas)." },
+    { id: "BL1", nombre: "Longitud base de la cola–hombro", sigla: "BL1", como: "De la base de la cola a la punta del hombro, en línea recta." },
+    { id: "HSLD", nombre: "Altura a la cruz", sigla: "HSLD", como: "Del suelo a la cruz, con el animal de pie y apoyado en las cuatro patas." },
+    { id: "HHIP", nombre: "Altura a la cadera", sigla: "HHIP", como: "Del suelo a la punta de la cadera (tuberosidad coxal)." },
+    { id: "HGH", nombre: "Perímetro torácico", sigla: "HGH", como: "Perímetro justo detrás de las patas delanteras (zona del corazón)." },
+    { id: "MGH", nombre: "Perímetro de la zona media", sigla: "MGH", como: "Perímetro a la mitad del tronco, entre las patas delanteras y traseras." },
+    { id: "PGH", nombre: "Perímetro de la zona baja", sigla: "PGH", como: "Perímetro justo delante de las patas traseras (flanco)." }];
+
+  // Grupos de la pantalla de inicio (v0.5)
+  var GRUPOS_INICIO = [
+    ["Función hepática", ["PERF:Lactato", "PERF:Glucosa", "PERF:Fibrinogeno", "PERF:ActPT", "PERF:Amonio", "BILIS:Volumen_mL", "PERF:Albumina", "DERIV:VO2"]],
+    ["Daño hepatocelular y colestasis", ["PERF:ALT", "PERF:AST", "PERF:LDH", "PERF:GGT", "PERF:FA", "PERF:BilT"]],
+    ["Hemodinámica", ["FLUJO:Q_AH", "FLUJO:Q_VP", "FLUJO:P_AH", "FLUJO:P_VP", "FLUJO:Temp"]],
+    ["Función CRRT", ["ART:pH", "PERF:HCO3", "PERF:BE", "PERF:Na", "PERF:K", "PERF:Ca", "PERF:Cl", "PERF:P", "PERF:Mg", "PERF:Urea", "PERF:Creatinina", "PERF:Osm"]]];
+
   return { KPA: KPA, num: num, r: r, clamp: clamp, media: media, de: de, MUESTRAS: MUESTRAS, DERIVADAS: DERIVADAS, variable: variable, DEF: DEF, MODELOS_DIETA: MODELOS_DIETA,
     aFecha: aFecha, horasEntre: horasEntre, minutosEntre: minutosEntre, hm: hm, enHora: enHora, duracionTxt: duracionTxt, cronoTxt: cronoTxt, etiquetaPunto: etiquetaPunto,
     energiaDieta: energiaDieta, compararModelosDieta: compararModelosDieta, factorSexo: factorSexo,
@@ -643,5 +780,8 @@
     avisosCircadianos: avisosCircadianos, puntosMuestreo: puntosMuestreo, avisosMuestreo: avisosMuestreo, ritmosVigentes: ritmosVigentes, reposicion: reposicion, sumarDias: sumarDias, diasEntre: diasEntre, aDia: aDia, diaISO: diaISO, fechasPrograma: fechasPrograma, hitosExperimento: hitosExperimento, faseDia: faseDia, icsExperimento: icsExperimento, diaAclimatacion: diaAclimatacion,
     infusionA: infusionA, volumenInfundido: volumenInfundido, volumenExtraido: volumenExtraido, balanceHDF: balanceHDF, recomendarExtraccion: recomendarExtraccion, avisosFoto: avisosFoto,
     serie: serie, xDe: xDe, bandaHistorica: bandaHistorica, zScore: zScore, agregarSeries: agregarSeries, pivotAncho: pivotAncho, tablaPrismXY: tablaPrismXY,
-    PALETA: PALETA, pesoMorfometrico: pesoMorfometrico };
+    PALETA: PALETA, pesoMorfometrico: pesoMorfometrico,
+    TIPOS_PROC: TIPOS_PROC, tipoProc: tipoProc, nombreTipo: nombreTipo, finPerfusionPrevista: finPerfusionPrevista, finRecalentamiento: finRecalentamiento,
+    NOMBRE_LINEA: NOMBRE_LINEA, nombreLinea: nombreLinea, LINEAS_OCULTAS: LINEAS_OCULTAS, PROTOCOLOS: PROTOCOLOS, VERSIONES: VERSIONES, versionActual: versionActual, aporteLinea: aporteLinea,
+    dializado: dializado, consejoHDF: consejoHDF, SUPERVISION_REC: SUPERVISION_REC, PUNTOS_REC: PUNTOS_REC, EVAL_REC: EVAL_REC, sacrificioPorEvaluacion: sacrificioPorEvaluacion, MORFO: MORFO, GRUPOS_INICIO: GRUPOS_INICIO };
 });

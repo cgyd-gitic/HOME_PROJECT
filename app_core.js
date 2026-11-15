@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var C = window.HOMECalc, H = window.HOME = window.HOME || {};
-  var VERSION = "0.4.0";
+  var VERSION = "0.5.0";
   var S = H.S = { token: null, usuario: null, demo: false, cfg: null, t: {}, med: {}, medCargada: {}, cola: [], enviando: false, online: navigator.onLine !== false,
     ultima: null, pref: {}, avisosVistos: {}, pendienteRepintar: false, errores: [] };
   var TABLAS = ["Experimentos", "Animales", "Dieta", "Formularios", "Eventos", "Avisos", "Material", "Movimientos", "Solicitudes", "Personal", "Usuarios", "Config", "Solicitudes_Acceso", "Fotos", "Pedidos"];
@@ -84,6 +84,7 @@
   H.filas = function (tabla) { return (S.t[tabla] || []).filter(function (f) { return !esBorrado(f); }); };
   function esBorrado(f) { return f.Borrado === true || f.Borrado === "TRUE" || f.Borrado === "true"; }
   H.esBorrado = esBorrado;
+  H.guardarSesion = function () { try { var sess = JSON.parse(localStorage.getItem("home_sesion") || "{}"); sess.usuario = S.usuario; localStorage.setItem("home_sesion", JSON.stringify(sess)); } catch (e) { } };
   H.fila = function (tabla, id) { var l = S.t[tabla] || []; for (var i = 0; i < l.length; i++) if (l[i].ID === id) return esBorrado(l[i]) ? null : l[i]; return null; };
   function upsertLocal(tabla, filas) {
     if (tabla === "Mediciones") { filas.forEach(function (f) { var e = f.Experimento, l = S.med[e] = S.med[e] || [], i = indice(l, f.ID); if (i === -1) l.push(f); else l[i] = mezclarFila(l[i], f); }); return; }
@@ -357,22 +358,22 @@
     return "<a class=\"marca\" href=\"#/inicio\" aria-label=\"HOME, inicio\"><svg viewBox=\"0 0 32 32\" aria-hidden=\"true\"><rect width=\"32\" height=\"32\" rx=\"8\" fill=\"var(--pri)\"/><path d=\"M4 14C4 9 9 7 15 7.5S27 8 28 10.5S24 15 20 17.5S11 23 7.5 21.5S4 17.5 4 14z\" fill=\"#fff\"/><path d=\"M15 7.6C13.5 10 13.2 12.5 14 15.5\" stroke=\"var(--pri)\" stroke-width=\"1.3\" fill=\"none\" stroke-linecap=\"round\"/></svg><b>HOME</b><span>Perfusión hepática extendida</span></a>";
   };
   var NAV = [
-    { r: "inicio", n: "Inicio", i: "house" }, { r: "experimentos", n: "Experimentos", i: "flask-conical" }, { r: "calendario", n: "Calendario", i: "calendar-days" }, { r: "graficos", n: "Gráficos", i: "chart-line" },
-    { r: "inventario", n: "Inventario", i: "package" }, { r: "exportar", n: "Exportar", i: "download" }, { r: "validar", n: "Validar", i: "badge-check", admin: true }, { r: "config", n: "Configuración", i: "settings", admin: true }];
+    { r: "inicio", n: "Inicio", i: "house" }, { r: "calendario", n: "Calendario", i: "calendar-days" }, { r: "experimentos", n: "Experimentos", i: "flask-conical" }, { r: "graficos", n: "Gráficos", i: "chart-line" },
+    { r: "inventario", n: "Inventario", i: "package", equipo: true }, { r: "exportar", n: "Exportar", i: "download" }, { r: "validar", n: "Validar", i: "badge-check", admin: true }, { r: "config", n: "Configuración", i: "settings", admin: true }];
   H.pintarMarco = function () {
     var u = S.usuario || {}, ini = String(u.nombre || u.email || "?").trim().charAt(0).toUpperCase();
     var bajo = H.stockBajo ? H.stockBajo().length : 0, solP = H.filas("Solicitudes").filter(function (s) { return s.Estado === "Pendiente"; }).length;
-    var nav = NAV.filter(function (x) { return !x.admin || H.esAdmin(); });
+    var nav = NAV.filter(function (x) { return (!x.admin || H.esAdmin()) && (!x.equipo || H.rol() !== "COLABORADOR"); });
     var pendV = H.esAdmin() && H.pendientesValidacion ? H.pendientesValidacion().length : 0, accP = H.esAdmin() ? H.filas("Solicitudes_Acceso").filter(function (s) { return s.Estado === "Pendiente"; }).length : 0;
     function cont(r) { var n = r === "inventario" ? bajo + (H.esAdmin() ? solP : 0) : r === "validar" ? pendV : r === "config" ? accP : 0; return n ? "<span class=\"cont\" aria-label=\"" + n + " avisos\">" + n + "</span>" : ""; }
-    var movil = nav.filter(function (x) { return ["inicio", "experimentos", "calendario", "inventario"].indexOf(x.r) !== -1; }), resto = nav.filter(function (x) { return movil.indexOf(x) === -1; });
+    var movil = nav.filter(function (x) { return ["inicio", "calendario", "experimentos", H.rol() === "COLABORADOR" ? "graficos" : "inventario"].indexOf(x.r) !== -1; }), resto = nav.filter(function (x) { return movil.indexOf(x) === -1; });
     var nResto = resto.reduce(function (a, x) { var m = /\d+/.exec(cont(x.r)); return a + (m ? +m[0] : 0); }, 0);
     function enlaceRiel(x) { return "<a href=\"#/" + x.r + "\" data-nav=\"" + x.r + "\" aria-label=\"" + esc(x.n) + "\" data-tip=\"" + esc(x.n) + "\">" + H.ico(x.i) + "<span class=\"et-riel\">" + esc(x.n) + "</span>" + cont(x.r) + "</a>"; }
     document.body.innerHTML = "<a class=\"saltar\" href=\"#principal\">Saltar al contenido</a>" + (S.demo ? "<div class=\"demo-banda\">Modo demostración · datos simulados guardados solo en este navegador</div>" : "") +
       "<nav class=\"riel\" aria-label=\"Secciones\"><a class=\"riel-logo\" href=\"#/inicio\" aria-label=\"HOME, inicio\" data-tip=\"HOME · Perfusión hepática extendida\">" + H.logoSVG() + "</a><div class=\"riel-lista\">" + nav.map(enlaceRiel).join("") + "</div>" +
       "<div class=\"riel-pie\">" + enlaceRiel({ r: "cuenta", n: "Mi cuenta", i: "user" }) + "</div></nav>" +
       "<div class=\"lienzo\"><header class=\"cab\">" + H.marcaHTML() + "<span id=\"chipActivo\"></span><span class=\"empuja\"></span><span id=\"estadoSync\" class=\"estado-sync\" role=\"status\"></span>" +
-      "<button class=\"avatar\" data-act=\"cuenta\" aria-label=\"Mi cuenta: " + esc(u.nombre || u.email || "") + " (" + esc(H.nombreRol(u.rol)) + ")\"><span>" + esc(ini) + "</span></button></header>" +
+      "<span id=\"cabPerf\"></span>" + (H.campanaHTML ? H.campanaHTML() : "") + "<button class=\"usuario-cab\" data-act=\"cuenta\" aria-label=\"Mi cuenta: " + esc(u.nombre || u.email || "") + " (" + esc(H.nombreRol(u.rol)) + ")\">" + (H.avatarHTML ? H.avatarHTML(u, "cab") : "<span class=\"avatar\"><span>" + esc(ini) + "</span></span>") + "<span class=\"usr-txt\"><b>" + esc(u.nombre || u.email || "") + "</b><span>" + esc(H.nombreRol(u.rol)) + "</span></span></button></header>" +
       "<main id=\"principal\" class=\"principal\" tabindex=\"-1\"></main></div>" +
       "<nav class=\"inferior\" aria-label=\"Secciones\">" + movil.map(function (x) { return "<a href=\"#/" + x.r + "\" data-nav=\"" + x.r + "\">" + H.ico(x.i) + "<span>" + esc(x.n) + "</span>" + cont(x.r) + "</a>"; }).join("") +
       "<button type=\"button\" data-act=\"menuMas\" aria-haspopup=\"dialog\" class=\"" + (resto.some(function (x) { return x.r === H.ruta().partes[0]; }) ? "activo" : "") + "\">" + H.ico("menu") + "<span>Más</span>" + (nResto ? "<span class=\"cont\">" + nResto + "</span>" : "") + "</button></nav>" +
@@ -394,7 +395,7 @@
     var bm = H.$("[data-act=menuMas]"); if (bm) bm.classList.toggle("activo", (H._navResto || []).some(function (x) { return x.r === r.partes[0]; }));
     H.$$("[data-nav]").forEach(function (a) { a.classList.toggle("activo", a.getAttribute("data-nav") === r.partes[0] || (r.partes[0] === "exp" && a.getAttribute("data-nav") === "experimentos")); if (a.classList.contains("activo")) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     if (H._postPintar) { var f = H._postPintar; H._postPintar = null; try { f(); } catch (e) { console.error(e); } }
-    H.chipActivo(); H.tic(true);
+    H.chipActivo(); if (H.pintarCabecera) H.pintarCabecera(r); H.tic(true);
     if (mismo) window.scrollTo(0, y); else { window.scrollTo(0, 0); H._ultimaRuta = location.hash; }
   };
   H.trasPintar = function (f) { var a = H._postPintar; H._postPintar = a ? function () { a(); f(); } : f; };
