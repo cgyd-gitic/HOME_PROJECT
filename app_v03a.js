@@ -226,6 +226,7 @@
       '<div class="fila-flex"><button class="bt" data-act="pwGuardar">' + ico("save") + "Guardar contraseña</button>" + (CRED.pass && CRED.pass.tiene ? '<button class="bt texto" data-act="pwQuitar">Quitar la contraseña</button><span class="chip ok">Contraseña definida</span>' : "") + "</div>";
     var extra = '<section class="tarjeta" id="accesoRapido"><div class="cabecera"><h2>Acceso rápido</h2></div><p class="tenue">Además del código por correo puedes entrar con la <b>llave de acceso</b> del dispositivo (Face ID, huella, PIN o Windows Hello) o con una <b>contraseña</b> que el navegador recuerda. El código por correo sigue funcionando siempre.</p>' +
       '<h3 class="sub">Llaves de acceso</h3>' + pk + (S.demo ? "" : '<h3 class="sub">Contraseña</h3>' + pw) + "</section>";
+    extra += '<section class="tarjeta" id="diagWeb"><div class="cabecera"><h2>Comprobar la instalación de la web</h2><button class="bt" data-act="diagWeb">' + ico("search-check") + 'Comprobar</button></div><p class="tenue">Revisa que todos los archivos de la web están subidos al repositorio de GitHub (por ejemplo, la librería de gráficos).</p><div id="diagRes"></div></section>';
     var h = cuentaOrig(p, q), i = h.indexOf('<section class="tarjeta"><div class="cabecera"><h2>Avisos en este dispositivo');
     return i === -1 ? h.replace(/<\/div>$/, extra + "</div>") : h.slice(0, i) + extra + h.slice(i);
   };
@@ -237,4 +238,15 @@
   };
   H.acc.pwQuitar = function () { H.confirmar("Quitar la contraseña", "Seguirás pudiendo entrar con el código por correo o con una llave de acceso.", "Quitar", true).then(function (ok) { if (ok) H.api("webPasswordQuitar").then(function () { cargarCred(true); H.toast("Contraseña quitada."); }).catch(function (e) { H.toast(e.message, "error"); }); }); };
   H.recargarCredenciales = function () { cargarCred(true); };
+  H.ARCHIVOS_WEB = ["index.html", "app.css", "config.js", "sprite.js", "qrcode.js", "calc.js", "demo.js", "app_core.js", "app_vistas.js", "app_exp.js", "app_exp2.js", "app_graf.js", "app_inv.js", "app_v02.js", "app_v03a.js", "app_v03b.js", "app_v03c.js", "app_v04.js",
+    "plotly-cartesian.min.js", "xlsx.full.min.js", "sw.js", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png", "roboto-latin-400-normal.woff2", "roboto-latin-500-normal.woff2", "roboto-latin-700-normal.woff2", "roboto-mono-latin-500-normal.woff2"];
+  H.acc.diagWeb = function (el) {
+    var c = H.$("#diagRes"); if (!c) return; if (location.protocol === "file:" || window.HOME_PREVIEW) { c.innerHTML = '<div class="aviso info">' + ico("info") + "<div>Estás en la vista previa de un solo archivo: aquí todas las librerías van dentro. La comprobación sirve para la web publicada en GitHub.</div></div>"; return; }
+    el.disabled = true; c.innerHTML = '<p class="tenue">Comprobando…</p>';
+    Promise.all(H.ARCHIVOS_WEB.map(function (f) { return fetch(f + "?comprobar=" + Date.now(), { method: "GET", cache: "no-store" }).then(function (r) { return { f: f, ok: r.ok }; }).catch(function () { return { f: f, ok: false }; }); })).then(function (l) {
+      el.disabled = false; var mal = l.filter(function (x) { return !x.ok; });
+      c.innerHTML = mal.length ? '<div class="aviso al">' + ico("circle-alert") + "<div><b>Faltan " + mal.length + " archivo(s) en el repositorio:</b> " + esc(mal.map(function (x) { return x.f; }).join(", ")) + ". Sube todos los archivos de HOME_web_github.zip a la carpeta principal del repositorio (junto a index.html) y vuelve a comprobarlo.</div></div>"
+        : '<div class="aviso ok">' + ico("circle-check") + "<div>Están los " + l.length + " archivos de la web.</div></div>";
+    });
+  };
 })();

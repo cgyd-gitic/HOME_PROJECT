@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var C = window.HOMECalc, H = window.HOME = window.HOME || {};
-  var VERSION = "0.3.0";
+  var VERSION = "0.4.0";
   var S = H.S = { token: null, usuario: null, demo: false, cfg: null, t: {}, med: {}, medCargada: {}, cola: [], enviando: false, online: navigator.onLine !== false,
     ultima: null, pref: {}, avisosVistos: {}, pendienteRepintar: false, errores: [] };
   var TABLAS = ["Experimentos", "Animales", "Dieta", "Formularios", "Eventos", "Avisos", "Material", "Movimientos", "Solicitudes", "Personal", "Usuarios", "Config", "Solicitudes_Acceso", "Fotos", "Pedidos"];
@@ -39,10 +39,10 @@
     setTimeout(function () { d.remove(); }, tipo === "error" ? 7000 : 3500);
   };
   H.modal = function (o) {   // {titulo, cuerpo (html), pie (html), ancho, alAbrir(dlg), alCerrar}
-    var d = document.createElement("dialog"); d.className = "modal" + (o.ancho ? " ancho" : ""); d.setAttribute("aria-label", o.titulo || "");
+    var d = document.createElement("dialog"); d.className = "modal" + (o.ancho ? " ancho" : "") + (o.hoja ? " hoja" : ""); d.setAttribute("aria-label", o.titulo || "");
     d.innerHTML = "<div class=\"m-cab\"><h2>" + esc(o.titulo || "") + "</h2><button class=\"bt ico-solo texto\" data-cerrar aria-label=\"Cerrar\">" + H.ico("x") + "</button></div><div class=\"m-cuerpo\">" + (o.cuerpo || "") + "</div>" + (o.pie ? "<div class=\"m-pie\">" + o.pie + "</div>" : "");
     document.body.appendChild(d);
-    d.addEventListener("click", function (e) { if (e.target.closest("[data-cerrar]") || e.target === d) d.close(); });
+    d.addEventListener("click", function (e) { var c = e.target.closest("[data-cerrar]"); if (c || e.target === d) { if (c && c.tagName === "A" && c.getAttribute("href")) { e.preventDefault(); d.close(); location.hash = c.getAttribute("href"); return; } d.close(); } });
     d.addEventListener("close", function () { if (o.alCerrar) o.alCerrar(d); d.remove(); });
     d.showModal(); if (o.alAbrir) o.alAbrir(d); return d;
   };
@@ -352,6 +352,7 @@
   document.addEventListener("focusout", function () { setTimeout(function () { if (S.pendienteRepintar) { var a = document.activeElement; if (!(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) { S.pendienteRepintar = false; H.repintar(); } } }, 250); });
 
   // ---------------------------------------------------------------- marco (cabecera + navegación)
+  H.logoSVG = function () { return "<svg viewBox=\"0 0 32 32\" aria-hidden=\"true\"><rect width=\"32\" height=\"32\" rx=\"9\" fill=\"var(--pri)\"/><path d=\"M4 14C4 9 9 7 15 7.5S27 8 28 10.5S24 15 20 17.5S11 23 7.5 21.5S4 17.5 4 14z\" fill=\"#fff\"/><path d=\"M15 7.6C13.5 10 13.2 12.5 14 15.5\" stroke=\"var(--pri)\" stroke-width=\"1.3\" fill=\"none\" stroke-linecap=\"round\"/></svg>"; };
   H.marcaHTML = function () {
     return "<a class=\"marca\" href=\"#/inicio\" aria-label=\"HOME, inicio\"><svg viewBox=\"0 0 32 32\" aria-hidden=\"true\"><rect width=\"32\" height=\"32\" rx=\"8\" fill=\"var(--pri)\"/><path d=\"M4 14C4 9 9 7 15 7.5S27 8 28 10.5S24 15 20 17.5S11 23 7.5 21.5S4 17.5 4 14z\" fill=\"#fff\"/><path d=\"M15 7.6C13.5 10 13.2 12.5 14 15.5\" stroke=\"var(--pri)\" stroke-width=\"1.3\" fill=\"none\" stroke-linecap=\"round\"/></svg><b>HOME</b><span>Perfusión hepática extendida</span></a>";
   };
@@ -364,14 +365,19 @@
     var nav = NAV.filter(function (x) { return !x.admin || H.esAdmin(); });
     var pendV = H.esAdmin() && H.pendientesValidacion ? H.pendientesValidacion().length : 0, accP = H.esAdmin() ? H.filas("Solicitudes_Acceso").filter(function (s) { return s.Estado === "Pendiente"; }).length : 0;
     function cont(r) { var n = r === "inventario" ? bajo + (H.esAdmin() ? solP : 0) : r === "validar" ? pendV : r === "config" ? accP : 0; return n ? "<span class=\"cont\" aria-label=\"" + n + " avisos\">" + n + "</span>" : ""; }
+    var movil = nav.filter(function (x) { return ["inicio", "experimentos", "calendario", "inventario"].indexOf(x.r) !== -1; }), resto = nav.filter(function (x) { return movil.indexOf(x) === -1; });
+    var nResto = resto.reduce(function (a, x) { var m = /\d+/.exec(cont(x.r)); return a + (m ? +m[0] : 0); }, 0);
+    function enlaceRiel(x) { return "<a href=\"#/" + x.r + "\" data-nav=\"" + x.r + "\" aria-label=\"" + esc(x.n) + "\" data-tip=\"" + esc(x.n) + "\">" + H.ico(x.i) + "<span class=\"et-riel\">" + esc(x.n) + "</span>" + cont(x.r) + "</a>"; }
     document.body.innerHTML = "<a class=\"saltar\" href=\"#principal\">Saltar al contenido</a>" + (S.demo ? "<div class=\"demo-banda\">Modo demostración · datos simulados guardados solo en este navegador</div>" : "") +
-      "<header class=\"cab\">" + H.marcaHTML() + "<span id=\"chipActivo\"></span><span class=\"empuja\"></span><span id=\"estadoSync\" class=\"estado-sync\" role=\"status\"></span>" +
-      "<button class=\"avatar\" data-act=\"cuenta\" aria-label=\"Mi cuenta: " + esc(u.nombre || u.email || "") + " (" + esc(H.nombreRol(u.rol)) + ")\">" + esc(ini) + "</button></header>" +
-      "<div class=\"marco\"><nav class=\"riel\" aria-label=\"Secciones\">" + nav.map(function (x) { return "<a href=\"#/" + x.r + "\" data-nav=\"" + x.r + "\">" + H.ico(x.i) + x.n + cont(x.r) + "</a>"; }).join("") +
-      "<div class=\"sep\"></div><a href=\"#/cuenta\" data-nav=\"cuenta\">" + H.ico("user") + "Mi cuenta</a><p class=\"muy-tenue\" style=\"padding:8px 10px\">" + esc(u.nombre || "") + "<br>" + esc(H.nombreRol(u.rol)) + " · v" + VERSION + "</p></nav>" +
+      "<nav class=\"riel\" aria-label=\"Secciones\"><a class=\"riel-logo\" href=\"#/inicio\" aria-label=\"HOME, inicio\" data-tip=\"HOME · Perfusión hepática extendida\">" + H.logoSVG() + "</a><div class=\"riel-lista\">" + nav.map(enlaceRiel).join("") + "</div>" +
+      "<div class=\"riel-pie\">" + enlaceRiel({ r: "cuenta", n: "Mi cuenta", i: "user" }) + "</div></nav>" +
+      "<div class=\"lienzo\"><header class=\"cab\">" + H.marcaHTML() + "<span id=\"chipActivo\"></span><span class=\"empuja\"></span><span id=\"estadoSync\" class=\"estado-sync\" role=\"status\"></span>" +
+      "<button class=\"avatar\" data-act=\"cuenta\" aria-label=\"Mi cuenta: " + esc(u.nombre || u.email || "") + " (" + esc(H.nombreRol(u.rol)) + ")\"><span>" + esc(ini) + "</span></button></header>" +
       "<main id=\"principal\" class=\"principal\" tabindex=\"-1\"></main></div>" +
-      "<nav class=\"inferior\" aria-label=\"Secciones\">" + nav.slice(0, 5).map(function (x) { return "<a href=\"#/" + x.r + "\" data-nav=\"" + x.r + "\">" + H.ico(x.i) + "<span>" + x.n + "</span></a>"; }).join("") + "</nav>" +
+      "<nav class=\"inferior\" aria-label=\"Secciones\">" + movil.map(function (x) { return "<a href=\"#/" + x.r + "\" data-nav=\"" + x.r + "\">" + H.ico(x.i) + "<span>" + esc(x.n) + "</span>" + cont(x.r) + "</a>"; }).join("") +
+      "<button type=\"button\" data-act=\"menuMas\" aria-haspopup=\"dialog\" class=\"" + (resto.some(function (x) { return x.r === H.ruta().partes[0]; }) ? "activo" : "") + "\">" + H.ico("menu") + "<span>Más</span>" + (nResto ? "<span class=\"cont\">" + nResto + "</span>" : "") + "</button></nav>" +
       "<div id=\"toasts\" class=\"toasts\" aria-live=\"polite\"></div><div id=\"alarmas\"></div>";
+    H._navResto = resto.concat([{ r: "cuenta", n: "Mi cuenta", i: "user" }]); H._contNav = cont;
     H.cargarIconos(); actualizarSync();
   };
   H.cargarIconos = function () { if (!document.getElementById("sprite") && window.HOME_SPRITE) { var d = document.createElement("div"); d.id = "sprite"; d.style.display = "none"; d.innerHTML = window.HOME_SPRITE; document.body.insertBefore(d, document.body.firstChild); } };
@@ -385,6 +391,7 @@
     if (!S.cfg) H.recalcCfg();
     var r = H.ruta(), v = H.vistas[r.partes[0]] || H.vistas.inicio, y = window.scrollY, mismo = H._ultimaRuta === location.hash;
     try { main.innerHTML = v(r.partes.slice(1), r.q); } catch (e) { console.error(e); main.innerHTML = "<div class=\"aviso al\">" + H.ico("circle-alert") + "<div><b>Error al mostrar esta pantalla.</b><br>" + esc(e.message) + "</div></div>"; }
+    var bm = H.$("[data-act=menuMas]"); if (bm) bm.classList.toggle("activo", (H._navResto || []).some(function (x) { return x.r === r.partes[0]; }));
     H.$$("[data-nav]").forEach(function (a) { a.classList.toggle("activo", a.getAttribute("data-nav") === r.partes[0] || (r.partes[0] === "exp" && a.getAttribute("data-nav") === "experimentos")); if (a.classList.contains("activo")) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     if (H._postPintar) { var f = H._postPintar; H._postPintar = null; try { f(); } catch (e) { console.error(e); } }
     H.chipActivo(); H.tic(true);
@@ -395,6 +402,10 @@
 
   // ---------------------------------------------------------------- acciones por delegación
   H.acc = {};
+  H.acc.menuMas = function () {
+    var r = H.ruta().partes[0];
+    H.modal({ titulo: "Más secciones", hoja: true, cuerpo: "<div class=\"menu-mas\">" + (H._navResto || []).map(function (x) { return "<a href=\"#/" + x.r + "\" class=\"" + (x.r === r ? "activo" : "") + "\" data-cerrar>" + H.ico(x.i) + "<span>" + esc(x.n) + "</span>" + (H._contNav ? H._contNav(x.r) : "") + "</a>"; }).join("") + "</div>" });
+  };
   document.addEventListener("click", function (e) {
     var el = e.target.closest("[data-act]"); if (!el || el.disabled) return;
     if (H.desbloquearAudio) H.desbloquearAudio();

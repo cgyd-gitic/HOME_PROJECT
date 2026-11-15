@@ -4,8 +4,15 @@
   var C = window.HOMECalc, H = window.HOME, S = H.S, esc = H.esc, ico = H.ico;
   var scripts = {};
   H.cargarScript = function (src) { if (!scripts[src]) scripts[src] = new Promise(function (ok, ko) { var s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = function () { ko(new Error("No se ha podido cargar " + src)); }; document.head.appendChild(s); }); return scripts[src]; };
-  H.plotly = function () { return window.Plotly ? Promise.resolve(window.Plotly) : H.cargarScript("lib/plotly-cartesian.min.js").then(function () { return window.Plotly; }); };
-  H.xlsx = function () { return window.XLSX ? Promise.resolve(window.XLSX) : H.cargarScript("lib/xlsx.full.min.js").then(function () { return window.XLSX; }); };
+  // Librerías pesadas: se cargan al usarlas. Desde la v0.4 están en la carpeta principal (junto a index.html); se prueba también lib/ por si
+  // el repositorio conserva la estructura antigua. Si falla, el mensaje dice exactamente qué archivo falta en GitHub.
+  function cargarLib(nombre, global) {
+    if (window[global]) return Promise.resolve(window[global]);
+    return H.cargarScript(nombre).catch(function () { return H.cargarScript("lib/" + nombre); }).then(function () { if (!window[global]) throw new Error("vacío"); return window[global]; })
+      .catch(function () { delete scripts[nombre]; delete scripts["lib/" + nombre]; throw new Error("No se ha podido cargar «" + nombre + "». Comprueba que ese archivo está subido en la carpeta principal del repositorio de GitHub, junto a index.html (Mi cuenta → Comprobar la instalación de la web)."); });
+  }
+  H.plotly = function () { return cargarLib("plotly-cartesian.min.js", "Plotly"); };
+  H.xlsx = function () { return cargarLib("xlsx.full.min.js", "XLSX"); };
 
   var DEF_G = { exps: [], colores: {}, muestra: "PERF", vars: ["Lactato"], eje: "real", modo: "individual", puntos: true, lineas: true, log: false, objetivo: true, historica: false, noche: true,
     xmin: "", xmax: "", titulo: "", fuente: 13, ancho: 1000, alto: 560, leyenda: "derecha", rejilla: true, estilo: "pantalla", grosor: 2, tam_punto: 6 };
@@ -59,7 +66,7 @@
       "<button class=\"bt\" data-act=\"gCSV\">" + ico("file-text") + "Datos (CSV)</button><button class=\"bt\" data-act=\"gPrism\">" + ico("file-spreadsheet") + "GraphPad Prism (XY)</button><span class=\"muy-tenue empuja\">" + G.exps.length + " perfusiones · " + G.vars.length + " variables</span></div>";
     H.trasPintar(dibujar);
     return "<div class=\"ancho\"><div class=\"titulo-pag\"><h1>Gráficos</h1></div><div class=\"graf-marco\">" + panel + "<div style=\"min-width:0\">" + barra + "<div id=\"graficos\" class=\"" + (G.vars.length > 1 ? "graf-multiples" : "") + "\">" +
-      G.vars.map(function (v, i) { return "<div class=\"tarjeta\" style=\"padding:8px\"><div id=\"gr_" + i + "\" class=\"graf-lienzo\" role=\"img\" aria-label=\"Gráfico de " + esc(C.variable(G.muestra === "DERIV" ? "FLUJO" : G.muestra, v).nombre) + "\"></div></div>"; }).join("") + "</div>" +
+      G.vars.map(function (v, i) { return "<div class=\"tarjeta graf-tarjeta\"><div id=\"gr_" + i + "\" class=\"graf-lienzo\" role=\"img\" aria-label=\"Gráfico de " + esc(C.variable(G.muestra === "DERIV" ? "FLUJO" : G.muestra, v).nombre) + "\"><div class=\"graf-carga\"><span class=\"giro\"></span>Cargando el gráfico de " + esc(C.variable(G.muestra === "DERIV" ? "FLUJO" : G.muestra, v).nombre) + "…</div></div></div>"; }).join("") + "</div>" +
       (G.vars.length ? "" : "<div class=\"vacio\">Elige al menos una variable.</div>") + "<div id=\"gTabla\"></div></div></div></div>";
   };
   function trazas(v) {
@@ -101,7 +108,7 @@
     if (!G.vars.length) return;
     H.plotly().then(function (P) {
       G.vars.forEach(function (v, i) {
-        var el = document.getElementById("gr_" + i); if (!el) return; var t = trazas(v), ly = layout(t.vd, v);
+        var el = document.getElementById("gr_" + i); if (!el) return; var ph = el.querySelector(".graf-carga"); if (ph) ph.remove(); var t = trazas(v), ly = layout(t.vd, v);
         if (G.muestra === "POR" || G.muestra === "ART" || G.muestra === "CAV") { if ((v === "pO2" || v === "pCO2") && H.pref("kpa")) t.trazas.forEach(function (tr) { if (tr.y) tr.y = tr.y.map(function (y) { return y === null ? null : y / C.KPA; }); if (tr.error_y) tr.error_y.array = tr.error_y.array.map(function (y) { return y / C.KPA; }); }); }
         if (!t.trazas.length) { el.innerHTML = "<div class=\"vacio\" style=\"margin:20px\">Sin datos de " + esc(t.vd.nombre) + " en las perfusiones seleccionadas.</div>"; return; }
         P.react(el, t.trazas, ly, { responsive: true, displaylogo: false, locale: "es", modeBarButtonsToRemove: ["lasso2d", "select2d"], toImageButtonOptions: { format: "png", scale: 3, filename: nombreArchivo(v) } });

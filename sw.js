@@ -1,10 +1,10 @@
 // HOME · service worker: app instalable, funcionamiento sin conexión (copia de la propia web) y notificaciones push.
 // Las llamadas al servidor (Apps Script) nunca se guardan en caché. El aviso push llega vacío: el texto se pide
 // al servidor con el código propio de este dispositivo (guardado en IndexedDB «home-push»).
-var CACHE = "home-0.3.0";
-var BASE = ["./", "index.html", "app.css", "config.js", "sprite.js", "calc.js", "demo.js", "app_core.js", "app_vistas.js", "app_exp.js", "app_exp2.js", "app_graf.js", "app_inv.js", "app_v02.js", "app_v03a.js", "app_v03b.js", "app_v03c.js", "lib/qrcode.js",
-  "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png", "fonts/roboto-latin-400-normal.woff2", "fonts/roboto-latin-500-normal.woff2", "fonts/roboto-latin-700-normal.woff2", "fonts/roboto-mono-latin-500-normal.woff2"];
-self.addEventListener("install", function (e) { e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(BASE).catch(function () { }); }).then(function () { return self.skipWaiting(); })); });
+var CACHE = "home-0.4.0";
+var BASE = ["./", "index.html", "app.css", "config.js", "sprite.js", "calc.js", "demo.js", "app_core.js", "app_vistas.js", "app_exp.js", "app_exp2.js", "app_graf.js", "app_inv.js", "app_v02.js", "app_v03a.js", "app_v03b.js", "app_v03c.js", "app_v04.js", "qrcode.js",
+  "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png", "roboto-latin-400-normal.woff2", "roboto-latin-500-normal.woff2", "roboto-latin-700-normal.woff2", "roboto-mono-latin-500-normal.woff2", "plotly-cartesian.min.js", "xlsx.full.min.js"];
+self.addEventListener("install", function (e) { e.waitUntil(caches.open(CACHE).then(function (c) { return Promise.all(BASE.map(function (u) { return c.add(u).catch(function () { }); }));   // un archivo que falte no impide guardar los demás }).then(function () { return self.skipWaiting(); })); });
 self.addEventListener("activate", function (e) { e.waitUntil(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k.indexOf("home-") === 0 && k !== CACHE; }).map(function (k) { return caches.delete(k); })); }).then(function () { return self.clients.claim(); })); });
 self.addEventListener("fetch", function (e) {
   var u = new URL(e.request.url); if (e.request.method !== "GET" || u.origin !== self.location.origin) return;   // el servidor de datos va siempre por la red
