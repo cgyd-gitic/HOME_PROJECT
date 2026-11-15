@@ -1,20 +1,71 @@
-// HOME · service worker: app instalable, funcionamiento sin conexión (copia de la propia web) y notificaciones push.
-// Las llamadas al servidor (Apps Script) nunca se guardan en caché. El aviso push llega vacío: el texto se pide
-// al servidor con el código propio de este dispositivo (guardado en IndexedDB «home-push»).
-var CACHE = "home-0.4.0";
-var BASE = ["./", "index.html", "app.css", "config.js", "sprite.js", "calc.js", "demo.js", "app_core.js", "app_vistas.js", "app_exp.js", "app_exp2.js", "app_graf.js", "app_inv.js", "app_v02.js", "app_v03a.js", "app_v03b.js", "app_v03c.js", "app_v04.js", "qrcode.js",
-  "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png", "roboto-latin-400-normal.woff2", "roboto-latin-500-normal.woff2", "roboto-latin-700-normal.woff2", "roboto-mono-latin-500-normal.woff2", "plotly-cartesian.min.js", "xlsx.full.min.js"];
-self.addEventListener("install", function (e) { e.waitUntil(caches.open(CACHE).then(function (c) { return Promise.all(BASE.map(function (u) { return c.add(u).catch(function () { }); }));   // un archivo que falte no impide guardar los demás }).then(function () { return self.skipWaiting(); })); });
-self.addEventListener("activate", function (e) { e.waitUntil(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k.indexOf("home-") === 0 && k !== CACHE; }).map(function (k) { return caches.delete(k); })); }).then(function () { return self.clients.claim(); })); });
-self.addEventListener("fetch", function (e) {
-  var u = new URL(e.request.url); if (e.request.method !== "GET" || u.origin !== self.location.origin) return;   // el servidor de datos va siempre por la red
-  if (/config\.js$/.test(u.pathname)) { e.respondWith(fetch(e.request).catch(function () { return caches.match(e.request); })); return; }
-  e.respondWith(caches.open(CACHE).then(function (c) { return c.match(e.request, { ignoreSearch: true }).then(function (r) {
-    var red = fetch(e.request).then(function (resp) { if (resp && resp.ok) c.put(e.request, resp.clone()); return resp; }).catch(function () { return r; });
-    return r || red;
-  }); }));
+// Service worker de Gestión CGyAD-GITIC (v0.9.7)
+// 1) Guarda la INTERFAZ (la página lleva dentro la letra y los iconos; los datos nunca se guardan) para que la web abra al instante, también con mala conexión.
+//    La página guardada se muestra enseguida y, a la vez, se pide la publicada: si es distinta, se guarda y la web avisa
+//    («Hay una versión nueva · Actualizar»).
+// 2) Recibe las notificaciones push. El aviso llega vacío: el texto se pide al servidor con el código propio de este dispositivo.
+var CACHE = "gc-app-v2";
+var ESTATICOS = ["manifest.webmanifest", "icon-192.png", "favicon-32.png", "apple-touch-icon.png", "badge-96.png"];
+
+self.addEventListener("install", function (e) {
+  self.skipWaiting();
+  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(["./", "config.js"].concat(ESTATICOS)); }).catch(function () {}));
 });
-function leerCfg() { return new Promise(function (ok) { try { var rq = indexedDB.open("home-push", 1); rq.onupgradeneeded = function () { rq.result.createObjectStore("cfg"); }; rq.onsuccess = function () { try { var g = rq.result.transaction("cfg", "readonly").objectStore("cfg").get("cfg"); g.onsuccess = function () { ok(g.result || null); }; g.onerror = function () { ok(null); }; } catch (e) { ok(null); } }; rq.onerror = function () { ok(null); }; } catch (e) { ok(null); } }); }
+self.addEventListener("activate", function (e) {
+  e.waitUntil(caches.keys().then(function (ks) {
+    return Promise.all(ks.filter(function (k) { return k.indexOf("gc-app-") === 0 && k !== CACHE; }).map(function (k) { return caches.delete(k); }));
+  }).catch(function () {}).then(function () { return self.clients.claim(); }));
+});
+function avisarVersion() {
+  return self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (cs) { cs.forEach(function (c) { c.postMessage({ nuevaVersion: true }); }); }).catch(function () {});
+}
+// Pide el archivo a la red, lo guarda y, si ha cambiado respecto al guardado, avisa a la página
+function revalidar(clave, url) {
+  return fetch(url, { cache: "no-cache" }).then(function (r) {
+    if (!r || !r.ok || r.redirected || (r.type && r.type !== "basic")) return r;
+    var paraGuardar = r.clone(), paraComparar = r.clone();
+    return caches.open(CACHE).then(function (c) {
+      return c.match(clave).then(function (vieja) {
+        return Promise.all([vieja ? vieja.text() : null, paraComparar.text()]).then(function (t) {
+          return c.put(clave, paraGuardar).then(function () { if (t[0] !== null && t[0] !== t[1]) return avisarVersion(); });
+        });
+      });
+    }).catch(function () {}).then(function () { return r; });
+  });
+}
+self.addEventListener("fetch", function (e) {
+  var req = e.request, base = self.registration.scope;
+  if (req.method !== "GET" || req.url.indexOf(base) !== 0) return;                    // el servidor (Apps Script) y lo demás: red normal
+  var ruta = req.url.slice(base.length).split("?")[0].split("#")[0];
+  var esPagina = req.mode === "navigate" || ruta === "" || ruta === "index.html";
+  if (esPagina || ruta === "config.js") {
+    var clave = esPagina ? "./" : "config.js", url = esPagina ? base : base + "config.js";
+    e.respondWith(caches.open(CACHE).then(function (c) { return c.match(clave); }).then(function (guardada) {
+      var red = revalidar(clave, url);
+      if (guardada) { e.waitUntil(red.catch(function () {})); return guardada; }
+      return red;
+    }).catch(function () { return fetch(req); }));
+    return;
+  }
+  if (/^(icon-|favicon-|apple-touch-icon|badge-|manifest\.webmanifest)/.test(ruta)) {
+    e.respondWith(caches.open(CACHE).then(function (c) {
+      return c.match(req, { ignoreSearch: true }).then(function (g) {
+        return g || fetch(req).then(function (r) { if (r && r.ok) c.put(req, r.clone()); return r; });
+      });
+    }).catch(function () { return fetch(req); }));
+  }
+});
+
+// ---- notificaciones push ----
+function leerCfg() {
+  return new Promise(function (ok) {
+    try {
+      var rq = indexedDB.open("gc-push", 1);
+      rq.onupgradeneeded = function () { rq.result.createObjectStore("cfg"); };
+      rq.onsuccess = function () { try { var g = rq.result.transaction("cfg", "readonly").objectStore("cfg").get("cfg"); g.onsuccess = function () { ok(g.result || null); }; g.onerror = function () { ok(null); }; } catch (e) { ok(null); } };
+      rq.onerror = function () { ok(null); };
+    } catch (e) { ok(null); }
+  });
+}
 function pedirAvisos(cfg) {
   if (!cfg || !cfg.api || !cfg.secreto) return Promise.resolve([]);
   return fetch(cfg.api, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ fn: "webPushPendientes", args: [cfg.secreto] }), redirect: "follow" })
@@ -22,13 +73,16 @@ function pedirAvisos(cfg) {
 }
 self.addEventListener("push", function (e) {
   e.waitUntil(leerCfg().then(pedirAvisos).then(function (lista) {
-    if (!lista.length) lista = [{ id: "general", titulo: "HOME · perfusión", texto: "Tienes avisos nuevos. Abre la app para verlos.", vista: "inicio" }];
-    return Promise.all(lista.map(function (a) { return self.registration.showNotification(a.titulo || "HOME", { body: a.texto || "", icon: "icon-192.png", badge: "icon-192.png", tag: "home-" + (a.id || "general"), renotify: true, requireInteraction: /recalent|critic|alerta/i.test(a.titulo || ""), vibrate: [300, 150, 300], data: { vista: a.vista || "inicio" } }); }));
+    if (!lista.length) lista = [{ id: "general", titulo: "Gestión CGyAD-GITIC", texto: "Tienes avisos nuevos. Abre la app para verlos.", vista: "inicio" }];
+    return Promise.all(lista.map(function (a) {
+      return self.registration.showNotification(a.titulo || "Gestión CGyAD-GITIC", {
+        body: a.texto || "", icon: "icon-192.png", badge: "badge-96.png", tag: "gc-" + (a.id || "general"), silent: !!a.repetido, data: { vista: a.vista || "inicio" } });
+    }));
   }));
 });
-function rutaDe(v) { var p = String(v || "inicio").split(":"); return p[0] === "exp" && p[1] ? "exp/" + encodeURIComponent(p[1]) + "/" + (p[2] || "resumen") : p[0]; }
 self.addEventListener("notificationclick", function (e) {
-  e.notification.close(); var vista = (e.notification.data && e.notification.data.vista) || "inicio", url = new URL("./#/" + rutaDe(vista), self.registration.scope).href;
+  e.notification.close();
+  var vista = (e.notification.data && e.notification.data.vista) || "inicio", url = new URL("./#ir=" + vista, self.registration.scope).href;
   e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (cs) {
     for (var i = 0; i < cs.length; i++) if (cs[i].url.indexOf(self.registration.scope) === 0 && "focus" in cs[i]) { cs[i].postMessage({ ir: vista }); return cs[i].focus(); }
     return self.clients.openWindow(url);
