@@ -866,3 +866,138 @@ html.tema-oscuro .crono-heroe { background: linear-gradient(140deg, var(--pri-cl
 .mf-l { fill: none; stroke-width: 3; stroke-linecap: round; } .mf-anillo { fill: none; stroke-width: 3; stroke-dasharray: 5 4; }
 .mf-et text { font-size: 11px; font-weight: 700; fill: #fff; font-family: inherit; }
 .lista-morfo { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 8px; padding: 0; list-style: none; } .lista-morfo li { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--sup2); } .lista-morfo span { font-size: 13px; color: var(--tenue); }
+
+/* =====================================================================================================================
+   v0.6 · ALINEACIÓN DE CASILLAS (Safari/iPhone/iPad y ordenador)
+   1) Todas las casillas (texto, número, fecha, hora, desplegable) tienen la MISMA altura y el mismo aspecto.
+   2) En cada fila de una rejilla, la etiqueta ocupa el hueco que sobra: las casillas quedan a la misma altura
+      aunque una etiqueta ocupe dos líneas. Si alguna casilla de la fila tiene texto de ayuda, las demás reservan su hueco.
+   ===================================================================================================================== */
+:root { --alto-in: 40px; --alto-in-t: 34px; }
+input:where(:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]):not([type=file]):not([type=hidden])), select {
+  box-sizing: border-box; height: var(--alto-in); min-height: var(--alto-in); line-height: 1.25; margin: 0; }
+select { -webkit-appearance: none; appearance: none; padding-right: 32px; text-overflow: ellipsis;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a96a0' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 11px center; background-size: 12px 12px; }
+select::-ms-expand { display: none; }
+input[type=date], input[type=time], input[type=datetime-local], input[type=month] { display: block; min-width: 0; width: 100%; text-align: left; }
+input::-webkit-date-and-time-value { text-align: left; margin: 0; min-height: 1.25em; }   /* iOS: centra el texto y encoge las fechas vacías */
+input::-webkit-datetime-edit { padding: 0; line-height: 1.25; }
+input[type=search] { -webkit-appearance: none; appearance: none; }
+textarea { min-height: 76px; height: auto; line-height: 1.4; }
+input:disabled, select:disabled, textarea:disabled, input[readonly] { opacity: 1; -webkit-text-fill-color: var(--tenue); color: var(--tenue); background-color: var(--sup2); }
+
+.campo { display: flex; flex-direction: column; min-width: 0; }
+.campo > .et, .campo > label.et, .campo > legend.et { flex: 1 0 auto; display: flex; align-items: flex-end; margin: 0 0 5px; line-height: 1.25; min-height: 1.25em; }
+.campo > .et + * { flex: none; }
+.campo > .ayuda { min-height: 1.3em; line-height: 1.3; margin-top: 4px; }
+.rejilla:has(> .campo > .ayuda) > .campo:not(:has(> .ayuda)):not(.span-todo)::after { content: ""; display: block; height: calc(1.3em + 4px); font-size: 12px; }
+.rejilla { align-items: stretch; row-gap: 2px; }
+.pg-rejilla { align-items: stretch; }
+.unidad-in, .con-ahora, .con-u { min-width: 0; }
+.unidad-in input { width: 100%; }
+.unidad-in span { line-height: 1; }
+.con-ahora { display: flex; gap: 6px; align-items: stretch; }
+.con-ahora > input { flex: 1 1 0; width: 0; min-width: 0; }
+.con-ahora > .bt { flex: none; min-height: var(--alto-in); height: var(--alto-in); padding: 0 12px; }
+.rejilla.cuatro:has(.con-ahora), .rejilla.cinco:has(.con-ahora) { grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); }
+.check-campo .check { min-height: var(--alto-in); }
+.campo .check { min-height: var(--alto-in); }
+/* casillas dentro de tablas: un poco más bajas, todas iguales */
+.t td input:where(:not([type=checkbox]):not([type=radio])), .t td select { height: var(--alto-in-t); min-height: var(--alto-in-t); }
+.t td .con-ahora > .bt { height: var(--alto-in-t); min-height: var(--alto-in-t); }
+.t td, .t th { vertical-align: middle; }
+.con-u input { min-height: var(--alto-in-t); height: var(--alto-in-t); }
+/* filas de participantes (Programar experimento) */
+.part-fila { align-items: end; }
+.part-fila .ppQuitar { height: var(--alto-in); width: 40px; margin: 0; }
+.part-fila .campo > .et { flex: none; }
+/* tarjetas de procedimientos programados (Calendario): mismas columnas en todas */
+.prog .hitos { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 1fr; }
+@media (max-width: 899px) { .prog .hitos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.prog .hito { min-height: 78px; display: flex; flex-direction: column; justify-content: space-between; }
+.prog-tit { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.prog-tit .chip { height: 26px; display: inline-flex; align-items: center; }
+.part-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 6px 16px; width: 100%; }
+.part-cat { display: flex; flex-direction: column; min-width: 0; } .part-cat .pc-et { font-size: 11.5px; color: var(--muy-tenue); text-transform: uppercase; letter-spacing: .03em; } .part-cat .pc-n { color: var(--texto); font-weight: 500; overflow-wrap: anywhere; }
+.pg-rejilla .ayuda, #pgProtA { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* KPI: los números largos no se salen de su recuadro ni se montan sobre el siguiente */
+.kpi { overflow: hidden; }
+.kpi .v { overflow-wrap: anywhere; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 4px; }
+.kpi .v small { white-space: nowrap; margin-left: 0; }
+.kpis + .sangre, .kpis + .kpis, .kpis + .rejilla, .sangre + .rejilla, .kpis + p { margin-top: 12px; }
+.sangre .kpis { margin-bottom: 0; }
+/* separación del menú lateral (tabletas y ordenador) y de las tablas anchas */
+@media (min-width: 600px) { .lienzo { margin-left: calc(var(--riel-w) + 40px); } }
+@media (min-width: 600px) and (max-width: 1099px) { .lienzo { margin-left: calc(var(--riel-w) + 30px); } }
+.principal .tabla-env, .principal .hoja { max-width: 100%; }
+.hoja-ruta { margin-left: 0; }
+/* avatar: iniciales centradas */
+.avatar { display: inline-flex !important; align-items: center; justify-content: center; padding: 0; line-height: 1; text-align: center; letter-spacing: 0; vertical-align: middle; }
+.avatar > span { display: block; line-height: 1; margin: 0; padding: 0; text-align: center; width: auto; transform: translateY(.02em); }
+img.avatar { display: block !important; }
+
+/* ---------- campana: «Marcar todas como leídas» y número debajo de cada filtro ---------- */
+.pop-cab { gap: 8px; } .pop-cab h2 { flex: 1; }
+.alertas-filtro { border-radius: 16px; } .alertas-filtro button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; border-radius: 13px !important; padding: 6px 4px; line-height: 1.15; min-height: 46px; }
+.alertas-filtro .et-f { font-size: 12.5px; } .alertas-filtro .n { display: block; margin: 0; font-size: 15px; font-weight: 700; color: var(--texto); font-variant-numeric: tabular-nums; }
+.alertas-filtro button:not(.activo) .n { color: var(--tenue); font-weight: 500; }
+
+/* ---------- gráficos de Inicio: basal del donante de hígado y ampliación ---------- */
+.ge-ref { stroke: #b45309; stroke-width: 1.5; stroke-dasharray: 5 3; } .lg-ref { border-top-color: #b45309 !important; }
+.ge-ref-tx { font-size: 11px; fill: #b45309; font-weight: 500; }
+html.tema-oscuro .ge-ref { stroke: #f59e0b; } html.tema-oscuro .ge-ref-tx { fill: #f59e0b; } html.tema-oscuro .lg-ref { border-top-color: #f59e0b !important; }
+.g-tarjeta[data-ampliar] { cursor: zoom-in; transition: box-shadow .15s; } .g-tarjeta[data-ampliar]:hover { box-shadow: inset 0 0 0 1.5px var(--borde-f); } .g-tarjeta[data-ampliar]:focus-visible { outline: 2px solid var(--pri); outline-offset: 2px; }
+.g-ayuda { margin-left: auto; font-style: italic; }
+.g-ampliado { position: fixed; inset: 0; z-index: 200; background: rgba(10, 18, 22, .55); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); cursor: zoom-out; -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); animation: ampAparece .15s ease-out; }
+@keyframes ampAparece { from { opacity: 0; } to { opacity: 1; } }
+.g-amp-caja { width: min(980px, 100%); max-height: 100%; overflow: auto; background: var(--sup); border-radius: 22px; padding: 16px 18px 10px; box-shadow: 0 20px 60px rgba(0, 0, 0, .3); }
+.g-amp-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 6px; } .g-amp-cab b { display: block; font-size: 17px; font-weight: 500; } .g-amp-cab .muy-tenue { font-size: 13px; }
+.g-amp-caja .graf-ejes { width: 100%; height: auto; display: block; }
+.g-amp-pie { text-align: center; margin: 4px 0 0; font-size: 12px; }
+body.con-ampliado { overflow: hidden; }
+
+/* ---------- Experimentos: Todos / Programados y en curso / Histórico ---------- */
+.vista-exp { display: flex; width: fit-content; max-width: 100%; margin: 0 0 12px; overflow-x: auto; }
+.vista-exp a { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 999px; color: var(--tenue); text-decoration: none; font-weight: 500; white-space: nowrap; min-height: 32px; }
+.vista-exp a.activo { background: var(--sup); color: var(--texto); box-shadow: 0 1px 3px rgba(16, 24, 32, .14); }
+.vista-exp .n { font-size: 12px; color: var(--muy-tenue); font-variant-numeric: tabular-nums; }
+.intro-hist { margin: -4px 0 12px; }
+.titulo-pag { flex-wrap: wrap; gap: 8px; }
+
+/* ---------- Preparación por pestañas ---------- */
+.prep-tabs button { display: inline-flex; align-items: center; gap: 6px; } .prep-tabs .n { font-size: 11.5px; color: var(--muy-tenue); font-variant-numeric: tabular-nums; } .prep-tabs .activo .n { color: var(--tenue); }
+.prep-resumen { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; margin-bottom: 12px; border-radius: var(--r); background: var(--sup); box-shadow: var(--anillo); }
+.prep-cab { align-items: center; margin-bottom: 10px; } .prep-cab p { margin: 0; flex: 1 1 320px; }
+.tabla-chk, .tabla-ins { table-layout: fixed; width: 100%; }
+.tabla-chk col.c-chk { width: 48px; } .tabla-chk col.c-cant { width: 200px; } .tabla-chk col.c-stock { width: 96px; } .tabla-chk col.c-est { width: 176px; }
+.tabla-chk td.chk { text-align: center; } .tabla-chk .nom, .tabla-ins .nom { display: block; overflow-wrap: anywhere; } .tabla-chk .ref { display: block; font-size: 12px; }
+.cant-u { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; width: 100%; } .cant-u input { width: 96px; flex: none; text-align: right; } .cant-u span { width: 52px; text-align: left; color: var(--tenue); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tabla-ins col.c-ref { width: 92px; } .tabla-ins col.c-num { width: 96px; } .tabla-ins col.c-rec { width: 112px; } .tabla-ins col.c-dif { width: 128px; }
+.tabla-ins td input { width: 80px; text-align: right; margin-left: auto; display: block; } .tabla-ins tr.falta td { background: color-mix(in srgb, var(--al) 7%, transparent); }
+.mono { font-family: "Roboto Mono", ui-monospace, monospace; font-size: 12px; }
+.caja-ins .cabecera h3 { display: inline-flex; align-items: center; gap: 6px; } .caja-ins.no-necesaria { opacity: .78; }
+.caja-estado { margin-bottom: 8px; } .recuento-res { min-height: var(--alto-in); display: flex; align-items: center; } .txt-al { color: var(--al); }
+.caja-acc { margin-top: 10px; gap: 8px; }
+@media (max-width: 720px) {
+  .tabla-chk col.c-cant { width: 132px; } .tabla-chk col.c-est { width: 118px; } .tabla-chk col.c-stock { width: 64px; } .cant-u input { width: 64px; } .cant-u span { width: 36px; }
+  .tabla-ins col.c-ref { width: 0; } .tabla-ins td.ref, .tabla-ins th:first-child { display: none; } .tabla-ins col.c-num { width: 58px; } .tabla-ins col.c-rec { width: 74px; } .tabla-ins col.c-dif { width: 92px; } .tabla-ins td input { width: 60px; }
+}
+@media (max-width: 520px) { .tabla-chk, .tabla-ins { table-layout: auto; min-width: 520px; } }
+/* tabla de infusiones: producto elegible del catálogo */
+.prot-prod { margin-top: 4px; height: var(--alto-in-t) !important; min-height: var(--alto-in-t) !important; font-size: 13px; }
+
+/* ---------- Cirugía: morfometría, hemodinámica y exanguinación ---------- */
+.rejilla.cuatro.morfo-rejilla, .tarjeta .rejilla.cuatro, .tarjeta .rejilla.cinco { row-gap: 2px; }
+.morfo-svg { width: 100%; height: auto; display: block; background: linear-gradient(#f3f7f8, #e9f0f2); border-radius: 16px; }
+html.tema-oscuro .morfo-svg { background: linear-gradient(#1d2a30, #172227); }
+.morfo-svg .mf-l { fill: none; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 7 5; }
+.morfo-svg .mf-anillo { fill: none; stroke-width: 3; stroke-dasharray: 6 4; }
+
+/* ---------- Seguimiento: tablas con aire respecto al menú y entre bloques ---------- */
+.segmentado.nivel { margin-bottom: 12px; }
+.tabla-fija, .tabla-prot, .tabla-eval, .tabla-sup { margin-top: 2px; }
+.principal > .ancho > .tabla-env, .principal .seg-cuerpo > .tabla-env { margin-bottom: var(--hueco); }
+.aviso-version { position: sticky; top: 0; z-index: 300; padding: 10px 16px; background: #fde68a; color: #422006; font-size: 14px; text-align: center; }
+.detalle-error pre { white-space: pre-wrap; font-size: 11px; max-height: 160px; overflow: auto; background: var(--sup2); padding: 8px; border-radius: 8px; }
+@media (pointer: coarse) { :root { --alto-in: 44px; --alto-in-t: 40px; } }

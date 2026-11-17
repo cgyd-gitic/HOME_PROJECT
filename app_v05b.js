@@ -24,7 +24,7 @@
   H.participo = function (e) { var yo = String((S.usuario || {}).email || "").toLowerCase(); return H.participantes(e).some(function (x) { return x.Email === yo; }); };
   function textoParticipantes(e) {
     var g = {}; H.participantes(e).forEach(function (x) { var c = x.Categoria || "Participantes"; (g[c] = g[c] || []).push(x.Nombre + (x.Email ? "" : " (sin correo)")); });
-    return Object.keys(g).map(function (c) { return "<span><b>" + esc(c) + ":</b> " + esc(g[c].join(", ")) + "</span>"; }).join("");
+    return Object.keys(g).map(function (c) { return '<div class="part-cat"><span class="pc-et">' + esc(c) + '</span><span class="pc-n">' + esc(g[c].join(", ")) + "</span></div>"; }).join("");   // v0.6: en columnas alineadas
   }
 
   // ============================================================== CALENDARIO (barras continuas por fase, como el calendario de Apple)
@@ -92,7 +92,7 @@
     var tipos = [["puesta", C.TIPOS_PROC[0]], ["perfusion", C.TIPOS_PROC[1]], ["trasplante", C.TIPOS_PROC[2]]];
     return '<fieldset class="campo pg-tipo"><legend class="et">Tipo de procedimiento</legend><div class="segmentado ancho-total" role="radiogroup">' + tipos.map(function (t) { return '<label class="seg-op"><input type="radio" name="pgTipo" value="' + t[0] + '"' + (t[0] === tipo ? " checked" : "") + "><span>" + esc(t[1]) + "</span></label>"; }).join("") + "</div></fieldset>" +
       '<div class="rejilla dos pg-rejilla"><div class="campo"><label class="et" for="pgProt">Versión del protocolo</label><select id="pgProt">' + C.VERSIONES.map(function (v) { var p = C.PROTOCOLOS[v]; return '<option value="' + v + '"' + (v === ver ? " selected" : "") + ">" + v + " · " + esc(p.propuesto ? "propuesto" : p.ref) + "</option>"; }).join("") + '</select><div class="ayuda" id="pgProtA">' + esc((C.PROTOCOLOS[ver] || {}).notas || "") + "</div></div>" +
-      '<div class="campo"><label class="et" for="pgEst">Estado de la fecha</label><select id="pgEst"><option' + (nuevo || e.Programacion === "Provisional" ? " selected" : "") + ">Provisional</option><option" + (!nuevo && e.Programacion !== "Provisional" ? " selected" : "") + '>Confirmado</option></select><div class="ayuda">Confirmado envía la cita a los participantes.</div></div>' +
+      '<div class="campo"><label class="et" for="pgEst">Estado de la fecha</label><select id="pgEst"><option' + (nuevo || e.Programacion === "Provisional" ? " selected" : "") + ">Provisional</option><option" + (!nuevo && e.Programacion !== "Provisional" ? " selected" : "") + '>Confirmado</option>' + (!nuevo && e.Programacion === "Histórico" ? '<option selected value="Histórico">Histórico (perfusión anterior)</option>' : "") + '</select><div class="ayuda">' + (!nuevo && e.Programacion === "Histórico" ? "Registro de una perfusión anterior: no se envían avisos." : "Confirmado envía la cita a los participantes.") + "</div></div>" +
       campoFecha("pgLl", "Llegada prevista de los animales", e.Fecha_llegada || (e.Fecha_cirugia ? C.sumarDias(e.Fecha_cirugia, -cfgP().dias_llegada_antes) : ""), cfgP().dias_llegada_antes + " días antes de la hepatectomía") +
       campoFecha("pgQx", "Hepatectomía e inicio de la perfusión", e.Fecha_cirugia, "Las demás fechas se calculan a partir de esta") +
       '<div class="pg-tx' + (tipo === "trasplante" ? "" : " oculto") + '">' + campoFecha("pgTx", "Trasplante del injerto", e.Fecha_trasplante, "Tras " + cfgP().dias_perfusion + " días de perfusión") + "</div>" +
@@ -251,3 +251,5 @@
       '<section class="tarjeta"><div class="cabecera"><h2>Animales</h2><a class="bt mini" href="#/exp/' + id + '/dieta">' + ico("utensils", "s") + "Dieta</a></div>" + animalesTab + "</section></div>" + cronologia(e);
   };
 })();
+
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v05b.js"] = "0.6.0";

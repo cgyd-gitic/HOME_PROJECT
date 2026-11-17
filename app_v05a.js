@@ -24,6 +24,8 @@
   var NOMBRE_TABLA = { Mediciones: "datos", Eventos: "evento", Fotos: "foto del injerto", Dieta: "registro de dieta", Formularios: "formulario", Experimentos: "datos del experimento", Animales: "datos de los animales" };
   var NOMBRE_FORM = { cirugia: "hoja de cirugía", checklist: "checklist de material", hdf: "configuración de la HDF", cierre: "cierre", protocolo: "tabla de infusiones", receptor: "hoja del receptor", morfometria: "morfometría", eutanasia: "eutanasia" };
   function vistoAlertas() { return C.num(localStorage.getItem("home_alertas_vistas")) || 0; }
+  function leidas() { try { return JSON.parse(localStorage.getItem("home_alertas_leidas") || "{}") || {}; } catch (e) { return {}; } }
+  function esNueva(x, v, lei) { return x.tipo === "accion" ? !lei[x.id] : x.t.getTime() > v; }   // v0.6: «Marcar todas como leídas» también vale para las que requieren acción
   H.alertasAccion = function () {
     var out = [], ahora = new Date(), hoy = C.diaISO(ahora), cfgP = S.cfg.programacion || C.DEF.programacion, adm = H.esAdmin();
     if (adm) {
@@ -61,19 +63,19 @@
     return Object.keys(grupos).map(function (k) { var g = grupos[k]; g.tipo = "actualizacion"; g.texto = (g.n > 1 ? g.n + " cambios · " : "") + "por " + H.nombreDe(g.por); return g; });
   };
   function alertas() { var a = H.alertasAccion().concat(H.alertasActualizaciones()); return a.sort(function (x, y) { return x.t - y.t; }); }
-  function nuevas(l) { var v = vistoAlertas(); return l.filter(function (x) { return x.tipo === "accion" || x.t.getTime() > v; }).length; }
+  function nuevas(l) { var v = vistoAlertas(), lei = leidas(); return l.filter(function (x) { return esNueva(x, v, lei); }).length; }
   H.campanaHTML = function () {
     var n = 0; try { n = nuevas(alertas()); } catch (e) { n = 0; }
     return '<button class="bt ico-solo campana" data-act="abrirAlertas" aria-haspopup="dialog" aria-label="Alertas' + (n ? " (" + n + " nuevas)" : "") + '">' + ico("bell") + (n ? '<span class="cont">' + (n > 99 ? "99+" : n) + "</span>" : "") + "</button>";
   };
   var POP = { filtro: "todas" };
   function listaAlertasHTML() {
-    var l = alertas(), v = vistoAlertas(), f = POP.filtro, sel = l.filter(function (x) { return f === "todas" || (f === "accion" ? x.tipo === "accion" : x.tipo === "actualizacion"); });
-    if (sel.length > 60) sel = sel.slice(-60);
+    var l = alertas(), v = vistoAlertas(), lei = leidas(), f = POP.filtro, sel = l.filter(function (x) { return f === "todas" || (f === "accion" ? x.tipo === "accion" : x.tipo === "actualizacion"); });
+    if (sel.length > 60) { var acc = sel.filter(function (x) { return x.tipo === "accion"; }), upd = sel.filter(function (x) { return x.tipo !== "accion"; }); sel = acc.concat(upd.slice(-Math.max(20, 60 - acc.length))).sort(function (a, b) { return a.t - b.t; }); }   // v0.6: las que requieren acción no se pierden
     var n = { todas: l.length, accion: l.filter(function (x) { return x.tipo === "accion"; }).length, actualizacion: l.filter(function (x) { return x.tipo === "actualizacion"; }).length };
-    return '<div class="segmentado alertas-filtro" role="tablist" aria-label="Filtrar alertas">' + [["todas", "Todas"], ["accion", "Requieren acción"], ["actualizacion", "Actualizaciones"]].map(function (x) { return '<button role="tab" aria-selected="' + (f === x[0]) + '" class="' + (f === x[0] ? "activo" : "") + '" data-act="filtroAlertas" data-f="' + x[0] + '">' + x[1] + ' <span class="n">' + n[x[0]] + "</span></button>"; }).join("") + "</div>" +
+    return '<div class="segmentado alertas-filtro" role="tablist" aria-label="Filtrar alertas">' + [["todas", "Todas"], ["accion", "Requieren acción"], ["actualizacion", "Actualizaciones"]].map(function (x) { return '<button role="tab" aria-selected="' + (f === x[0]) + '" class="' + (f === x[0] ? "activo" : "") + '" data-act="filtroAlertas" data-f="' + x[0] + '"><span class="et-f">' + x[1] + '</span><span class="n">' + n[x[0]] + "</span></button>"; }).join("") + "</div>" +
       (sel.length ? '<ol class="lista-alertas">' + sel.map(function (x) {
-        var nueva = x.tipo === "accion" || x.t.getTime() > v;
+        var nueva = esNueva(x, v, lei);
         return '<li class="' + (x.tipo === "accion" ? "accion" : "upd") + (nueva ? " nueva" : "") + '"><a href="' + esc(x.href || "#/inicio") + '" data-cerrar-alertas>' + '<span class="ic">' + ico(x.icono || "bell", "s") + '</span><span class="tx"><b>' + esc(x.titulo) + "</b>" + (x.texto ? "<span>" + esc(x.texto) + "</span>" : "") + '</span><time datetime="' + esc(x.t.toISOString()) + '">' + esc(H.diaCorto(x.t) + " " + H.hora(x.t)) + "</time></a></li>";
       }).join("") + "</ol>" : '<p class="tenue vacio-alertas">' + (f === "accion" ? "No hay nada pendiente de tu parte." : "Sin novedades en los últimos 7 días.") + "</p>") +
       '<p class="muy-tenue pie-alertas">Orden cronológico, de la más antigua a la más reciente. Actualizaciones de los últimos 7 días hechas por otras personas.</p>';
@@ -81,7 +83,7 @@
   H.acc.abrirAlertas = function (el) {
     var ex = H.$("#popAlertas"); if (ex) { cerrarPop(); return; }
     var d = document.createElement("div"); d.id = "popAlertas"; d.className = "pop-alertas"; d.setAttribute("role", "dialog"); d.setAttribute("aria-label", "Alertas");
-    d.innerHTML = '<div class="pop-cab"><h2>Alertas</h2><button class="bt ico-solo texto" data-act="cerrarAlertas" aria-label="Cerrar">' + ico("x") + '</button></div><div class="pop-cuerpo">' + listaAlertasHTML() + "</div>";
+    d.innerHTML = '<div class="pop-cab"><h2>Alertas</h2><button class="bt mini" data-act="leerAlertas">' + ico("check-check", "s") + 'Marcar todas como leídas</button><button class="bt ico-solo texto" data-act="cerrarAlertas" aria-label="Cerrar">' + ico("x") + '</button></div><div class="pop-cuerpo">' + listaAlertasHTML() + "</div>";
     document.body.appendChild(d); var fondo = document.createElement("div"); fondo.id = "popFondo"; fondo.className = "pop-fondo"; fondo.addEventListener("click", cerrarPop); document.body.appendChild(fondo);
     d.addEventListener("click", function (e) { var a = e.target.closest("[data-cerrar-alertas]"); if (a) { cerrarPop(); } });
     var c = el.closest(".campana") || el; if (c && c.getBoundingClientRect && window.innerWidth >= 600) { var r = c.getBoundingClientRect(); d.style.top = Math.round(r.bottom + 8) + "px"; d.style.right = Math.max(12, Math.round(window.innerWidth - r.right)) + "px"; }
@@ -89,6 +91,12 @@
   };
   function cerrarPop() { var d = H.$("#popAlertas"), f = H.$("#popFondo"); if (d) d.remove(); if (f) f.remove(); var c = H.$(".campana"); if (c) c.outerHTML = H.campanaHTML(); }
   H.acc.cerrarAlertas = cerrarPop;
+  // v0.6: marca todas como leídas (solo se han visto; no significa que estén resueltas)
+  H.acc.leerAlertas = function () {
+    var lei = leidas(); alertas().forEach(function (x) { if (x.tipo === "accion") lei[x.id] = Date.now(); });
+    localStorage.setItem("home_alertas_leidas", JSON.stringify(lei)); localStorage.setItem("home_alertas_vistas", String(Date.now())); localStorage.setItem("home_alertas_vistas_prev", String(Date.now()));
+    var c = H.$("#popAlertas .pop-cuerpo"); if (c) c.innerHTML = listaAlertasHTML(); H.toast("Todas las alertas marcadas como leídas.");
+  };
   H.acc.filtroAlertas = function (el) { POP.filtro = el.getAttribute("data-f"); var c = H.$("#popAlertas .pop-cuerpo"); if (c) { var v = localStorage.getItem("home_alertas_vistas"); localStorage.setItem("home_alertas_vistas", localStorage.getItem("home_alertas_vistas_prev") || "0"); c.innerHTML = listaAlertasHTML(); localStorage.setItem("home_alertas_vistas", v); } };
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && H.$("#popAlertas")) cerrarPop(); });
 
@@ -142,7 +150,7 @@
   }
   function fmt(v, dec) { return H.n(v, Math.max(0, Math.min(dec, Math.abs(v) >= 100 ? 0 : Math.abs(v) >= 10 ? 1 : dec))); }
   H.graficoEjes = function (pts, o) {
-    o = o || {}; var W = 320, Hh = 158, L = 44, R = 10, T = 10, B = 26, pw = W - L - R, ph = Hh - T - B;
+    o = o || {}; var W = o.W || 320, Hh = o.H || 158, L = o.W ? 56 : 44, R = o.W ? 64 : 10, T = 10, B = o.W ? 34 : 26, pw = W - L - R, ph = Hh - T - B;
     var x0 = o.x0 !== undefined ? o.x0 : 0, x1 = o.x1 !== undefined ? o.x1 : Math.max(1, pts.length ? pts[pts.length - 1].t : 1); if (x1 <= x0) x1 = x0 + 1;
     var vis = pts.filter(function (p) { return p.t >= x0 - 1e-9 && p.t <= x1 + 1e-9; }), banda = (o.banda || []).filter(function (b) { return b.t >= x0 - 1e-9 && b.t <= x1 + 1e-9; });
     var ys = vis.map(function (p) { return p.v; }); banda.forEach(function (b) { ys.push(b.m); if (b.s !== null) { ys.push(b.m - b.s); ys.push(b.m + b.s); } }); if (o.ob) { if (o.ob[0] !== null) ys.push(o.ob[0]); if (o.ob[1] !== null) ys.push(o.ob[1]); } if (o.ref !== null && o.ref !== undefined) ys.push(o.ref);
@@ -159,7 +167,7 @@
         g += '<polyline class="ge-de" points="' + bs.map(function (b) { return X(b.t).toFixed(1) + "," + Y(b.m + b.s).toFixed(1); }).join(" ") + '"/><polyline class="ge-de" points="' + bs.map(function (b) { return X(b.t).toFixed(1) + "," + Y(b.m - b.s).toFixed(1); }).join(" ") + '"/>'; }
       g += '<polyline class="ge-media" points="' + banda.map(function (b) { return X(b.t).toFixed(1) + "," + Y(b.m).toFixed(1); }).join(" ") + '"/>';
     }
-    if (o.ref !== null && o.ref !== undefined) g += '<line class="ge-ref" x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(o.ref).toFixed(1) + '" y2="' + Y(o.ref).toFixed(1) + '"><title>Basal del donante de sangre</title></line>';
+    if (o.ref !== null && o.ref !== undefined) g += '<line class="ge-ref" x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(o.ref).toFixed(1) + '" y2="' + Y(o.ref).toFixed(1) + '"><title>Basal del donante de hígado: ' + esc(H.n(o.ref, o.dec || 1)) + '</title></line>' + (o.W ? '<text class="ge-ref-tx" x="' + (W - R + 4) + '" y="' + (Y(o.ref) + 3.5).toFixed(1) + '">basal LD</text>' : "");
     if (vis.length > 1) g += '<polyline class="ge-linea" points="' + vis.map(function (p) { return X(p.t).toFixed(1) + "," + Y(p.v).toFixed(1); }).join(" ") + '"/>';
     vis.forEach(function (p, i) { var fuera = o.ob ? C.enRango(p.v, o.ob) : 0; g += '<circle class="ge-punto' + (fuera ? " fuera" : "") + (i === vis.length - 1 ? " ultimo" : "") + '" cx="' + X(p.t).toFixed(1) + '" cy="' + Y(p.v).toFixed(1) + '" r="' + (i === vis.length - 1 ? 3.6 : 2.4) + '"><title>' + esc((p.punto || "") + " · " + H.n(p.t, 1) + " h · " + H.n(p.v, o.dec || 1)) + "</title></circle>"; });
     g += '<line class="ge-eje" x1="' + L + '" x2="' + L + '" y1="' + T + '" y2="' + (T + ph) + '"/><line class="ge-eje" x1="' + L + '" x2="' + (W - R) + '" y1="' + (T + ph) + '" y2="' + (T + ph) + '"/>';
@@ -168,19 +176,35 @@
   };
 
   // tarjeta de una variable con valor actual, tendencia y gráfico
-  function basalBD(expId, k) { var p = String(k).split(":"); if (p[0] !== "PERF" && p[0] !== "ART") return null; var m = H.med(expId).filter(function (x) { return x.Muestra === "BASAL_BD" && x.Variable === p[1] && C.num(x.Valor) !== null; })[0]; return m ? C.num(m.Valor) : null; }
+  function basalLD(expId, k) { var p = String(k).split(":"); if (p[0] !== "PERF" && p[0] !== "ART") return null; var m = H.med(expId).filter(function (x) { return x.Muestra === "BASAL_LD" && x.Variable === p[1] && C.num(x.Valor) !== null; })[0]; return m ? C.num(m.Valor) : null; }
   function tarjetaGrafico(e, k, modo, horas) {
     var d = defClave(k), serie = serieClave(e.ID, k).map(function (p) { return { t: p.t, v: C.num(H.aVista(d.v, p.v)), punto: p.punto, tn: p.tn }; }), u = serie[serie.length - 1], a = serie[serie.length - 2];
     var x1 = Math.max(horas, 1), x0 = modo === "24h" ? Math.max(0, x1 - 24) : 0, banda = null, nComp = 0;
     if (modo === "comparar") { var bc = bandaComparacion(e, k); nComp = bc.n; banda = bc.puntos.map(function (b) { return { t: b.t, m: C.num(H.aVista(d.v, b.m)), s: b.s === null ? null : Math.abs(C.num(H.aVista(d.v, b.m + b.s)) - C.num(H.aVista(d.v, b.m))), n: b.n }; }); }
-    var ob = d.ob ? [C.num(H.aVista(d.v, d.ob[0])), C.num(H.aVista(d.v, d.ob[1]))] : null, ref = basalBD(e.ID, k), cls = u && ob ? (C.enRango(u.v, ob) ? "al" : "ok") : "";
+    var ob = d.ob ? [C.num(H.aVista(d.v, d.ob[0])), C.num(H.aVista(d.v, d.ob[1]))] : null, ref = basalLD(e.ID, k), cls = u && ob ? (C.enRango(u.v, ob) ? "al" : "ok") : "";
     var tend = u && a ? (function () { var dv = u.v - a.v, fl = Math.abs(dv) < Math.pow(10, -d.dec) / 2 ? "=" : dv > 0 ? "↑" : "↓"; return '<span class="tend"><span class="flecha" aria-label="' + (fl === "↑" ? "sube" : fl === "↓" ? "baja" : "sin cambio") + '">' + fl + "</span> " + esc(H.n(a.v, d.dec)) + "</span>"; })() : u ? '<span class="tend muy-tenue">primer valor</span>' : "";
-    return '<div class="g-tarjeta ' + cls + '"><div class="g-cab"><div class="g-tit"><span class="et">' + esc(d.nombre) + (d.mu !== "PERF" && d.mu !== "BILIS" && d.mu !== "FLUJO" && d.mu !== "DERIV" ? " · " + esc(NOMBRE_M[d.mu] || d.mu) : "") + '</span><span class="u">' + esc(d.unidad) + (u && u.punto ? " · " + esc(u.punto) : "") + '</span></div><div class="g-val"><b>' + (u ? esc(H.n(u.v, d.dec)) : "—") + "</b>" + tend + "</div></div>" +
+    return '<div class="g-tarjeta ' + cls + '" data-ampliar="' + esc(e.ID) + '" data-k="' + esc(k) + '" data-modo="' + esc(modo) + '" role="button" tabindex="0" aria-label="Ampliar el gráfico de ' + esc(d.nombre) + '"><div class="g-cab"><div class="g-tit"><span class="et">' + esc(d.nombre) + (d.mu !== "PERF" && d.mu !== "BILIS" && d.mu !== "FLUJO" && d.mu !== "DERIV" ? " · " + esc(NOMBRE_M[d.mu] || d.mu) : "") + '</span><span class="u">' + esc(d.unidad) + (u && u.punto ? " · " + esc(u.punto) : "") + '</span></div><div class="g-val"><b>' + (u ? esc(H.n(u.v, d.dec)) : "—") + "</b>" + tend + "</div></div>" +
       H.graficoEjes(serie, { x0: x0, x1: x1, ob: ob, banda: banda, dec: d.dec, ref: ref, titulo: d.nombre }) +
       (modo === "comparar" ? '<div class="g-pie">' + (nComp ? "Media ± DE de " + nComp + " perfusión(es) anterior(es)" : "Sin perfusiones anteriores con este dato") + "</div>" : "") + "</div>";
   }
 
   H.tarjetaGrafico = tarjetaGrafico;
+  // v0.6: gráfico ampliado (se cierra con la X, con Esc o tocando en cualquier sitio)
+  H.ampliarGrafico = function (exp, k, modo) {
+    var e = H.exp(exp); if (!e) return; cerrarAmpliado();
+    var d = defClave(k), t0 = H.inicioPerf(e.ID), horas = t0 ? C.horasEntre(t0, new Date()) : 1, serie = serieClave(e.ID, k).map(function (p) { return { t: p.t, v: C.num(H.aVista(d.v, p.v)), punto: p.punto, tn: p.tn }; });
+    var x1 = Math.max(horas, 1), x0 = modo === "24h" ? Math.max(0, x1 - 24) : 0, banda = null;
+    if (modo === "comparar") { var bc = bandaComparacion(e, k); banda = bc.puntos.map(function (b) { return { t: b.t, m: C.num(H.aVista(d.v, b.m)), s: b.s === null ? null : Math.abs(C.num(H.aVista(d.v, b.m + b.s)) - C.num(H.aVista(d.v, b.m))), n: b.n }; }); }
+    var ob = d.ob ? [C.num(H.aVista(d.v, d.ob[0])), C.num(H.aVista(d.v, d.ob[1]))] : null, ref = basalLD(e.ID, k), u = serie[serie.length - 1];
+    var o = document.createElement("div"); o.id = "grafAmpliado"; o.className = "g-ampliado"; o.setAttribute("role", "dialog"); o.setAttribute("aria-modal", "true"); o.setAttribute("aria-label", d.nombre);
+    o.innerHTML = '<div class="g-amp-caja"><div class="g-amp-cab"><div><b>' + esc(d.nombre) + (NOMBRE_M[d.mu] && d.mu !== "PERF" ? " · " + esc(NOMBRE_M[d.mu]) : "") + '</b><span class="muy-tenue">' + esc(e.ID) + " · " + esc(d.unidad) + (u ? " · último " + esc(H.n(u.v, d.dec)) + (u.punto ? " (" + esc(u.punto) + ")" : "") : "") + (ref !== null ? " · basal LD " + esc(H.n(ref, d.dec)) : "") + '</span></div><button class="bt ico-solo" data-act="cerrarAmpliado" aria-label="Cerrar la ampliación">' + ico("x") + "</button></div>" +
+      H.graficoEjes(serie, { x0: x0, x1: x1, ob: ob, banda: banda, dec: d.dec, ref: ref, titulo: d.nombre, W: 760, H: 380 }) + '<p class="muy-tenue g-amp-pie">Toca en cualquier sitio para cerrar.</p></div>';
+    o.addEventListener("click", cerrarAmpliado); document.body.appendChild(o); document.body.classList.add("con-ampliado");
+  };
+  function cerrarAmpliado() { var o = H.$("#grafAmpliado"); if (o) o.remove(); document.body.classList.remove("con-ampliado"); }
+  H.acc.cerrarAmpliado = cerrarAmpliado;
+  document.addEventListener("click", function (ev) { var g = ev.target && ev.target.closest ? ev.target.closest("[data-ampliar]") : null; if (g && !ev.target.closest("a,button,input,select")) H.ampliarGrafico(g.getAttribute("data-ampliar"), g.getAttribute("data-k"), g.getAttribute("data-modo")); });
+  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape") cerrarAmpliado(); if ((ev.key === "Enter" || ev.key === " ") && ev.target && ev.target.getAttribute && ev.target.getAttribute("data-ampliar")) { ev.preventDefault(); H.ampliarGrafico(ev.target.getAttribute("data-ampliar"), ev.target.getAttribute("data-k"), ev.target.getAttribute("data-modo")); } });
   // ============================================================== pantalla de inicio: perfusión en curso
   H.tarjetaPerfusion = function (e) {
     var t0 = H.inicioPerf(e.ID), ev = H.eventos(e.ID), horas = t0 ? C.horasEntre(t0, new Date()) : 0, prox = H.proximoPunto(e.ID), idq = encodeURIComponent(e.ID), modo = modoIni();
@@ -194,7 +218,7 @@
       return '<h3 class="sub">' + esc(g[0]) + '</h3><div class="g-rejilla">' + ks.map(function (k) { return tarjetaGrafico(e, k, modo, horas); }).join("") + "</div>";
     }).join("");
     var otros = sel.filter(function (k) { return !usados[k]; }); if (otros.length) grupos += '<h3 class="sub">Otros valores</h3><div class="g-rejilla">' + otros.map(function (k) { return tarjetaGrafico(e, k, modo, horas); }).join("") + "</div>";
-    var leyenda = '<p class="g-leyenda muy-tenue"><span class="lg lg-serie"></span>' + esc(e.ID) + '<span class="lg lg-obj"></span>rango objetivo' + (modo === "comparar" ? '<span class="lg lg-media"></span>media de las perfusiones anteriores<span class="lg lg-de"></span>± 1 DE' : "") + '<span class="lg lg-ref"></span>basal del donante de sangre · ' + (modo === "24h" ? "últimas 24 h" : "desde el inicio") + "</p>";
+    var leyenda = '<p class="g-leyenda muy-tenue"><span class="lg lg-serie"></span>' + esc(e.ID) + '<span class="lg lg-obj"></span>rango objetivo' + (modo === "comparar" ? '<span class="lg lg-media"></span>media de las perfusiones anteriores<span class="lg lg-de"></span>± 1 DE' : "") + '<span class="lg lg-ref"></span>basal del donante de hígado · desde el inicio<span class="g-ayuda">Toca un gráfico para ampliarlo</span></p>';
     var bx = H.balanceExp ? H.balanceExp(e) : null, hdf = bx ? '<h3 class="sub">Balance de volumen y HDF</h3><div class="kpis kpis-ini"><div class="kpi ' + (Math.abs(bx.b.balance_mL) <= 50 ? "ok" : Math.abs(bx.b.balance_mL) <= 150 ? "aj" : "al") + '"><div class="et">Balance desde el inicio</div><div class="v">' + (bx.b.balance_mL > 0 ? "+" : "") + H.n(bx.b.balance_mL, 0) + '<small>mL</small></div><div class="tend">infundido ' + H.n(bx.b.infundido_mL, 0) + " · bilis " + H.n(bx.b.bilis_mL, 0) + " · HDF " + H.n(bx.b.extraido_mL, 0) + "</div></div>" +
       '<div class="kpi"><div class="et">Extracción de la HDF ahora</div><div class="v">' + (bx.b.extraccion_actual !== null ? H.n(bx.b.extraccion_actual, 0) + "<small>mL/h</small>" : "—") + '</div><div class="tend">recomendada ' + H.n(bx.rec.redondeada_mL_h, 0) + " mL/h</div></div>" +
       '<div class="kpi"><div class="et">Infusión total ahora</div><div class="v">' + H.n(H.infusionAhora(e), 1) + '<small>mL/h</small></div><div class="tend"><a href="#/exp/' + idq + '/seguimiento/perf/hdf">Ajustar la extracción</a></div></div></div>' : "";
@@ -287,3 +311,5 @@
   H.acc.fotoPerfil = function (el) { var f = el.files && el.files[0]; if (!f) return; reducirFoto(f).then(guardarFoto).catch(function (e) { H.toast(e.message, "error"); }); };
   H.acc.quitarFotoPerfil = function () { guardarFoto(""); };
 })();
+
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v05a.js"] = "0.6.0";

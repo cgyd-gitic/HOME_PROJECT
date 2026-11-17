@@ -286,3 +286,5 @@
       .catch(function (e) { el.disabled = false; H.toast(e.message || "No se ha podido enviar.", "error"); });
   };
 })();
+
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v02.js"] = "0.6.0";

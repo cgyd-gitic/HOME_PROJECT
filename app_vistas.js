@@ -198,3 +198,5 @@
     el.innerHTML = e && H.inicioPerf(e.ID) ? "<a class=\"chip-activo\" href=\"#/exp/" + encodeURIComponent(e.ID) + "/seguimiento\" title=\"Perfusión en curso\">" + ico("activity", "s") + esc(e.ID) + " <span class=\"mono\" data-crono=\"" + esc(H.inicioPerf(e.ID)) + "\"></span></a>" : "";
   };
 })();
+
+;(window.HOME_MODS = window.HOME_MODS || {})["app_vistas.js"] = "0.6.0";

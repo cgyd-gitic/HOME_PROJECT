@@ -311,3 +311,5 @@
     return '<div class="aviso ' + (n ? (aviso ? "aj" : "ok") : "aj") + '" style="margin-top:10px">' + ico(n && !aviso ? "circle-check" : "triangle-alert") + "<div><b>Muestra basal del donante de hígado:</b> " + (n ? n + " valores registrados" + (f ? " a las " + esc(H.hora(f)) : "") + "." + esc(aviso) : "pendiente.") + " Se saca con el animal ya intubado y <b>siempre antes de empezar la cirugía</b>; sirve de referencia para la perfusión. " + enlace + "</div></div>";
   };
 })();
+
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v03c.js"] = "0.6.0";

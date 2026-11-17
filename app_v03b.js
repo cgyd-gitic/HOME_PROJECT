@@ -123,3 +123,5 @@
     H.confirmar("Guardar el recuento", "Se corregirá el stock de " + movs.length + " material(es).", "Guardar").then(function (ok) { if (!ok) return; H.guardar("Movimientos", movs); H.pintarMarco(); H.toast("Recuento guardado: " + movs.length + " ajuste(s)."); });
   };
 })();
+
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v03b.js"] = "0.6.0";

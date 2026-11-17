@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var C = window.HOMECalc, H = window.HOME = window.HOME || {};
-  var VERSION = "0.5.0";
+  var VERSION = "0.6.0";
   var S = H.S = { token: null, usuario: null, demo: false, cfg: null, t: {}, med: {}, medCargada: {}, cola: [], enviando: false, online: navigator.onLine !== false,
     ultima: null, pref: {}, avisosVistos: {}, pendienteRepintar: false, errores: [] };
   var TABLAS = ["Experimentos", "Animales", "Dieta", "Formularios", "Eventos", "Avisos", "Material", "Movimientos", "Solicitudes", "Personal", "Usuarios", "Config", "Solicitudes_Acceso", "Fotos", "Pedidos"];
@@ -391,7 +391,12 @@
     var main = H.$("#principal"); if (!main || !S.usuario) return;
     if (!S.cfg) H.recalcCfg();
     var r = H.ruta(), v = H.vistas[r.partes[0]] || H.vistas.inicio, y = window.scrollY, mismo = H._ultimaRuta === location.hash;
-    try { main.innerHTML = v(r.partes.slice(1), r.q); } catch (e) { console.error(e); main.innerHTML = "<div class=\"aviso al\">" + H.ico("circle-alert") + "<div><b>Error al mostrar esta pantalla.</b><br>" + esc(e.message) + "</div></div>"; }
+    try { main.innerHTML = v(r.partes.slice(1), r.q); } catch (e) {
+      console.error(e); var pila = String((e && e.stack) || "").split("\n").slice(0, 4).join("\n");
+      main.innerHTML = "<div class=\"aviso al\">" + H.ico("circle-alert") + "<div><b>Error al mostrar esta pantalla.</b><br>" + esc(e.message) + "<div class=\"muy-tenue\">Pantalla #/" + esc(r.partes.join("/")) + " · versión " + VERSION + "</div>" +
+        "<details class=\"detalle-error\"><summary>Detalle para el equipo de la app</summary><pre>" + esc(pila) + "</pre></details>" +
+        "<div class=\"fila-flex\"><button class=\"bt\" data-act=\"repararApp\">" + H.ico("refresh-cw") + "Volver a cargar la app</button><a class=\"bt\" href=\"#/inicio\">Ir a Inicio</a></div></div></div>";
+    }
     var bm = H.$("[data-act=menuMas]"); if (bm) bm.classList.toggle("activo", (H._navResto || []).some(function (x) { return x.r === r.partes[0]; }));
     H.$$("[data-nav]").forEach(function (a) { a.classList.toggle("activo", a.getAttribute("data-nav") === r.partes[0] || (r.partes[0] === "exp" && a.getAttribute("data-nav") === "experimentos")); if (a.classList.contains("activo")) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     if (H._postPintar) { var f = H._postPintar; H._postPintar = null; try { f(); } catch (e) { console.error(e); } }
@@ -403,6 +408,12 @@
 
   // ---------------------------------------------------------------- acciones por delegación
   H.acc = {};
+  // v0.6: borra la copia local de la web (no los datos) y recarga; arregla mezclas de archivos de versiones distintas
+  H.acc.repararApp = function () {
+    var p = []; if (window.caches) p.push(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k.indexOf("home-") === 0 && k !== "home-push"; }).map(function (k) { return caches.delete(k); })); }));
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) p.push(navigator.serviceWorker.getRegistration().then(function (r) { if (r) return r.update(); }).catch(function () { }));
+    Promise.all(p).then(function () { location.reload(); }, function () { location.reload(); });
+  };
   H.acc.menuMas = function () {
     var r = H.ruta().partes[0];
     H.modal({ titulo: "Más secciones", hoja: true, cuerpo: "<div class=\"menu-mas\">" + (H._navResto || []).map(function (x) { return "<a href=\"#/" + x.r + "\" class=\"" + (x.r === r ? "activo" : "") + "\" data-cerrar>" + H.ico(x.i) + "<span>" + esc(x.n) + "</span>" + (H._contNav ? H._contNav(x.r) : "") + "</a>"; }).join("") + "</div>" });
@@ -503,3 +514,5 @@
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar); else setTimeout(iniciar, 0);
 })();
+
+;(window.HOME_MODS = window.HOME_MODS || {})["app_core.js"] = "0.6.0";

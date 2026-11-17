@@ -158,3 +158,5 @@
   H.csv = function (filas, sep) { sep = sep || ","; return "\ufeff" + filas.map(function (f) { return f.map(function (x) { if (x === null || x === undefined) return ""; var s = typeof x === "number" ? String(x) : String(x); return /[",\n;]/.test(s) ? "\"" + s.replace(/"/g, "\"\"") + "\"" : s; }).join(sep); }).join("\r\n"); };
   H.descargar = function (nombre, contenido, tipo) { var b = contenido instanceof Blob ? contenido : new Blob([contenido], { type: (tipo || "text/plain") + ";charset=utf-8" }), a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = nombre; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000); };
 })();
+
+;(window.HOME_MODS = window.HOME_MODS || {})["app_graf.js"] = "0.6.0";

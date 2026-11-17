@@ -250,3 +250,5 @@
     });
   };
 })();
+
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v03a.js"] = "0.6.0";

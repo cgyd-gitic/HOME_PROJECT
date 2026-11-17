@@ -370,3 +370,5 @@
   H.acc.prefKpa = function (el) { H.pref("kpa", el.value === "1"); };
   H.acc.forzarSync = function () { S.online = true; H.enviarCola().then(H.sondear); H.toast("Sincronizando…"); };
 })();
+
+;(window.HOME_MODS = window.HOME_MODS || {})["app_inv.js"] = "0.6.0";

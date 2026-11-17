@@ -287,3 +287,5 @@
   H.tabsExp.preparacion = function (e) { return sinSub(prepOrig(e, ["material"])); };
   H.calculosPerfusato = function (e) { return sinSub(prepOrig(e, ["calculos"])); };
 })();
+
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v05c.js"] = "0.6.0";

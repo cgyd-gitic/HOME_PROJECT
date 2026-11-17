@@ -18,3 +18,5 @@
     return "<div class=\"semana-cab\"><span>" + esc(mes.charAt(0).toUpperCase() + mes.slice(1)) + "</span></div><div class=\"semana\" aria-label=\"Semana actual\">" + dias + "</div>";
   };
 })();
+
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v04.js"] = "0.6.0";

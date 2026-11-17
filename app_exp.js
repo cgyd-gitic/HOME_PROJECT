@@ -221,3 +221,5 @@
       alAbrir: function (d) { d.querySelector("#npOk").addEventListener("click", function () { var n = d.querySelector("#npN").value.trim(); if (!n) return; H.guardar("Personal", [{ ID: "PER-" + H.uid(), Nombre: n, Categoria: d.querySelector("#npC").value, Email: d.querySelector("#npE").value.trim(), Activo: true }]); d.close(); }); } });
   };
 })();
+
+;(window.HOME_MODS = window.HOME_MODS || {})["app_exp.js"] = "0.6.0";

@@ -1,17 +1,24 @@
 // HOME · service worker: app instalable, funcionamiento sin conexión (copia de la propia web) y notificaciones push.
 // Las llamadas al servidor (Apps Script) nunca se guardan en caché. El aviso push llega vacío: el texto se pide
 // al servidor con el código propio de este dispositivo (guardado en IndexedDB «home-push»).
-var CACHE = "home-0.5.0";
-var BASE = ["./", "index.html", "app.css", "config.js", "sprite.js", "calc.js", "demo.js", "app_core.js", "app_vistas.js", "app_exp.js", "app_exp2.js", "app_graf.js", "app_inv.js", "app_v02.js", "app_v03a.js", "app_v03b.js", "app_v03c.js", "app_v04.js", "app_v05a.js", "app_v05b.js", "app_v05c.js", "app_v05d.js", "qrcode.js",
+var VERSION = "0.6.0", CACHE = "home-" + VERSION;
+var BASE = ["./", "index.html", "app.css", "config.js", "sprite.js", "calc.js", "demo.js", "app_core.js", "app_vistas.js", "app_exp.js", "app_exp2.js", "app_graf.js", "app_inv.js", "app_v02.js", "app_v03a.js", "app_v03b.js", "app_v03c.js", "app_v04.js", "app_v05a.js", "app_v05b.js", "app_v05c.js", "app_v05d.js", "app_v06.js", "qrcode.js",
   "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png", "roboto-latin-400-normal.woff2", "roboto-latin-500-normal.woff2", "roboto-latin-700-normal.woff2", "roboto-mono-latin-500-normal.woff2", "plotly-cartesian.min.js", "xlsx.full.min.js"];
-self.addEventListener("install", function (e) { e.waitUntil(caches.open(CACHE).then(function (c) { return Promise.all(BASE.map(function (u) { return c.add(u).catch(function () { }); }));   // un archivo que falte no impide guardar los demás }).then(function () { return self.skipWaiting(); })); });
-self.addEventListener("activate", function (e) { e.waitUntil(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k.indexOf("home-") === 0 && k !== CACHE; }).map(function (k) { return caches.delete(k); })); }).then(function () { return self.clients.claim(); })); });
+// v0.6: al instalar se descarga todo SIN la caché HTTP del navegador (cache: "reload"), para no mezclar archivos de dos versiones.
+self.addEventListener("install", function (e) { e.waitUntil(caches.open(CACHE).then(function (c) { return Promise.all(BASE.map(function (u) { return fetch(new Request(u, { cache: "reload" })).then(function (r) { if (r && r.ok) return c.put(u, r); }).catch(function () { }); }));   // un archivo que falte no impide guardar los demás
+}).then(function () { return self.skipWaiting(); })); });
+self.addEventListener("activate", function (e) { e.waitUntil(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k.indexOf("home-") === 0 && k !== CACHE && k !== "home-push"; }).map(function (k) { return caches.delete(k); })); }).then(function () { return self.clients.claim(); })); });
+self.addEventListener("message", function (e) { if (e.data === "borrar-cache") e.waitUntil(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k.indexOf("home-") === 0; }).map(function (k) { return caches.delete(k); })); })); });
+// v0.6: la página (index.html) y config.js van primero por la red; el resto, de la caché de ESTA versión (con «?v=» exacto).
+// Si un archivo pide otra versión (?v= distinto del de esta copia), se descarga de la red y no se guarda: así nunca se mezclan versiones.
 self.addEventListener("fetch", function (e) {
   var u = new URL(e.request.url); if (e.request.method !== "GET" || u.origin !== self.location.origin) return;   // el servidor de datos va siempre por la red
-  if (/config\.js$/.test(u.pathname)) { e.respondWith(fetch(e.request).catch(function () { return caches.match(e.request); })); return; }
+  var pagina = e.request.mode === "navigate" || /\/$|index\.html$|config\.js$|manifest\.webmanifest$/.test(u.pathname);
+  if (pagina) { e.respondWith(fetch(e.request, { cache: "no-cache" }).then(function (r) { if (r && r.ok && !/config\.js$/.test(u.pathname)) caches.open(CACHE).then(function (c) { c.put(e.request, r.clone()); }); return r; }).catch(function () { return caches.match(e.request, { ignoreSearch: true }); })); return; }
+  var v = u.searchParams.get("v");
+  if (v && v !== VERSION) { e.respondWith(fetch(e.request, { cache: "reload" }).catch(function () { return caches.match(e.request, { ignoreSearch: true }); })); return; }
   e.respondWith(caches.open(CACHE).then(function (c) { return c.match(e.request, { ignoreSearch: true }).then(function (r) {
-    var red = fetch(e.request).then(function (resp) { if (resp && resp.ok) c.put(e.request, resp.clone()); return resp; }).catch(function () { return r; });
-    return r || red;
+    return r || fetch(e.request, { cache: "reload" }).then(function (resp) { if (resp && resp.ok) c.put(e.request, resp.clone()); return resp; });
   }); }));
 });
 function leerCfg() { return new Promise(function (ok) { try { var rq = indexedDB.open("home-push", 1); rq.onupgradeneeded = function () { rq.result.createObjectStore("cfg"); }; rq.onsuccess = function () { try { var g = rq.result.transaction("cfg", "readonly").objectStore("cfg").get("cfg"); g.onsuccess = function () { ok(g.result || null); }; g.onerror = function () { ok(null); }; } catch (e) { ok(null); } }; rq.onerror = function () { ok(null); }; } catch (e) { ok(null); } }); }
