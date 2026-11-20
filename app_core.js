@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var C = window.HOMECalc, H = window.HOME = window.HOME || {};
-  var VERSION = "0.6.0";
+  var VERSION = "0.7.0";
   var S = H.S = { token: null, usuario: null, demo: false, cfg: null, t: {}, med: {}, medCargada: {}, cola: [], enviando: false, online: navigator.onLine !== false,
     ultima: null, pref: {}, avisosVistos: {}, pendienteRepintar: false, errores: [] };
   var TABLAS = ["Experimentos", "Animales", "Dieta", "Formularios", "Eventos", "Avisos", "Material", "Movimientos", "Solicitudes", "Personal", "Usuarios", "Config", "Solicitudes_Acceso", "Fotos", "Pedidos"];
@@ -188,7 +188,7 @@
   H.pendiente = function (f) { return !!f && (f.Validado === false || f.Validado === "FALSE" || f.Validado === "false"); };
   H.requiereValidacion = function (tabla) { return H.rol() === "INVESTIGADOR" && H.VALIDABLES.indexOf(tabla) !== -1; };
   var SOLO_ADMIN = { Material: 1, Movimientos: 1, Config: 1, Usuarios: 1, Solicitudes_Acceso: 1, Pedidos: 1 };
-  function permisoTabla(tabla) { return SOLO_ADMIN[tabla] ? "admin" : tabla === "Solicitudes" ? "solicitar" : "registrar"; }
+  function permisoTabla(tabla) { return tabla === "Material" || tabla === "Pedidos" ? "gestor_inventario" : tabla === "Movimientos" ? "movimientos" : SOLO_ADMIN[tabla] ? "admin" : tabla === "Solicitudes" ? "solicitar" : "registrar"; }   // v0.7: gestor de inventario
   H.permisoTabla = permisoTabla;
 
   // ---------------------------------------------------------------- acceso
@@ -515,4 +515,4 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar); else setTimeout(iniciar, 0);
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_core.js"] = "0.6.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_core.js"] = "0.7.0";

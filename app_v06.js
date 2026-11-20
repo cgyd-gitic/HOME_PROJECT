@@ -204,7 +204,7 @@
   // al pasar un experimento a «Finalizado» (cierre de la perfusión) se comprueba el material
   var guardarOrig = H.guardar;
   H.guardar = function (tabla, filas) {
-    var antes = tabla === "Experimentos" ? (filas || []).filter(function (f) { var e = f && H.exp(f.ID); return f && f.Estado === "Finalizado" && (!e || e.Estado !== "Finalizado") && f.Programacion !== "Histórico"; }).map(function (f) { return f.ID; }) : [];
+    var antes = tabla === "Experimentos" ? (filas || []).filter(function (f) { var e = f && H.exp(f.ID); return f && (f.Estado === "Finalizado" || f.Estado === "Trasplante") && (!e || (e.Estado !== "Finalizado" && e.Estado !== "Trasplante")) && f.Programacion !== "Histórico"; }).map(function (f) { return f.ID; }) : [];
     var r = guardarOrig.apply(this, arguments);
     antes.forEach(function (id) { setTimeout(function () { avisoMaterial(H.exp(id)); }, 0); });
     return r;
@@ -320,4 +320,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v06.js"] = "0.6.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v06.js"] = "0.7.0";

@@ -786,4 +786,4 @@
     dializado: dializado, consejoHDF: consejoHDF, SUPERVISION_REC: SUPERVISION_REC, PUNTOS_REC: PUNTOS_REC, EVAL_REC: EVAL_REC, sacrificioPorEvaluacion: sacrificioPorEvaluacion, MORFO: MORFO, GRUPOS_INICIO: GRUPOS_INICIO };
 });
 
-;(window.HOME_MODS = window.HOME_MODS || {})["calc.js"] = "0.6.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["calc.js"] = "0.7.0";

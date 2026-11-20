@@ -141,7 +141,7 @@
       var an = (d.animales || []).slice().sort(function (a, b) { return String(a.Crotal || a.ID).localeCompare(String(b.Crotal || b.ID)); }), r0 = an.length ? racion(an[0], cfgD) : null, pt = pautaDia(ac, d.experimento, cfgD, r0 ? r0.g : null);
       cuerpo = '<div class="qr-cab"><b>' + esc(d.experimento.ID) + "</b> · día " + ac.dia + ' de aclimatación<span class="muy-tenue">Registro de las <b>' + esc(H.hora(QR.abierto)) + "</b> del " + esc(dma(d.hoy)) + " (hora en que abriste el código)</span></div>" +
         '<div class="pauta ' + pt.tipo + '">' + ico(pt.tipo === "igual" ? "circle-check" : "triangle-alert") + "<span>" + esc(pt.texto) + "</span></div>";
-      cuerpo += '<div class="campo"><label class="et" for="qrNombre">Tu nombre</label><input id="qrNombre" autocomplete="name" value="' + esc(localStorage.getItem("home_qr_nombre") || "") + '" placeholder="Nombre y apellido…"></div>';
+      cuerpo += H.qrNombreHTML ? H.qrNombreHTML(cfgD) : '<div class="campo"><label class="et" for="qrNombre">Tu nombre</label><input id="qrNombre" autocomplete="name" value="' + esc(localStorage.getItem("home_qr_nombre") || "") + '" placeholder="Nombre y apellido…"></div>';   // v0.7: lista de responsables
       if (ac.patron) {
         cuerpo += '<div class="segmentado qr-toma ancho-total" role="tablist" aria-label="Toma">' + ["1ª toma", "2ª toma"].map(function (t) { return '<button role="tab" class="' + (QR.toma === t ? "activo" : "") + '" aria-selected="' + (QR.toma === t) + '" data-qtoma="' + t + '">' + t + "</button>"; }).join("") + "</div>" +
           an.map(function (a, i) {
@@ -288,4 +288,4 @@
   H.calculosPerfusato = function (e) { return sinSub(prepOrig(e, ["calculos"])); };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v05c.js"] = "0.6.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v05c.js"] = "0.7.0";

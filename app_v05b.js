@@ -7,7 +7,7 @@
   function hoyISO() { return C.diaISO(new Date()); }
   function dma(v) { var d = C.aDia(v); return d ? H.fechaDMA(d).replace(/\//g, ".") : ""; }
   function iso(v) { var d = C.aDia(v); return d ? C.diaISO(d) : ""; }
-  var CATEGORIAS = (H.CAT_ASIST || []).map(function (c) { return c[1]; }).concat(["Investigador/a", "Otro"]);
+  var CATEGORIAS = (H.CAT_ASIST || []).map(function (c) { return c[1]; }).concat(["Responsable de la perfusión", "Investigador/a", "Otro"]);   // v0.7: los responsables reciben los avisos de su perfusión
 
   // ============================================================== participantes (objetos {Categoria, Nombre, Email, Usuario_ID})
   function usuariosConocidos() {
@@ -252,4 +252,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v05b.js"] = "0.6.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v05b.js"] = "0.7.0";

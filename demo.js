@@ -2,7 +2,7 @@
    Los datos son SINTÉTICOS (generador con semilla) y se guardan solo en este navegador (IndexedDB). */
 (function () {
   "use strict";
-  var C = window.HOMECalc, DB = null, listo = null, VERSION_DEMO = 7;
+  var C = window.HOMECalc, DB = null, listo = null, VERSION_DEMO = 8;
   var TABLAS = ["Experimentos", "Animales", "Dieta", "Formularios", "Mediciones", "Eventos", "Avisos", "Material", "Movimientos", "Solicitudes", "Personal", "Usuarios", "Config", "Solicitudes_Acceso", "Fotos", "Pedidos"];
   function idb(op, v) { return new Promise(function (ok) { try { var r = indexedDB.open("home-demo", 1); r.onupgradeneeded = function () { r.result.createObjectStore("kv"); }; r.onsuccess = function () { var tx = r.result.transaction("kv", op === "get" ? "readonly" : "readwrite"), st = tx.objectStore("kv"); if (op === "get") { var q = st.get("db"); q.onsuccess = function () { ok(q.result); }; q.onerror = function () { ok(null); }; } else { st.put(v, "db"); tx.oncomplete = function () { ok(true); }; } }; r.onerror = function () { ok(null); }; } catch (e) { ok(null); } }); }
   var tGuardar = null; function persistir() { clearTimeout(tGuardar); tGuardar = setTimeout(function () { idb("put", DB); }, 400); }
@@ -26,9 +26,9 @@
       ["Periolimel N4E 1500 mL", "Fármacos y soluciones", "bolsa", 10, 7, 7], ["Heparina sódica 5000 U/mL (5 mL)", "Fármacos y soluciones", "vial", 30, 25, 22], ["Jeringa 50 mL", "Fungible general", "unidad", 80, 40, 30], ["Tubo de gasometría", "Fungible general", "unidad", 150, 100, 120], ["Guantes estériles 7,5", "Fungible general", "par", 60, 30, 20]];
     function via(m) { return m[1] === "Fármacos y soluciones" ? (/IGL/.test(m[0]) ? ["Reactivo", "Licitación", "EXP-2026-014", "Proveedor de perfusión (demo)", "pedidos-perfusion@example.org", 40] : ["Fármaco", "Farmacia", "", "", "", null])
       : m[1] === "Fungible de perfusión" ? ["Fungible", "Licitación", "EXP-2026-014", "Proveedor de perfusión (demo)", "pedidos-perfusion@example.org", 30] : m[1] === "HDF" ? ["Fungible", "Contrato menor", "CM-2026-031", "Proveedor de HDF (demo)", "pedidos-hdf@example.org", 60] : ["Fungible", "Otro", "", "", "", null]; }
-    MAT.forEach(function (m, i) { var v = via(m); add("Material", { ID: "MAT-D" + i, Nombre: m[0], Categoria: m[1], Unidad: m[2], Stock_inicial: m[3], Stock_minimo: m[4], Por_perfusion: m[5], Referencia: "REF-" + (1000 + i), Proveedor: v[3], Ubicacion: "Almacén CCE", Activo: true, Tipo: v[0], Via: v[1], Expediente: v[2], Email_proveedor: v[4], Unidades_contrato: v[5], Unidades_pedidas: 0 }); });
+    MAT.forEach(function (m, i) { var v = via(m); add("Material", { ID: "MAT-D" + i, Nombre: m[0], Categoria: m[1], Unidad: m[2], Stock_inicial: m[3], Stock_minimo: m[4], Por_perfusion: m[5], Referencia: "REF-" + (1000 + i), Proveedor: v[3], Ubicacion: C.UBICACIONES[0], Activo: true, Tipo: v[0], Via: v[1], Expediente: v[2], Email_proveedor: v[4], Unidades_contrato: v[5], Unidades_pedidas: 0 }); });
     (window.HOME && window.HOME.filasCajas ? window.HOME.filasCajas() : []).forEach(function (m) { add("Material", m); });   // v0.6: cajas de instrumental (B. Braun)
-    [["Máquina de perfusión Liver Assist", "Máquina de perfusión"], ["Monitor de hemodiafiltración Aquarius", "HDF"], ["Termohigrómetro LIORQUE YGH5254", "Fungible general"]].forEach(function (m, i) { add("Material", { ID: "MAT-I" + i, Nombre: m[0], Categoria: m[1], Unidad: "unidad", Stock_inicial: 1, Stock_minimo: 1, Por_perfusion: 0, Referencia: "", Proveedor: "", Ubicacion: "Quirófano experimental", Activo: true, Tipo: "Inventariable", Via: "", Expediente: "" }); });
+    [["Máquina de perfusión Liver Assist", "Equipos"], ["Monitor de hemodiafiltración Aquarius", "Equipos"], ["Termohigrómetro LIORQUE YGH5254", "Equipos"]].forEach(function (m, i) { add("Material", { ID: "MAT-I" + i, Nombre: m[0], Categoria: m[1], Unidad: "unidad", Stock_inicial: 1, Stock_minimo: 1, Por_perfusion: 0, Referencia: "", Proveedor: "", Ubicacion: C.UBICACIONES[0], Activo: true, Tipo: "Inventariable", Via: "", Expediente: "" }); });
     add("Solicitudes", { ID: "SOL-D1", Fecha: new Date(Date.now() - 2 * 864e5).toISOString(), Solicitante: "Investigador demo", Material: "MAT-D14", Cantidad: 6, Urgencia: "Urgente", Motivo: "Quedan 4 bolsas de IGL-1 y cada perfusión usa 3", Estado: "Pendiente" });
     add("Solicitudes", { ID: "SOL-D2", Fecha: new Date(Date.now() - 5 * 864e5).toISOString(), Solicitante: "Investigador demo", Material: "", Nombre_nuevo: "Monitor continuo de glucosa (sensor)", Categoria: "Máquina de perfusión", Cantidad: 4, Urgencia: "Normal", Motivo: "Controlador BES (objetivo 1 del PI26/00141)", Estado: "Aprobada" });
 
@@ -38,14 +38,15 @@
     exps.forEach(function (x) {
       var s = (x.n < 10 ? "0" : "") + x.n, id = "HOME-" + s, ini = x.ini ? new Date(C.enHora(new Date(x.ini), "11:00", 0).getTime() + (x.n === 4 ? 0 : 0)) : null;
       if (x.n === 4) ini = new Date(x.ini);
-      var fin = ini && x.dias ? new Date(ini.getTime() + x.dias * 864e5) : null, est = x.n <= 3 ? "Finalizado" : x.n === 4 ? "Perfusión" : "Planificado";
+      var fin = ini && x.dias ? new Date(ini.getTime() + x.dias * 864e5) : null, est = x.n === 2 ? "Trasplante" : x.n <= 3 ? "Finalizado" : x.n === 4 ? "Perfusión" : "Planificado";   // v0.7: HOME-02 con el injerto trasplantado (seguimiento del receptor)
       var fqx = ini ? new Date(ini.getTime() - 3.2 * H0) : C.enHora(new Date(ahora), "08:00", x.en_dias);
       var fcx = C.diaISO(fqx), fll = x.llegada !== undefined ? C.sumarDias(C.diaISO(new Date(ahora)), x.llegada) : C.sumarDias(fcx, -7);
       var txd = x.n === 2 || x.n === 5 || x.n === 6;
       add("Experimentos", { ID: id, Numero: x.n, Codigo_PM: "HOME-PM-" + s, Fase: txd ? "Perfusión con trasplante" : "Perfusión", Protocolo: ["V5", "V6", "V7", "V8", "V8", "V9"][x.n - 1], Estado: est, Fecha_llegada: fll, Fecha_cirugia: fcx, Fecha_trasplante: txd ? C.sumarDias(fcx, 7) : "", Fecha_sacrificio: txd ? C.sumarDias(fcx, 12) : "", Programacion: x.prov ? "Provisional" : "Confirmado",
         Participantes: JSON.stringify([{ Categoria: "Cirujanos (F.E.A.)", Nombre: "Administrador demo", Email: "demo-admin@home.demo", Usuario_ID: "USR-D0" }, { Categoria: "Cirujanos (residentes)", Nombre: "Investigador demo", Email: "demo-investigador@home.demo", Usuario_ID: "USR-D1" }].concat(x.n === 6 ? [{ Categoria: "Alumnos de Medicina", Nombre: "Estudiante externo", Email: "", Usuario_ID: "" }] : [])),
         Inicio_perfusion: ini ? ini.toISOString() : "", Fin_perfusion: fin ? fin.toISOString() : "", Peso_higado_inicial_g: x.hig || null, Peso_higado_final_g: fin ? Math.round(x.hig * (x.fallo ? 1.18 : 1.06)) : null, Volumen_perfusato_mL: 2390, Color: C.PALETA[(x.n - 1) % C.PALETA.length], Responsable: "Investigador demo", Notas: x.fallo ? "Datos sintéticos de demostración. Fin anticipado por deterioro del injerto (lactato y transaminasas en ascenso desde el día 4)." : "Datos sintéticos de demostración." });
-      if (est === "Finalizado") { var cj = {}; ["Caja donante"].concat(txd ? ["Caja receptor"] : []).forEach(function (nb) { cj[nb] = { pre: true, post: x.n === 3 ? "Enviada a esterilizar" : "Esterilizada" }; });   // v0.6: HOME-03 con la caja aún sin esterilizar
+      if (est === "Trasplante") add("Formularios", { ID: id + "|cierre|", Experimento: id, Tipo: "cierre", Animal: "", Datos_JSON: JSON.stringify({ motivo: "Trasplante del injerto", obs: "Datos sintéticos de demostración." }) });
+      if (est === "Finalizado" || est === "Trasplante") { var cj = {}; ["Caja donante"].concat(txd ? ["Caja receptor"] : []).forEach(function (nb) { cj[nb] = { pre: true, post: x.n === 3 ? "Enviada a esterilizar" : "Esterilizada" }; });   // v0.6: HOME-03 con la caja aún sin esterilizar
         add("Formularios", { ID: id + "|instrumental|", Experimento: id, Tipo: "instrumental", Animal: "", Datos_JSON: JSON.stringify({ cajas: cj }) }); }
       [["BD", 61, "M"], ["LD", x.peso, x.sexo]].forEach(function (a) { add("Animales", { ID: "HOME-" + a[0] + "-" + s, Experimento: id, Rol: a[0], Crotal: "ES" + (10000 + x.n * 7 + (a[0] === "BD" ? 1 : 2)), Sexo: a[2], Castrado: a[2] === "M" ? "Sí" : "No", Raza: "Landrace × Large White", Fecha_llegada: new Date(fqx.getTime() - 6 * 864e5).toISOString(), Hora_llegada: "10:00", Peso_llegada_kg: x.prov ? null : C.r(a[1] - 1.2, 1) }); });
       if (x.n === 5) { var hoyD = C.diaISO(new Date(ahora)); ["BD", "LD"].forEach(function (rol) { var pk = rol === "BD" ? 59.8 : x.peso - 1.2, en = C.energiaDieta(pk, rol === "BD" ? "M" : x.sexo, rol === "BD" ? "Sí" : "No", C.DEF.dieta);
@@ -75,9 +76,12 @@
       function med(muestra, punto, tn, fecha, vals) { var th = C.r((fecha - ini) / H0, 3); Object.keys(vals).forEach(function (v) { if (vals[v] === null || !isFinite(vals[v])) return; T.Mediciones.push(meta({ ID: id + "|" + muestra + "|" + punto + "|" + v, Experimento: id, Muestra: muestra, Punto: punto, T_nominal_h: tn, Fecha_hora: fecha.toISOString(), T_real_h: th, Variable: v, Valor: C.r(vals[v], C.variable(muestra, v).dec + 1), Texto: "", Unidad: C.variable(muestra, v).unidad }, u, t)); }); }
       // basales de los donantes (v0.6: la línea de referencia de Inicio es la basal del donante de hígado)
       med("BASAL_LD", "Basal", null, new Date(ini.getTime() - 5 * 36e5), { pH: 7.42, pO2: 98, pCO2: 41, Hb: 10.2, Hto: 31, Lactato: gn(1.4, 0.2), HCO3: 25.5, BE: 1, K: 4.1, Na: 140, Cl: 101, Ca: 1.25, Glucosa: gn(95, 6), ALT: gn(42, 5), AST: gn(38, 6), LDH: gn(480, 40), GGT: gn(28, 3), BilT: 0.2, FA: gn(160, 12), Albumina: 3.4, ActPT: 92, Fibrinogeno: 210, Urea: gn(22, 3) });
-      med("BASAL_BD", "Basal", null, new Date(ini.getTime() - 6 * 36e5), { pH: 7.43, pO2: 96, pCO2: 40, Hb: 11.5, Hto: 34, Lactato: gn(1.2, 0.2), HCO3: 26, BE: 1.5, K: 4.0, Na: 141, Cl: 102, Ca: 1.28, Glucosa: gn(92, 6), ALT: gn(40, 5), AST: gn(35, 5), LDH: gn(450, 40), Urea: gn(20, 3) });
+      // v0.7: sin basal del donante de sangre; la inmunología solo en la basal y en la pre-perfusión
+      med("BASAL_LD", "Basal", null, new Date(ini.getTime() - 5 * 36e5), { C3: gn(95, 8), C4: gn(13, 2), IgA: gn(62, 6), IgG: gn(1350, 90), IgM: gn(125, 12), PCR: gn(6, 1.2) });
       // PRE
-      med("PRE", "Pre", null, new Date(ini.getTime() - 20 * 6e4), { pH: 7.08, pO2: 145, pCO2: 33, Hb: 8.9, Hto: 27, Lactato: gn(7.5, 0.8), HCO3: 11.5, BE: -15, K: 3.4, Cl: 104, Ca: 0.31, Na: 151, Glucosa: 465, Albumina: 2.1, Mg: 1.6, P: 4.8, Osm: 302 });
+      med("PRE", "Pre", null, new Date(ini.getTime() - 20 * 6e4), { pH: 7.08, pO2: 145, pCO2: 33, Hb: 8.9, Hto: 27, Lactato: gn(7.5, 0.8), HCO3: 11.5, BE: -15, K: 3.4, Cl: 104, Ca: 0.31, Na: 151, Glucosa: 465, Albumina: 2.1, Mg: 1.6, P: 4.8, Osm: 302, C3: gn(60, 6), C4: gn(8, 1.5), IgA: gn(40, 5), IgG: gn(900, 80), IgM: gn(80, 10), PCR: gn(5, 1) });
+      var PRE0 = { pH: 1, pO2: 1, pCO2: 1, Hb: 1, Hto: 1, Lactato: 1, HCO3: 1, BE: 1, K: 1, Cl: 1, Ca: 1, Na: 1, Glucosa: 1, Albumina: 1, Mg: 1, P: 1, Osm: 1 };   // v0.7: la pre-perfusión es la toma del punto 0 h
+      function sinPre(o, h) { if (h !== 0) return o; var c = {}; Object.keys(o).forEach(function (k) { if (!PRE0[k]) c[k] = o[k]; }); return c; }
       C.puntosMuestreo(ini.toISOString(), 8, C.DEF.muestreo).forEach(function (p) {
         var f = new Date(p.fecha.getTime() + gn(4, 3) * 6e4); if (f.getTime() > hasta) return; var h = (f - ini) / H0, m = mal(h), hd = hc(f), dia = h > 24, ppd = dia ? pr(f) : 0;
         var lac = 1.1 + 6.4 * Math.exp(-h / 2.2) + 0.25 * ppd + 1.8 * m * m + gn(0, 0.12);
@@ -87,10 +91,10 @@
           Creatinina: 1.4 - 0.1 * h / 24 + gn(0, 0.05), HCO3: 24.5 - 9 * Math.exp(-h / 2) - 3 * m + gn(0, 0.6), BE: 0.6 - 11 * Math.exp(-h / 2) - 3.5 * m + gn(0, 0.6), Ca: 1.05 + gn(0, 0.05), Na: 143 + 0.8 * h / 24 + gn(0, 1), K: 4.1 + 0.3 * m + gn(0, 0.15), Cl: 106 + gn(0, 1.5),
           P: 4.2 - 0.25 * h / 24 + gn(0, 0.2), Mg: 2.0 + gn(0, 0.08), Urea: 18 + 3 * h / 24 + gn(0, 1), Amonio: 45 + 30 * Math.exp(-h / 4) + 40 * m + gn(0, 5), Osm: 296 + gn(0, 2), Hb: 8.6 - 0.1 * h / 24 + gn(0, 0.15), Hto: 26 - 0.3 * h / 24 + gn(0, 0.5),
           Cortisol: dia ? 55 + 230 * Math.exp(-Math.pow((hd - 8.6) / 0.9, 2)) + 130 * Math.exp(-Math.pow((hd - 11) / 0.9, 2)) + 110 * Math.exp(-Math.pow((hd - 17) / 0.9, 2)) + gn(0, 10) : 60 + gn(0, 12), Insulina: 8 + 25 * ppd + gn(0, 2) };
-        med("PERF", p.etiqueta, p.t_h, f, vals);
+        med("PERF", p.etiqueta, p.t_h, f, sinPre(vals, p.t_h));
         var pHa = 7.40 - 0.12 * Math.exp(-h / 2) - 0.06 * m + gn(0, 0.015), pco2 = 39 + gn(0, 2.5);
         [["ART", gn(84, 7) - 15 * m], ["POR", gn(46, 4)], ["CAV", gn(34, 3)]].forEach(function (r) {
-          var po2 = r[1], hb = vals.Hb; med(r[0], p.etiqueta, p.t_h, f, { pH: pHa - (r[0] === "CAV" ? 0.03 : 0) + gn(0, 0.005), pO2: po2, pCO2: pco2 + (r[0] === "CAV" ? 4 : 0) + gn(0, 0.8), sO2: C.sO2Hill(po2), HCO3: vals.HCO3, BE: vals.BE, Hb: hb, Lactato: vals.Lactato, Glucosa: vals.Glucosa, Na: vals.Na, K: vals.K, Ca: vals.Ca, Cl: vals.Cl });
+          var po2 = r[1], hb = vals.Hb; med(r[0], p.etiqueta, p.t_h, f, (r[0] === "ART" ? function (o) { return sinPre(o, p.t_h); } : function (o) { return o; })({ pH: pHa - (r[0] === "CAV" ? 0.03 : 0) + gn(0, 0.005), pO2: po2, pCO2: pco2 + (r[0] === "CAV" ? 4 : 0) + gn(0, 0.8), sO2: C.sO2Hill(po2), HCO3: vals.HCO3, BE: vals.BE, Hb: hb, Lactato: vals.Lactato, Glucosa: vals.Glucosa, Na: vals.Na, K: vals.K, Ca: vals.Ca, Cl: vals.Cl }));
         });
         med("FLUJO", p.etiqueta, p.t_h, f, flujo(h, f, m));
         if (!dia ? (p.t_h % 2 === 0) : true) med("BILIS", p.etiqueta, p.t_h, f, (function () { var vol = Math.max(0.2, (p.t_h <= 2 ? 1.5 : dia ? 12 : 6) * (1 - 0.6 * m) + gn(0, 0.8)); return { Volumen_mL: vol, Peso_g: vol * 1.01, pH: 7.6 + gn(0, 0.08) - 0.2 * m, BilT: 18 + gn(0, 3), Glucosa: 20 + gn(0, 5), HCO3: 30 + gn(0, 2), Na: 150 + gn(0, 3), K: 4.5 + gn(0, 0.3), Cl: 100 + gn(0, 3), Lactato: 1 + gn(0, 0.2), LDH: 60 + gn(0, 10) }; })());
@@ -98,8 +102,10 @@
       function flujo(h, f, m) { var hd = hc(f), noche = hd >= 22 || hd < 8; return { P_AH: 60 + gn(0, 2), P_AH_sis: 88 + gn(0, 3), P_AH_dia: 50 + gn(0, 3), Q_AH: Math.max(60, 120 + 140 * (1 - Math.exp(-h / 3)) - 60 * m + gn(0, 15)), P_VP: 3 + gn(0, 0.3), Q_VP: Math.max(200, 560 + 380 * (1 - Math.exp(-h / 3)) - 150 * m + gn(0, 40)),
         Temp: h < 1.25 ? 24 + 14 * h / 1.25 : (noche ? 36.6 : 37.6) + gn(0, 0.1), FiO2_ART: h < 1 ? 30 : 40, Barrido_ART: 300, FiO2_POR: 21, Barrido_POR: 420 }; }
       for (var hh = 27; ini.getTime() + hh * H0 <= hasta; hh += 3) { var ff = new Date(ini.getTime() + hh * H0); med("FLUJO", C.etiquetaPunto(hh), hh, ff, flujo(hh, ff, mal(hh))); }
-      for (var hd2 = 6; hd2 <= 24 && ini.getTime() + hd2 * H0 <= hasta; hd2++) { var fh = new Date(ini.getTime() + hd2 * H0); med("HDF", C.etiquetaPunto(hd2), hd2, fh, { P_acceso: gn(-60, 6), P_retorno: gn(55, 5), TMP: gn(45, 6), Caida_P: gn(30, 4), P_efluente: gn(-20, 4), P_prefiltro: gn(110, 8), Temp: 37 + gn(0, 0.2) }); }
-      for (var hi = 0; ini.getTime() + hi * H0 <= hasta; hi += 24) { var fi = new Date(ini.getTime() + hi * H0); med("INMUNO", C.etiquetaPunto(hi), hi, fi, { C3: gn(90, 8), C4: gn(12, 2), IgA: gn(60, 6), IgG: gn(1300, 90), IgM: gn(120, 12), PCR: gn(8 + hi / 24, 1.5) }); }
+      // v0.7: HDF desde la pre-perfusión; variables cada hora las primeras 24 h y después en los puntos del muestreo
+      med("PRE_HDF", "Pre", null, new Date(ini.getTime() - 25 * 6e4), { Q_sangre: 80, Q_dialisis: 250, Reposicion: 100, Extraccion: 40, P_acceso: gn(-55, 5), P_retorno: gn(50, 5), TMP: gn(35, 5), Caida_P: gn(25, 3), P_efluente: gn(-15, 4), P_prefiltro: gn(100, 8), Temp: 37.2 });
+      var phdf = C.puntosHDF(ini.toISOString(), 8, C.DEF.muestreo).filter(function (q) { return q.fecha.getTime() <= hasta; });
+      phdf.forEach(function (q, k) { var ult = k === phdf.length - 1 && x.n === 4; med("HDF", q.etiqueta.replace(/^HDF /, ""), q.t_h, q.fecha, { Extraccion: q.t_h < 6 ? 40 : 50, P_acceso: gn(-60, 6), P_retorno: gn(55, 5), TMP: gn(45, 6) + (ult ? 115 : 0), Caida_P: gn(30, 4) + (ult ? 25 : 0), P_efluente: gn(-20, 4), P_prefiltro: gn(110, 8), Temp: 37 + gn(0, 0.2) }); });
       for (var rp = 0; rp < 15; rp++) { var pr0 = C.DEF.recalentamiento.pasos[rp], fr = new Date(ini.getTime() + (pr0.t + 2) * 6e4); if (fr.getTime() > hasta) break; med("RECAL", "R" + pr0.t, C.r(pr0.t / 60, 3), fr, { Temp: pr0.Temp - 0.4 + gn(0, 0.2), P_VP: pr0.P_VP + gn(0, 0.2), P_AH: pr0.P_AH + gn(0, 1.5) }); }
       add("Formularios", { ID: id + "|hdf|", Experimento: id, Tipo: "hdf", Animal: "", Datos_JSON: JSON.stringify({ Q_sangre: 150, Q_dialisis: 1000, Extraccion: 0, Reposicion: 1000, liquido: "Bicarbonato 32 mmol/L", inicio: new Date(ini.getTime() + 6 * H0).toISOString() }) });
       if (x.n === 4) {
@@ -131,21 +137,28 @@
   function sesion(token) { var s = DB.sesiones[token]; if (!s) throw new Error("Sesión caducada. Vuelve a entrar."); var u = DB.tablas.Usuarios.filter(function (x) { return x.Email === s; })[0]; if (!u || u.Activo === false) throw new Error("Sesión caducada. Vuelve a entrar."); return { email: u.Email, nombre: u.Nombre, rol: normRol(u.Rol), id: u.ID, foto: u.Foto || "" }; }
   function req(u, roles) { if (roles.indexOf(u.rol) === -1) throw new Error("Tu rol (" + u.rol + ") no permite esta acción."); }
   function vivas(t, admin) { return DB.tablas[t].filter(function (f) { return f.Borrado !== true || (admin && esPend(f)); }); }
+  // v0.7 (a): preferencias de notificación (contrato v0.7, anexo A). Celda vacía = valor por defecto del rol.
+  function siNoD(v) { if (v === true || v === false) return v; var t = String(v === null || v === undefined ? "" : v).trim().toLowerCase(); return t ? /^(true|s[ií]|1|verdadero|x)$/.test(t) : null; }
+  function notifD(f, k) { var v = siNoD(f[k]), r = normRol(f.Rol); return v !== null ? v : k === "Notif_perfusion" ? (r === "ADMIN" || r === "INVESTIGADOR") : k === "Notif_revision" ? r === "ADMIN" : false; }
+  var sesionSinNotif = sesion;
+  sesion = function (token) { var u = sesionSinNotif(token), f = DB.tablas.Usuarios.filter(function (x) { return x.Email === u.email; })[0]; if (f) u.notif = { diaria: notifD(f, "Notif_diaria"), revision: notifD(f, "Notif_revision"), perfusion: notifD(f, "Notif_perfusion") }; return u; };
   function stockDemo(m) { var s2 = C.num(m.Stock_inicial) || 0; DB.tablas.Movimientos.forEach(function (x) { if (x.Material === m.ID && x.Borrado !== true) s2 += C.num(x.Cantidad) || 0; }); return s2; }
   var API = {
     webSolicitarCodigo: function () { return { ok: true, mensaje: "Si el correo tiene acceso, recibirás un código." }; },
     webVerificarCodigo: function (email) { var u = DB.tablas.Usuarios.filter(function (x) { return x.Email === email; })[0]; if (!u) throw new Error("Código incorrecto o caducado."); var tok = "demo-" + Math.random().toString(36).slice(2) + Date.now(); DB.sesiones[tok] = email; u.Ultimo_acceso = ahoraISO(); persistir(); return { ok: true, token: tok, usuario: { email: u.Email, nombre: u.Nombre, rol: normRol(u.Rol), personalId: "", id: u.ID, foto: u.Foto || "" } }; },
     webSesion: function (tok) { return { usuario: sesion(tok) }; },
     webSalir: function (tok) { delete DB.sesiones[tok]; persistir(); return { ok: true }; },
-    webCargar: function (tok) { var u = sesion(tok), o = {}, ad = u.rol === "ADMIN"; TABLAS.forEach(function (t) { if (t !== "Mediciones") o[t] = vivas(t, ad); }); if (!ad) { o.Usuarios = []; o.Solicitudes_Acceso = []; o.Pedidos = []; } if (u.rol === "COLABORADOR") { o.Material = []; o.Movimientos = []; o.Solicitudes = []; o.Pedidos = []; }
+    webCargar: function (tok) { var u = sesion(tok), o = {}, ad = u.rol === "ADMIN"; TABLAS.forEach(function (t) { if (t !== "Mediciones") o[t] = vivas(t, ad); }); if (!ad) { o.Usuarios = []; o.Solicitudes_Acceso = []; if (!esGestor(u)) o.Pedidos = []; } if (u.rol === "COLABORADOR") { o.Material = []; o.Movimientos = []; o.Solicitudes = []; o.Pedidos = []; }
       o.Equipo = DB.tablas.Usuarios.filter(function (x) { return x.Activo !== false && x.Borrado !== true; }).map(function (x) { var q = { ID: x.ID, Nombre: x.Nombre, Rol: normRol(x.Rol), Foto: x.Foto || "" }; if (u.rol !== "COLABORADOR") q.Email = x.Email; return q; });
       return { usuario: u, ahora: ahoraISO(), config: {}, tablas: o }; },
     webPerfilFoto: function (tok, url) { var u = sesion(tok); url = String(url || ""); if (url && (!/^data:image\/(jpeg|webp);base64,[A-Za-z0-9+\/=]+$/.test(url) || url.length > 20000)) throw new Error("La foto no es válida o es demasiado grande."); var f = DB.tablas.Usuarios.filter(function (x) { return x.Email === u.email; })[0]; f.Foto = url; meta(f, u.email, ahoraISO()); persistir(); return { ok: true, usuario: sesion(tok) }; },
+    webPerfilNotificaciones: function (tok, o) { var u = sesion(tok), f = DB.tablas.Usuarios.filter(function (x) { return x.Email === u.email; })[0]; o = o || {}; if (o.gestor_inventario !== undefined) throw new Error("Sin permiso: el gestor de inventario lo asigna un administrador.");   // v0.7 (a)
+      if (o.revision === true && u.rol !== "ADMIN") throw new Error("Sin permiso: solo los administradores reciben los datos para revisar."); [["diaria", "Notif_diaria"], ["revision", "Notif_revision"], ["perfusion", "Notif_perfusion"]].forEach(function (k) { if (o[k[0]] !== undefined) f[k[1]] = !!siNoD(o[k[0]]); }); meta(f, u.email, ahoraISO()); persistir(); return { ok: true, usuario: sesion(tok) }; },
     webMediciones: function (tok, exps) { var u = sesion(tok); return { filas: vivas("Mediciones", u.rol === "ADMIN").filter(function (m) { return exps.indexOf(m.Experimento) !== -1; }) }; },
-    webCambios: function (tok, desde) { var u = sesion(tok), o = {}; TABLAS.forEach(function (t) { if ((t === "Usuarios" || t === "Solicitudes_Acceso" || t === "Pedidos") && u.rol !== "ADMIN") return; if (u.rol === "COLABORADOR" && /^(Material|Movimientos|Solicitudes)$/.test(t)) return; var f = DB.tablas[t].filter(function (x) { return String(x.Actualizado_en) > String(desde); }); if (f.length) o[t] = f; }); return { ahora: ahoraISO(), tablas: o }; },
+    webCambios: function (tok, desde) { var u = sesion(tok), o = {}; TABLAS.forEach(function (t) { if ((t === "Usuarios" || t === "Solicitudes_Acceso" || (t === "Pedidos" && !esGestor(u))) && u.rol !== "ADMIN") return; if (u.rol === "COLABORADOR" && /^(Material|Movimientos|Solicitudes)$/.test(t)) return; var f = DB.tablas[t].filter(function (x) { return String(x.Actualizado_en) > String(desde); }); if (f.length) o[t] = f; }); return { ahora: ahoraISO(), tablas: o }; },
     webGuardar: function (tok, tabla, filas) {
       var u = sesion(tok); if (TABLAS.indexOf(tabla) === -1) throw new Error("Tabla no válida: " + tabla);
-      if (/^(Config|Usuarios|Material|Movimientos|Pedidos)$/.test(tabla)) req(u, ["ADMIN"]); else if (/^(Avisos|Solicitudes_Acceso)$/.test(tabla)) throw new Error("Sin permiso: " + tabla + " no se escribe con webGuardar."); else req(u, ["ADMIN", "INVESTIGADOR"]);
+      if (/^(Material|Pedidos)$/.test(tabla)) reqGestor(u); else if (tabla === "Movimientos") { if (u.rol !== "ADMIN") reqGestor(u); } else if (/^(Config|Usuarios)$/.test(tabla)) req(u, ["ADMIN"]); else if (/^(Avisos|Solicitudes_Acceso)$/.test(tabla)) throw new Error("Sin permiso: " + tabla + " no se escribe con webGuardar."); else req(u, ["ADMIN", "INVESTIGADOR"]);
       var val = VALIDABLES.indexOf(tabla) !== -1;
       var l = DB.tablas[tabla], idx = {}, t = ahoraISO(), out = []; l.forEach(function (f, i) { idx[f.ID] = i; });
       filas.forEach(function (f) {
@@ -164,7 +177,7 @@
       });
       persistir(); return { ok: true, filas: out, ahora: t };
     },
-    webBorrar: function (tok, tabla, ids) { var u = sesion(tok); if (/^(Config|Usuarios|Material|Movimientos|Pedidos)$/.test(tabla)) req(u, ["ADMIN"]); else req(u, ["ADMIN", "INVESTIGADOR"]); var n = 0, t = ahoraISO(), val = VALIDABLES.indexOf(tabla) !== -1;
+    webBorrar: function (tok, tabla, ids) { var u = sesion(tok); if (/^(Material|Pedidos)$/.test(tabla)) reqGestor(u); else if (tabla === "Movimientos") { if (u.rol !== "ADMIN") reqGestor(u); } else if (/^(Config|Usuarios)$/.test(tabla)) req(u, ["ADMIN"]); else req(u, ["ADMIN", "INVESTIGADOR"]); var n = 0, t = ahoraISO(), val = VALIDABLES.indexOf(tabla) !== -1;
       DB.tablas[tabla].forEach(function (f) { if (ids.indexOf(f.ID) === -1 || f.Borrado === true) return; if (u.rol !== "ADMIN" && f.Creado_por !== u.email && f.Creado_por !== "demo") throw new Error("Sin permiso: solo puedes borrar tus propios registros.");
         var eraVal = !esPend(f); f.Borrado = true; meta(f, u.email, t); if (val) { if (u.rol === "ADMIN") { f.Validado = true; f.Previo_JSON = ""; } else { f.Validado = false; f.Previo_JSON = eraVal ? JSON.stringify({ Borrado: false }) : f.Previo_JSON || ""; } } n++; }); persistir(); return { ok: true, n: n }; },
     webValidar: function (tok, tabla, ids) { var u = sesion(tok); req(u, ["ADMIN"]); var t = ahoraISO(), n = 0, out = []; DB.tablas[tabla].forEach(function (f) { if (ids.indexOf(f.ID) === -1) return; if (esPend(f)) n++; f.Validado = true; f.Validado_por = u.email; f.Validado_en = t; f.Previo_JSON = ""; f.Actualizado_en = t; out.push(f); }); persistir(); return { ok: true, n: n, filas: out }; },
@@ -179,7 +192,7 @@
       var t = ahoraISO(), usr = null; o = o || {}; if (o.accion === "aprobar") { var rol = normRol(o.rol || a.Rol_solicitado); usr = DB.tablas.Usuarios.filter(function (x) { return String(x.Email).toLowerCase() === a.Email; })[0]; if (!usr) { usr = { ID: "USR-" + Date.now().toString(36), Email: a.Email }; DB.tablas.Usuarios.push(usr); } Object.assign(usr, { Nombre: o.nombre || (a.Nombre + " " + a.Apellidos), Rol: rol, Activo: true, Borrado: false }); meta(usr, u.email, t); a.Estado = "Aprobada"; a.Rol_asignado = rol; }
       else if (o.accion === "rechazar") a.Estado = "Rechazada"; else throw new Error("Acción no válida.");
       a.Resuelto_por = u.email; a.Resuelto_en = t; a.Nota = o.nota || ""; meta(a, u.email, t); persistir(); return { ok: true, solicitud: a, usuario: usr || undefined }; },
-    webEnviarReposicion: function (tok, exp) { var u = sesion(tok); req(u, ["ADMIN"]); var mats = DB.tablas.Material.filter(function (m) { return m.Borrado !== true; }).map(function (m) { var s = (C.num(m.Stock_inicial) || 0); DB.tablas.Movimientos.forEach(function (x) { if (x.Material === m.ID && x.Borrado !== true) s += C.num(x.Cantidad) || 0; }); return Object.assign({}, m, { Stock_actual: s }); });
+    webEnviarReposicion: function (tok, exp) { var u = sesion(tok); reqGestor(u); var mats = DB.tablas.Material.filter(function (m) { return m.Borrado !== true; }).map(function (m) { var s = (C.num(m.Stock_inicial) || 0); DB.tablas.Movimientos.forEach(function (x) { if (x.Material === m.ID && x.Borrado !== true) s += C.num(x.Cantidad) || 0; }); return Object.assign({}, m, { Stock_actual: s }); });
       var cfg = (DB.tablas.Config.filter(function (c) { return c.ID === "reposicion"; })[0] || {}).Valor_JSON, dest = []; try { dest = (JSON.parse(cfg || "{}").destinatarios) || []; } catch (e) { } if (!dest.length) dest = DB.tablas.Usuarios.filter(function (x) { return normRol(x.Rol) === "ADMIN" && x.Activo !== false; }).map(function (x) { return x.Email; });
       return { ok: true, n: C.reposicion(mats).length, destinatarios: dest, nota: "Modo demostración: no se envía ningún correo." }; },
     // ---- v0.3 · acceso rápido (en demostración solo se simula el estado)
@@ -222,9 +235,9 @@
       });
       persistir(); return { ok: true, filas: filas, fila: filas[0] };
     },
-    // ---- v0.3 · pedidos (solo ADMIN)
+    // ---- v0.3 · pedidos (v0.7: solo gestores de inventario)
     webPedidosGenerar: function (tok) {
-      var u = sesion(tok); req(u, ["ADMIN"]); var t = ahoraISO(), grupos = {}, out = [];
+      var u = sesion(tok); reqGestor(u); var t = ahoraISO(), grupos = {}, out = [];
       var enviados = {}; vivas("Pedidos").forEach(function (p) { if (p.Estado === "Enviado") JSON.parse(p.Lineas_JSON || "[]").forEach(function (x) { enviados[x.Material] = (enviados[x.Material] || 0) + (C.num(x.Cantidad) || 0); }); });
       C.reposicion(vivas("Material"), stockDemo).forEach(function (m) { if (!/^(Contrato menor|Licitación)$/.test(m.Via)) return; var c = Math.max(0, m.a_reponer - (enviados[m.ID] || 0)); if (!c) return; var mat = DB.tablas.Material.filter(function (x) { return x.ID === m.ID; })[0], k = [mat.Proveedor, mat.Email_proveedor, mat.Expediente].join("|"); (grupos[k] = grupos[k] || { mat: mat, lineas: [] }).lineas.push({ Material: m.ID, Nombre: m.Nombre, Referencia: m.Referencia, Cantidad: c, Unidad: m.Unidad }); });
       Object.keys(grupos).forEach(function (k) { var g = grupos[k], ex = vivas("Pedidos").filter(function (p) { return p.Estado === "Borrador" && p.Origen === "auto" && [p.Proveedor, p.Email_proveedor, p.Expediente].join("|") === k; })[0];
@@ -233,14 +246,14 @@
       persistir(); return { ok: true, n: out.length, pedidos: out };
     },
     webPedidoEnviar: function (tok, id, o) {
-      var u = sesion(tok); req(u, ["ADMIN"]); var p = vivas("Pedidos").filter(function (x) { return x.ID === id; })[0], t = ahoraISO(); o = o || {}; if (!p) throw new Error("Pedido no encontrado."); if (p.Estado !== "Borrador") throw new Error("El pedido ya está " + String(p.Estado).toLowerCase() + ".");
+      var u = sesion(tok); reqGestor(u); var p = vivas("Pedidos").filter(function (x) { return x.ID === id; })[0], t = ahoraISO(); o = o || {}; if (!p) throw new Error("Pedido no encontrado."); if (p.Estado !== "Borrador") throw new Error("El pedido ya está " + String(p.Estado).toLowerCase() + ".");
       if (!p.Email_proveedor) throw new Error("Falta el correo del proveedor."); var ls = JSON.parse(p.Lineas_JSON || "[]"); if (!ls.length) throw new Error("El pedido no tiene líneas.");
       ls.forEach(function (x) { var m = DB.tablas.Material.filter(function (y) { return y.ID === x.Material; })[0]; if (!m) return; var uc = C.num(m.Unidades_contrato), up = C.num(m.Unidades_pedidas) || 0; if (uc !== null && up + x.Cantidad > uc && !o.forzar) throw new Error("Supera las unidades del expediente: quedan " + Math.max(0, uc - up) + " de " + m.Nombre + "."); });
       ls.forEach(function (x) { var m = DB.tablas.Material.filter(function (y) { return y.ID === x.Material; })[0]; if (m) { m.Unidades_pedidas = (C.num(m.Unidades_pedidas) || 0) + x.Cantidad; meta(m, u.email, t); } });
       p.Estado = "Enviado"; p.Enviado_por = u.email; p.Enviado_en = t; p.Asunto = o.asunto || p.Asunto || ""; p.Texto = o.texto || ""; meta(p, u.email, t); persistir(); return { ok: true, pedido: p, nota: "Modo demostración: no se envía ningún correo." };
     },
     webPedidoRecibir: function (tok, id) {
-      var u = sesion(tok); req(u, ["ADMIN"]); var p = vivas("Pedidos").filter(function (x) { return x.ID === id; })[0], t = ahoraISO(); if (!p) throw new Error("Pedido no encontrado."); if (p.Estado !== "Enviado") throw new Error("Solo se reciben los pedidos enviados.");
+      var u = sesion(tok); reqGestor(u); var p = vivas("Pedidos").filter(function (x) { return x.ID === id; })[0], t = ahoraISO(); if (!p) throw new Error("Pedido no encontrado."); if (p.Estado !== "Enviado") throw new Error("Solo se reciben los pedidos enviados.");
       var movs = JSON.parse(p.Lineas_JSON || "[]").map(function (x, i) { var m = meta({ ID: id + "-in" + i, Material: x.Material, Fecha: t, Cantidad: x.Cantidad, Motivo: "Pedido " + id, Experimento: "", Nota: "Entrada del pedido " + id }, u.email, t); DB.tablas.Movimientos.push(m); return m; });
       p.Estado = "Recibido"; p.Recibido_en = t; meta(p, u.email, t); persistir(); return { ok: true, pedido: p, movimientos: movs };
     },
@@ -260,6 +273,12 @@
     webPushProbar: function () { throw new Error("Las notificaciones push no funcionan en modo demostración."); },
     webPushSuscribir: function () { throw new Error("No disponible en modo demostración."); }, webPushBaja: function () { return { ok: true }; }, webPushEstado: function () { return { preparado: false, esta: false, dispositivos: 0 }; }
   };
+  // v0.7 · gestores de inventario: casilla Gestor_inventario (ADMIN o INVESTIGADOR activos); si no hay ninguno, los ADMIN (respaldo)
+  function siNo(v) { return v === true || /^(true|sí|si|1|verdadero)$/i.test(String(v === undefined || v === null ? "" : v).trim()); }
+  function gestores() { return DB.tablas.Usuarios.filter(function (x) { return x.Activo !== false && x.Borrado !== true && siNo(x.Gestor_inventario) && /^(ADMIN|INVESTIGADOR)$/.test(normRol(x.Rol)); }); }
+  function esGestor(u) { var g = gestores(); return g.length ? g.some(function (x) { return x.Email === u.email; }) : u.rol === "ADMIN"; }
+  function reqGestor(u) { if (!esGestor(u)) throw new Error("Sin permiso: esta acción es del gestor de inventario (Configuración › Inventario › Gestores)."); }
+  var sesion0 = sesion; sesion = function (tok) { var u = sesion0(tok); if (u.gestor_inventario === undefined) { u.gestor_inventario = esGestor(u); u.gestor_respaldo = u.gestor_inventario && !gestores().length; } return u; };
   window.HOMEDemo = {
     iniciar: function () { if (!listo) listo = idb("get").then(function (d) { DB = d && d.version === VERSION_DEMO ? d : sembrar(); if (!d || d.version !== VERSION_DEMO) idb("put", DB); }); return listo; },
     llamar: function (fn, args) { return window.HOMEDemo.iniciar().then(function () { return new Promise(function (ok, ko) { setTimeout(function () { try { if (!API[fn]) throw new Error("Función no disponible en demostración: " + fn); var r = API[fn].apply(null, args || []); ok(JSON.parse(JSON.stringify(r))); } catch (e) { var er = new Error(e.message); er.servidor = true; ko(er); } }, 60); }); }); },
@@ -267,4 +286,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["demo.js"] = "0.6.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["demo.js"] = "0.7.0";

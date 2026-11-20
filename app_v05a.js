@@ -189,6 +189,12 @@
   }
 
   H.tarjetaGrafico = tarjetaGrafico;
+  // v0.7: cada grupo de gráficos es un desplegable (en el móvil, cerrados salvo el primero; se recuerda la elección)
+  function grupoG(nombre, html, n) {
+    var est = (H.pref("gruposIni") || {})[nombre], movil = window.matchMedia && window.matchMedia("(max-width: 599px)").matches, abierto = est !== undefined ? est : !movil || nombre === C.GRUPOS_INICIO[0][0];
+    return '<details class="g-grupo"' + (abierto ? " open" : "") + ' data-grupo="' + esc(nombre) + '"><summary><h3 class="sub">' + esc(nombre) + '</h3><span class="n">' + n + "</span></summary>" + '<div class="g-rejilla">' + html + "</div></details>";
+  }
+  document.addEventListener("toggle", function (ev) { var d = ev.target; if (!d || !d.classList || !d.classList.contains("g-grupo")) return; var o = Object.assign({}, H.pref("gruposIni") || {}); o[d.getAttribute("data-grupo")] = d.open; H.pref("gruposIni", o); }, true);
   // v0.6: gráfico ampliado (se cierra con la X, con Esc o tocando en cualquier sitio)
   H.ampliarGrafico = function (exp, k, modo) {
     var e = H.exp(exp); if (!e) return; cerrarAmpliado();
@@ -215,9 +221,9 @@
       (al.length ? "<ul>" + al.map(function (a) { return '<li><span class="chip ' + (a.dir < 0 ? "info" : "al") + '">' + (a.dir < 0 ? "↓ bajo" : "↑ alto") + "</span> <b>" + esc(a.nombre) + "</b> " + esc(NOMBRE_M[a.muestra] || a.muestra) + " · " + esc(a.punto) + ": <b>" + esc(H.n(H.aVista(a.variable, a.valor), 2)) + "</b> " + esc(H.unidadVisible(a.variable, a.unidad)) + ' <span class="muy-tenue">(objetivo ' + esc(H.n(H.aVista(a.variable, a.ob[0]), 2)) + "–" + esc(H.n(H.aVista(a.variable, a.ob[1]), 2)) + ")</span></li>"; }).join("") + "</ul>" : "") + "</details>";
     var usados = {}, grupos = C.GRUPOS_INICIO.map(function (g) {
       var ks = g[1].filter(function (k) { return sel.indexOf(k) !== -1; }); ks.forEach(function (k) { usados[k] = 1; }); if (!ks.length) return "";
-      return '<h3 class="sub">' + esc(g[0]) + '</h3><div class="g-rejilla">' + ks.map(function (k) { return tarjetaGrafico(e, k, modo, horas); }).join("") + "</div>";
+      return grupoG(g[0], ks.map(function (k) { return tarjetaGrafico(e, k, modo, horas); }).join(""), ks.length);
     }).join("");
-    var otros = sel.filter(function (k) { return !usados[k]; }); if (otros.length) grupos += '<h3 class="sub">Otros valores</h3><div class="g-rejilla">' + otros.map(function (k) { return tarjetaGrafico(e, k, modo, horas); }).join("") + "</div>";
+    var otros = sel.filter(function (k) { return !usados[k]; }); if (otros.length) grupos += grupoG("Otros valores", otros.map(function (k) { return tarjetaGrafico(e, k, modo, horas); }).join(""), otros.length);
     var leyenda = '<p class="g-leyenda muy-tenue"><span class="lg lg-serie"></span>' + esc(e.ID) + '<span class="lg lg-obj"></span>rango objetivo' + (modo === "comparar" ? '<span class="lg lg-media"></span>media de las perfusiones anteriores<span class="lg lg-de"></span>± 1 DE' : "") + '<span class="lg lg-ref"></span>basal del donante de hígado · desde el inicio<span class="g-ayuda">Toca un gráfico para ampliarlo</span></p>';
     var bx = H.balanceExp ? H.balanceExp(e) : null, hdf = bx ? '<h3 class="sub">Balance de volumen y HDF</h3><div class="kpis kpis-ini"><div class="kpi ' + (Math.abs(bx.b.balance_mL) <= 50 ? "ok" : Math.abs(bx.b.balance_mL) <= 150 ? "aj" : "al") + '"><div class="et">Balance desde el inicio</div><div class="v">' + (bx.b.balance_mL > 0 ? "+" : "") + H.n(bx.b.balance_mL, 0) + '<small>mL</small></div><div class="tend">infundido ' + H.n(bx.b.infundido_mL, 0) + " · bilis " + H.n(bx.b.bilis_mL, 0) + " · HDF " + H.n(bx.b.extraido_mL, 0) + "</div></div>" +
       '<div class="kpi"><div class="et">Extracción de la HDF ahora</div><div class="v">' + (bx.b.extraccion_actual !== null ? H.n(bx.b.extraccion_actual, 0) + "<small>mL/h</small>" : "—") + '</div><div class="tend">recomendada ' + H.n(bx.rec.redondeada_mL_h, 0) + " mL/h</div></div>" +
@@ -312,4 +318,4 @@
   H.acc.quitarFotoPerfil = function () { guardarFoto(""); };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v05a.js"] = "0.6.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v05a.js"] = "0.7.0";
