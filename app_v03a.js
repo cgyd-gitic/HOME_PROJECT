@@ -39,8 +39,8 @@
       '<section class="tarjeta"><div class="cabecera"><a class="bt ico-solo" href="#/calendario?m=' + mesRel(-1) + '" aria-label="Mes anterior">' + ico("chevron-left") + '</a><h2 style="text-transform:capitalize;min-width:170px;text-align:center">' + esc(nombreMes) + '</h2><a class="bt ico-solo" href="#/calendario?m=' + mesRel(1) + '" aria-label="Mes siguiente">' + ico("chevron-right") + '</a><a class="bt texto" href="#/calendario">Hoy</a></div>' +
       '<div class="cal" role="grid" aria-label="' + esc(nombreMes) + '">' + ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(function (x) { return '<div class="cal-cab">' + x + "</div>"; }).join("") + celdas + "</div>" +
       '<div class="cal-leyenda">' + Object.keys(FASES).map(function (f) { return '<span><i class="cal-ev f-' + f + '"></i>' + FASES[f] + "</span>"; }).join("") + '<span><i class="cal-ev f-perfusion prov"></i>Fecha provisional</span></div></section>' +
-      '<section class="tarjeta"><div class="cabecera"><h2>Procedimientos programados</h2></div>' + (prox.length ? prox.map(tarjetaProg).join("") : '<p class="tenue">No hay procedimientos programados.' + (H.esAdmin() ? " Usa «Programar experimento» para reservar las fechas." : "") + "</p>") +
-      '<p class="muy-tenue" style="margin-top:8px">Al programar una fecha provisional se avisa a los participantes. Tres semanas antes, los administradores reciben el aviso para confirmarla; al confirmar, los participantes reciben la cita para su calendario y un recordatorio una semana antes de cada procedimiento.</p></section></div>';
+      '<section class="tarjeta"><div class="cabecera"><h2>Procedimientos programados</h2>' + H.botonInfo("Al programar una fecha provisional se avisa a los participantes. Tres semanas antes, los administradores reciben el aviso para confirmarla; al confirmar, los participantes reciben la cita para su calendario y un recordatorio una semana antes de cada procedimiento.") + "</div>" + (prox.length ? prox.map(tarjetaProg).join("") : '<p class="tenue">No hay procedimientos programados.' + (H.esAdmin() ? " Usa «Programar experimento» para reservar las fechas." : "") + "</p>") +
+      "</section></div>";
   };
   function tarjetaProg(e) {
     var hitos = C.hitosExperimento(e, cfgP()), part = H.participantes(e), dias = C.diasEntre(hoyISO(), e.Fecha_cirugia), prov = H.esProvisional(e), id = esc(e.ID);
@@ -197,12 +197,12 @@
     var k = H._qrClave, url = k ? H.urlQR(k) : "", svg = "";
     if (k && window.qrcode) { try { var q = window.qrcode(0, "M"); q.addData(url); q.make(); svg = q.createSvgTag({ cellSize: 5, margin: 4, scalable: true }); } catch (e) { svg = ""; } }
     var pp = H.proximaPerfusion ? H.proximaPerfusion() : null;
-    return '<section class="tarjeta"><div class="cabecera"><h2>Código QR para el registro de la alimentación</h2></div>' +
-      '<p class="tenue">Imprime este código y ponlo junto a los corrales. Quien lo escanee (celadores) abre <b>solo</b> la pantalla de registro de tomas, sin usuario ni contraseña. Solo funciona mientras hay un procedimiento confirmado en fase de aclimatación; fuera de ese periodo indica la fecha del próximo procedimiento. Lo que registren queda pendiente de validación.</p>' +
+    return '<section class="tarjeta"><div class="cabecera"><h2>Código QR para el registro de la alimentación</h2>' + H.botonInfo("Solo funciona mientras hay un procedimiento confirmado en fase de aclimatación; fuera de ese periodo indica la fecha del próximo procedimiento. Lo que registren queda pendiente de validación.") + "</div>" +
+      '<p class="tenue">Imprime este código y ponlo junto a los corrales. Quien lo escanee (celadores) abre <b>solo</b> la pantalla de registro de tomas, sin usuario ni contraseña.</p>' +
       (k === null ? '<p class="tenue">Cargando el código…</p>' : !k ? '<div class="aviso al">' + ico("circle-alert") + "<div>" + esc(H._qrError || "No se ha podido obtener el código.") + "</div></div>" :
         '<div class="qr-panel imprimible"><div class="qr-img">' + (svg || '<p class="tenue">No se ha podido dibujar el código.</p>') + '</div><div><h3>HOME · Alimentación de los animales</h3><p>Escanea el código con la cámara del móvil y registra cada toma (1ª y 2ª).</p><p class="muy-tenue qr-url">' + esc(url) + "</p></div></div>" +
-        '<div class="fila-flex" style="margin-top:10px"><button class="bt pri" data-act="imprimir">' + ico("printer") + 'Imprimir</button><a class="bt" href="' + esc(url) + '" target="_blank" rel="noopener">' + ico("external-link") + 'Abrir la pantalla</a><button class="bt peligro" data-act="qrRegenerar">' + ico("refresh-cw") + "Generar un código nuevo</button></div>" +
-        '<p class="muy-tenue" style="margin-top:8px">«Generar un código nuevo» anula el anterior: úsalo si el cartel se pierde o al terminar una serie de experimentos.' + (pp ? " Próximo procedimiento: " + esc(dma(pp.fecha)) + "." : "") + "</p>") + "</section>";
+        '<div class="fila-flex" style="margin-top:10px"><button class="bt pri" data-act="imprimir">' + ico("printer") + 'Imprimir</button><a class="bt" href="' + esc(url) + '" target="_blank" rel="noopener">' + ico("external-link") + 'Abrir la pantalla</a><button class="bt peligro" data-act="qrRegenerar">' + ico("refresh-cw") + "Generar un código nuevo</button>" + H.botonInfo("«Generar un código nuevo» anula el anterior: el cartel impreso deja de funcionar. Úsalo si el cartel se pierde o al terminar una serie de experimentos.") + "</div>" +
+        (pp ? '<p class="muy-tenue" style="margin-top:8px">Próximo procedimiento: ' + esc(dma(pp.fecha)) + ".</p>" : "")) + "</section>";
   };
   H.acc.imprimir = function () { document.body.classList.add("imprimiendo"); try { window.print(); } catch (e) { } setTimeout(function () { document.body.classList.remove("imprimiendo"); }, 800); };
   H.acc.qrRegenerar = function () { H.confirmar("Generar un código nuevo", "El código QR actual dejará de funcionar y habrá que imprimir el nuevo.", "Generar", true).then(function (ok) { if (!ok) return; H.api("webDietaQRRegenerar").then(function (r) { H._qrClave = r.clave; H.toast("Código nuevo generado."); H.repintar(); }).catch(function (e) { H.toast(e.message, "error"); }); }); };
@@ -251,4 +251,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v03a.js"] = "0.7.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v03a.js"] = "0.7.1";

@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var C = window.HOMECalc, H = window.HOME = window.HOME || {};
-  var VERSION = "0.7.0";
+  var VERSION = "0.7.1";
   var S = H.S = { token: null, usuario: null, demo: false, cfg: null, t: {}, med: {}, medCargada: {}, cola: [], enviando: false, online: navigator.onLine !== false,
     ultima: null, pref: {}, avisosVistos: {}, pendienteRepintar: false, errores: [] };
   var TABLAS = ["Experimentos", "Animales", "Dieta", "Formularios", "Eventos", "Avisos", "Material", "Movimientos", "Solicitudes", "Personal", "Usuarios", "Config", "Solicitudes_Acceso", "Fotos", "Pedidos"];
@@ -10,6 +10,8 @@
 
   // ---------------------------------------------------------------- utilidades
   var esc = H.esc = function (s) { return String(s === null || s === undefined ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]; }); };
+  // v0.7.1: botón (i) para la información importante (mismo marcado y acción que el de v0.7 b: .bt-info → H.acc.infoTexto)
+  H.botonInfo = function (texto) { return '<button type="button" class="bt-info" data-act="infoTexto" data-t="' + esc(texto) + '" aria-label="Más información" title="' + esc(texto) + '">' + H.ico("info", "s") + "</button>"; };
   H.ico = function (n, cls) { return "<svg class=\"ico " + (cls || "") + "\" aria-hidden=\"true\"><use href=\"#i-" + n + "\"/></svg>"; };
   var nf = {}; H.n = function (v, d) { v = C.num(v); if (v === null) return ""; d = d === undefined ? 1 : d; var k = "d" + d; if (!nf[k]) nf[k] = new Intl.NumberFormat("es-ES", { maximumFractionDigits: d, minimumFractionDigits: 0 }); return nf[k].format(v); };
   H.nFijo = function (v, d) { v = C.num(v); if (v === null) return ""; return new Intl.NumberFormat("es-ES", { maximumFractionDigits: d, minimumFractionDigits: d }).format(v); };
@@ -373,7 +375,7 @@
       "<nav class=\"riel\" aria-label=\"Secciones\"><a class=\"riel-logo\" href=\"#/inicio\" aria-label=\"HOME, inicio\" data-tip=\"HOME · Perfusión hepática extendida\">" + H.logoSVG() + "</a><div class=\"riel-lista\">" + nav.map(enlaceRiel).join("") + "</div>" +
       "<div class=\"riel-pie\">" + enlaceRiel({ r: "cuenta", n: "Mi cuenta", i: "user" }) + "</div></nav>" +
       "<div class=\"lienzo\"><header class=\"cab\">" + H.marcaHTML() + "<span id=\"chipActivo\"></span><span class=\"empuja\"></span><span id=\"estadoSync\" class=\"estado-sync\" role=\"status\"></span>" +
-      "<span id=\"cabPerf\"></span>" + (H.campanaHTML ? H.campanaHTML() : "") + "<button class=\"usuario-cab\" data-act=\"cuenta\" aria-label=\"Mi cuenta: " + esc(u.nombre || u.email || "") + " (" + esc(H.nombreRol(u.rol)) + ")\">" + (H.avatarHTML ? H.avatarHTML(u, "cab") : "<span class=\"avatar\"><span>" + esc(ini) + "</span></span>") + "<span class=\"usr-txt\"><b>" + esc(u.nombre || u.email || "") + "</b><span>" + esc(H.nombreRol(u.rol)) + "</span></span></button></header>" +
+      "<span id=\"cabPerf\"></span>" + (H.campanaHTML ? H.campanaHTML() : "") + "<button class=\"usuario-cab\" data-act=\"cuenta\" aria-label=\"Mi cuenta: " + esc(u.nombre || u.email || "") + " (" + esc(H.nombreRol(u.rol)) + ")\">" + (H.avatarHTML ? H.avatarHTML(u, "av-cab") : "<span class=\"avatar\"><span>" + esc(ini) + "</span></span>") + "<span class=\"usr-txt\"><b>" + esc(u.nombre || u.email || "") + "</b><span>" + esc(H.nombreRol(u.rol)) + "</span></span></button></header>" +
       "<main id=\"principal\" class=\"principal\" tabindex=\"-1\"></main></div>" +
       "<nav class=\"inferior\" aria-label=\"Secciones\">" + movil.map(function (x) { return "<a href=\"#/" + x.r + "\" data-nav=\"" + x.r + "\">" + H.ico(x.i) + "<span>" + esc(x.n) + "</span>" + cont(x.r) + "</a>"; }).join("") +
       "<button type=\"button\" data-act=\"menuMas\" aria-haspopup=\"dialog\" class=\"" + (resto.some(function (x) { return x.r === H.ruta().partes[0]; }) ? "activo" : "") + "\">" + H.ico("menu") + "<span>Más</span>" + (nResto ? "<span class=\"cont\">" + nResto + "</span>" : "") + "</button></nav>" +
@@ -453,14 +455,24 @@
     if (H.pref("silenciar")) return;
     H.mostrarAlarma(due);
   };
+  // v0.7.1: texto de un aviso en formato lista. Convención: un elemento por línea separado por "\n", sin viñeta en el texto
+  // (la pone quien lo muestra). Un texto sin "\n" se muestra como antes (un párrafo).
+  H.lineasAviso = function (t) { return String(t === null || t === undefined ? "" : t).split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean); };
+  H.textoAvisoHTML = function (t, cls, enLinea) {
+    var l = H.lineasAviso(t), c = cls ? " " + cls : "";
+    if (l.length < 2) return enLinea ? '<span class="aviso-txt' + c + '">' + esc(l[0] || "") + "</span>" : '<p class="aviso-txt' + c + '">' + esc(l[0] || "") + "</p>";
+    return enLinea ? '<span class="aviso-lista en-linea' + c + '">' + l.map(function (x) { return '<span class="aviso-li">' + esc(x) + "</span>"; }).join("") + "</span>"
+      : '<ul class="aviso-lista' + c + '">' + l.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>";
+  };
+  H.textoAvisoPlano = function (t) { var l = H.lineasAviso(t); return l.length < 2 ? (l[0] || "") : l.map(function (x) { return "• " + x; }).join("\n"); };   // notificación del sistema
   H.mostrarAlarma = function (lista) {
     var c = H.$("#alarmas"); if (!c) return;
     var a = lista[0], mas = lista.length > 1 ? " (+" + (lista.length - 1) + ")" : "";
-    c.innerHTML = "<div class=\"alarma\" role=\"alertdialog\" aria-labelledby=\"alT\" aria-describedby=\"alX\"><h3 id=\"alT\">" + H.ico("bell-ring") + esc(a.Titulo + mas) + "</h3><p id=\"alX\">" + lista.map(function (x) { return esc(x.Texto); }).join("<br>") + "</p>" +
+    c.innerHTML = "<div class=\"alarma\" role=\"alertdialog\" aria-labelledby=\"alT\" aria-describedby=\"alX\"><h3 id=\"alT\">" + H.ico("bell-ring") + esc(a.Titulo + mas) + "</h3><div id=\"alX\" class=\"al-texto\">" + lista.map(function (x, i) { return (lista.length > 1 && i ? '<p class="al-sub"><b>' + esc(x.Titulo) + "</b></p>" : "") + H.textoAvisoHTML(x.Texto); }).join("") + "</div>" +
       "<div class=\"acciones\"><button class=\"bt\" data-act=\"alarmaCerrar\">Entendido</button>" + (a.Vista ? "<button class=\"bt pri\" data-act=\"alarmaIr\" data-vista=\"" + esc(a.Vista) + "\">Abrir</button>" : "") + "</div></div>";
     H.pitido(a.Tipo === "critico" ? 5 : 3);
     if (navigator.vibrate) try { navigator.vibrate([300, 150, 300, 150, 300]); } catch (e) { }
-    if (document.hidden && window.Notification && Notification.permission === "granted" && navigator.serviceWorker) navigator.serviceWorker.getRegistration().then(function (reg) { if (reg) reg.showNotification(a.Titulo, { body: a.Texto, tag: "home-local-" + a.ID, icon: "icon-192.png", data: { vista: a.Vista } }); }).catch(function () { });
+    if (document.hidden && window.Notification && Notification.permission === "granted" && navigator.serviceWorker) navigator.serviceWorker.getRegistration().then(function (reg) { if (reg) reg.showNotification(a.Titulo, { body: H.textoAvisoPlano(a.Texto), tag: "home-local-" + a.ID, icon: "icon-192.png", data: { vista: a.Vista } }); }).catch(function () { });
   };
   H.acc.alarmaCerrar = function () { H.$("#alarmas").innerHTML = ""; };
   H.acc.alarmaIr = function (el) { H.$("#alarmas").innerHTML = ""; H.irVista(el.getAttribute("data-vista")); };
@@ -515,4 +527,4 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar); else setTimeout(iniciar, 0);
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_core.js"] = "0.7.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_core.js"] = "0.7.1";

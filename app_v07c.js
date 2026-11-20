@@ -10,7 +10,7 @@
     rejilla_t: "tenue", ingles: false, y0: false, dias: true, etiq_x: "horas", sup_prandial: true, sup_gluco: true, sup_noche: true, color_media: "#1d3a5a" };
   Object.keys(NUEVAS).forEach(function (k) { if (!(k in GI.DEF)) GI.DEF[k] = NUEVAS[k]; });
   GI.DEF.leyenda = "abajo";
-  var EJES = [["real", "Tiempo real de perfusión (h)"], ["reloj", "Hora de perfusión (reloj, alineada a las 00:00)"], ["nominal", "Tiempo nominal del protocolo (h)"], ["dia", "Día de perfusión"], ["hora", "Hora del día (circadiano, 0–24 h)"]];
+  var EJES = [["real", "Tiempo real de perfusión (h)"], ["reloj", "Hora de perfusión (reloj)"], ["nominal", "Tiempo nominal del protocolo (h)"], ["dia", "Día de perfusión"], ["hora", "Hora del día (circadiano, 0–24 h)"]];
   var MODOS = [["individual", "Cada perfusión"], ["media_de", "Media ± DE"], ["media_eem", "Media ± EEM"], ["ind_media", "Cada perfusión + media"]];
   var DISPOS = [["auto", "Automática"], ["1x1", "1 × 1"], ["1x2", "1 × 2 (una fila, dos paneles)"], ["2x1", "2 × 1 (dos filas)"], ["2x2", "2 × 2"], ["2x3", "2 × 3 (dos filas, tres columnas)"], ["3x2", "3 × 2 (tres filas, dos columnas)"], ["3x3", "3 × 3"],
     ["col1", "1 columna"], ["col2", "2 columnas"], ["col3", "3 columnas"], ["col4", "4 columnas"]];
@@ -48,7 +48,9 @@
     // muestras y compartimentos
     "Arterial": "Hepatic artery", "Portal": "Portal vein", "Cava": "Vena cava", "Bioquímica": "Perfusate", "Receptor": "Recipient", "Evaluación": "Recipient assessment", "Inmuno": "Immunology",
     // ejes, leyenda y textos de la figura
-    "Tiempo de perfusión (h)": "Hour of perfusion", "Hora de perfusión": "Hour of perfusion", "Tiempo nominal del protocolo (h)": "Nominal protocol time (h)", "Día de perfusión": "Day of perfusion", "Hora del día": "Time of day",
+    "Tiempo de perfusión (h)": "Hour of perfusion (h)", "Hora de perfusión": "Hour of perfusion", "Tiempo nominal del protocolo (h)": "Nominal protocol time (h)", "Día de perfusión": "Day of perfusion", "Hora del día": "Time of day",
+    // v0.7.1: títulos del eje X con su unidad (también en inglés)
+    "Hora de perfusión (reloj)": "Hour of perfusion (clock time)", "Día de perfusión (días)": "Day of perfusion (days)", "Hora del día (h)": "Time of day (h)",
     "Media": "Mean", "Media ± DE": "Mean ± SD", "Media ± EEM": "Mean ± SEM", "Rango objetivo": "Target range", "Histórico ± 2 DE": "Historical ± 2 SD", "Prandial": "Prandial", "Glucocorticoides": "Glucocorticoids", "Melatonina (noche)": "Melatonin",
     "Periodo nocturno": "Night", "Día": "Day", "Sin datos": "No data"
   };
@@ -172,7 +174,8 @@
     if (g.eje === "hora") return [a !== null ? a : 0, b !== null ? b : 24];
     var lo = xs.length ? Math.min.apply(null, xs) : 0, hi = xs.length ? Math.max.apply(null, xs) : (g.eje === "dia" ? 1 : 24), u = g.eje === "dia" ? 1 : g.eje === "reloj" ? 12 : hi - lo > 48 ? 12 : hi - lo > 12 ? 6 : 1;
     if (g.eje === "real" || g.eje === "nominal") lo = Math.min(0, lo);
-    lo = Math.floor(lo / u + 1e-9) * u; hi = Math.ceil(hi / u - 1e-9) * u; if (hi <= lo) hi = lo + u;
+    var a0 = g.eje === "reloj" ? FASE_RELOJ : 0;   // v0.7.1: con el eje de reloj, el rango empieza y acaba a las 08:00 o a las 20:00
+    lo = Math.floor((lo - a0) / u + 1e-9) * u + a0; hi = Math.ceil((hi - a0) / u - 1e-9) * u + a0; if (hi <= lo) hi = lo + u;
     return [a !== null ? a : lo, b !== null && b > (a !== null ? a : lo) ? b : hi];
   }
   // modo de las marcas del eje X: horas, reloj (desplazamiento = hora del día del cero del eje) o días
@@ -184,10 +187,12 @@
     if (g.etiq_x === "reloj" && ref && ref.c !== null) return { reloj: true, off: ref.c };
     return { horas: true };
   }
+  var FASE_RELOJ = 8;   // hora del reloj en la que se anclan las marcas principales (08:00 y 20:00)
   function ticksX(x0, x1, pw, f, mx) {
     var span = x1 - x0, cand = mx.dia ? [0.25, 0.5, 1, 2, 5, 10] : mx.reloj ? [1, 2, 3, 4, 6, 12, 24, 48] : [0.5, 1, 2, 4, 6, 12, 24, 48, 96], hueco = (mx.reloj ? f * 3.6 : f * 2.6), paso = cand[cand.length - 1];
     for (var i = 0; i < cand.length; i++) { if (span / cand[i] <= Math.max(2, pw / hueco) && span / cand[i] <= 16) { paso = cand[i]; break; } }
-    var off = mx.reloj ? mx.off || 0 : 0, out = [], t = Math.ceil((x0 + off) / paso - 1e-9) * paso - off;
+    // v0.7.1: marcas de reloj ancladas a las 08:00 (y 20:00): con paso de 12 h caen a las 08:00 y 20:00, con 24 h a las 08:00; el eje «Hora del día» (0–24 h) sigue en 00:00
+    var off = mx.reloj ? mx.off || 0 : 0, fase = mx.reloj && G().eje !== "hora" ? FASE_RELOJ : 0, out = [], t = Math.ceil((x0 + off - fase) / paso - 1e-9) * paso - off + fase;
     for (; t <= x1 + 1e-9; t += paso) out.push({ t: +t.toFixed(9), et: mx.reloj ? (G().eje === "hora" && Math.abs(t + off - 24) < 1e-9 ? "24:00" : hhmm(t + off)) : fmtN(t, decDe(paso)) });
     return out;
   }
@@ -219,7 +224,7 @@
   function letra(i) { var l = G().letras, A = String.fromCharCode(65 + (i % 26)); return l === "A" ? A : l === "a" ? A.toLowerCase() : l === "(A)" ? "(" + A + ")" : l === "(a)" ? "(" + A.toLowerCase() + ")" : ""; }
   function tituloPanel(d) { var g = G(), m = C.MUESTRAS[g.muestra]; return tr(d.vd.nombre) + (RAMAS[g.muestra] || g.muestra === "REC" ? " · " + tr(m.corto) : ""); }
   function tituloY(d) { var u = trU(d.unidad); return tr(d.vd.nombre) + (u ? " (" + u + ")" : ""); }
-  function tituloX() { var g = G(), mx = g.eje; return mx === "nominal" ? tr("Tiempo nominal del protocolo (h)") : mx === "dia" ? tr("Día de perfusión") : mx === "hora" ? tr("Hora del día") : mx === "reloj" || g.etiq_x === "reloj" ? tr("Hora de perfusión") : tr("Tiempo de perfusión (h)"); }
+  function tituloX() { var g = G(), mx = g.eje; return mx === "nominal" ? tr("Tiempo nominal del protocolo (h)") : mx === "dia" ? tr("Día de perfusión (días)") : mx === "hora" ? tr("Hora del día (h)") : mx === "reloj" || g.etiq_x === "reloj" ? tr("Hora de perfusión (reloj)") : tr("Tiempo de perfusión (h)"); }
   function f1(x) { return (Math.round(x * 100) / 100).toString(); }
   function panelSVG(d, idx, geo, ctx) {
     var g = G(), f = geo.fs, W = geo.Wp, Hh = geo.Hp, pal = ctx.pal, id = ctx.pre + idx, lw = lpt(), pr = ppt(), usado = ctx.usado, x0 = ctx.xr[0], x1 = ctx.xr[1];
@@ -400,7 +405,7 @@
     return '<h3 style="margin-bottom:8px">Perfusiones</h3><div class="fila-flex" style="margin-bottom:6px"><button class="bt mini" data-act="gTodas">Todas</button><button class="bt mini" data-act="gNinguna">Ninguna</button><button class="bt mini" data-act="gPaleta" title="Reasignar la paleta apta para daltonismo">Paleta</button></div>' +
       '<div class="lista-sel">' + (exps.length ? exps.map(function (e, i) { var on = g.exps.indexOf(e.ID) !== -1; return '<label><input type="checkbox" data-cambio="gExp" data-id="' + esc(e.ID) + '"' + (on ? " checked" : "") + "> <span>" + esc(e.ID) + '</span> <span class="muy-tenue">' + esc(e.Estado || "") + '</span><input type="color" aria-label="Color de ' + esc(e.ID) + '" value="' + esc(GI.colorDe(e.ID, i)) + '" data-cambio="gColor" data-id="' + esc(e.ID) + '"></label>'; }).join("") : '<p class="tenue">Sin experimentos.</p>') + "</div>" +
       '<h3 style="margin:14px 0 8px">Variables</h3><div id="g7Vars">' + varsHTML() + "</div>" +
-      '<h3 style="margin:14px 0 8px">Presentación</h3>' + sel("eje", "Eje X", EJES) + sel("modo", "Modo", MODOS) +
+      '<h3 style="margin:14px 0 8px">Presentación</h3>' + sel("eje", "Eje X", EJES).replace('<label class="et" for="g_eje">Eje X</label>', '<label class="et et-i" for="g_eje">Eje X</label>' + H.botonInfo("Hora de perfusión (reloj): cada perfusión se dibuja a la hora del reloj en que se tomó cada muestra. El 0 del eje son las 00:00 del día en que empezó cada perfusión, así que perfusiones que empezaron a distinta hora quedan alineadas por la hora del día; las marcas principales están a las 08:00 y a las 20:00 y los bloques «Día N» son días naturales (el día 1 es el día del inicio).")) + sel("modo", "Modo", MODOS) +
       '<div class="rejilla estrecha">' + num("xmin", "X desde", "") + num("xmax", "X hasta", "") + "</div>" +
       '<div class="g7-checks">' + chk("puntos", "Puntos") + chk("lineas", "Líneas") + chk("objetivo", "Banda de objetivo") + chk("historica", "Banda histórica (media ± 2 DE del resto)") + chk("y0", "Eje Y desde 0") + "</div>" +
       '<h3 style="margin:14px 0 8px">Protocolo circadiano</h3><div class="g7-checks">' + chk("sup_prandial", '<span class="g7-sw prandial"></span>Prandial (nutrición parenteral)') + chk("sup_gluco", '<span class="g7-sw gluco"></span>Glucocorticoides (bolos de hidrocortisona)') +
@@ -413,7 +418,7 @@
       '<div class="campo"><label class="et" for="g_fig_mm_p">Ancho personalizado</label><div class="unidad-in"><input id="g_fig_mm_p" type="text" inputmode="decimal" data-num="1" value="' + esc(g.fig_mm) + '" data-cambio="gOpc" data-k="fig_mm"><span>mm</span></div></div>' +
       sel("letras", "Etiquetas de panel", [["A", "A, B, C…"], ["a", "a, b, c…"], ["(A)", "(A), (B), (C)…"], ["(a)", "(a), (b), (c)…"], ["", "Sin etiquetas"]]) + chk("titulos", "Título en cada panel (variable y compartimento)") + ordenHTML() +
       '<div class="campo"><label class="et" for="g_titulo">Título de la figura</label><input id="g_titulo" value="' + esc(g.titulo) + '" data-cambio="gOpc" data-k="titulo" placeholder="Sin título" autocomplete="off"></div>' +
-      chk("ingles", "Ejes, títulos y leyenda en inglés (traducción automática)", "Traduce los nombres de las variables, unidades, compartimentos, ejes y leyenda (p. ej. «Hour of perfusion», «Day 1», «Mean ± SEM»). El título que escribas no se traduce.") +
+      '<div class="fila-info">' + chk("ingles", "Ejes, títulos y leyenda en inglés (traducción automática)") + H.botonInfo("Traduce los nombres de las variables, compartimentos, ejes y leyenda (p. ej. «Hour of perfusion (h)», «Day 1», «Mean ± SEM»); las unidades se mantienen. El título que escribas no se traduce.") + "</div>" +
       "</div></details>" +
       '<details class="plegable" style="margin-top:10px"><summary>Estilo</summary><div class="dentro">' +
       sel("estilo", "Estilo", [["pantalla", "Pantalla (sigue el tema)"], ["publicacion", "Publicación (fondo blanco, ejes negros)"]]) + sel("familia", "Fuente", [["Arial", "Arial"], ["Helvetica", "Helvetica"], ["Roboto", "Roboto"], ["Times New Roman", "Times New Roman"]]) +
@@ -515,4 +520,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v07c.js"] = "0.7.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v07c.js"] = "0.7.1";

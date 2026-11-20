@@ -39,11 +39,11 @@
   H.proximoPunto = function (exp) { return H.perfTerminada(exp) ? null : ppOrig(exp); };
   // registros urgentes (después del fin y fuera de los puntos del muestreo): Formularios «urgentes»
   function urgentes(exp) { var f = H.form(exp, "urgentes", ""); return (f && f.lista) || []; }
-  var MUESTRAS_URG = /^(PERF|ART|POR|CAV|FLUJO|BILIS|HDF)$/;
+  var MUESTRAS_URG = /^(PERF|ART|POR|CAV|FLUJO|BILIS|HDF|INMUNO)$/;
   H.puntosPlan = function (exp, muestra) {
     var l = planOrig(exp, muestra);
     if (muestra === "HDF") l = planHDF(exp);
-    if (muestra === "INMUNO") l = [];   // v0.7: la inmunología solo se hace en la basal y en la pre-perfusión
+    if (muestra === "INMUNO") l = planInmuno(exp);   // v0.7.1: inmunología en la pre-perfusión y cada 24 h (tubo amarillo)
     var fh = finH(exp); if (fh !== null) l = l.filter(function (p) { return p.t_h === null || p.t_h === undefined || p.t_h <= fh + 0.75; });
     if (MUESTRAS_URG.test(muestra)) urgentes(exp).forEach(function (u) { if (!l.some(function (p) { return p.punto === u.punto; })) l.push({ punto: u.punto, t_h: u.t_h, fecha: u.fecha, urgente: true }); });
     return l;
@@ -55,6 +55,9 @@
     return C.puntosHDF(t0, dias, m).map(function (p) { return { punto: p.etiqueta.replace(/^HDF /, ""), t_h: p.t_h, fecha: p.fecha.toISOString() }; });
   }
   H.planHDF = planHDF;
+  // v0.7.1: puntos de inmunología de la perfusión (24 h y después el punto de las 10:00 de cada día, con tubo amarillo)
+  function planInmuno(exp) { var t0 = H.inicioPerf(exp); if (!t0) return []; return C.puntosInmuno(t0, S.cfg.general.dias_perfusion, S.cfg.muestreo).map(function (p) { return { punto: p.etiqueta, t_h: p.t_h, fecha: p.fecha.toISOString() }; }); }
+  H.planInmuno = planInmuno;
   function puntosMuestreoHasta(exp) { var t0 = H.inicioPerf(exp); if (!t0) return []; var fh = finH(exp); return C.puntosMuestreo(t0, S.cfg.general.dias_perfusion, S.cfg.muestreo).filter(function (p) { return fh === null || p.t_h <= fh + 0.75; }); }
   var anadirOrig = H.acc.añadirPunto;
   H.acc.añadirPunto = function (el) {
@@ -153,8 +156,23 @@
     var h = segPrev(e, [niv, sub], q);
     h = h.replace(/<div class="segmentado sub2" role="tablist">[\s\S]*?<\/div>/, subSeg);
     if (niv === "perf" && term) h = h.replace(RE_TIRA, tiraTerminada(e) + avisoTerminada(e));
-    return gruposFijos(h);
+    return gruposFijos(grisesAInfo(h, niv, sub));
   };
+  // v0.7.1: las notas grises importantes de las pestañas de otros módulos pasan a una (i); los avisos del plan se ven en formato lista
+  function grisesAInfo(h, niv, sub) {
+    h = String(h);
+    if (sub === "plan") {
+      var mp = /<p class="muy-tenue">(Llegan como notificación push[^<]*)<\/p>/.exec(h);
+      if (mp) h = h.replace(mp[0], "").replace("<h3>Avisos programados</h3>", "<h3>Avisos programados</h3>" + info(mp[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&")));
+      h = h.replace(/<td class="envolver"><b>/g, '<td class="envolver aviso-txt"><b>');
+    }
+    if (sub === "flujos") { var mv = /<p class="muy-tenue" style="margin-top:8px">(VO₂ = [^<]*)<\/p>/.exec(h); if (mv) h = h.replace(mv[0], '<div class="et-info" style="margin-top:8px">Cómo se calcula el VO₂' + info(mv[1].replace(/&amp;/g, "&")) + "</div>"); }
+    if (niv === "post") {
+      h = h.replace(/<span class="muy-tenue">(1 = normal · 2 = alterado · 3 = nulo) · (si suma (\d+) dos veces seguidas, se sacrifica)<\/span>/, function (m0, a, b, n) { return '<span class="muy-tenue">' + a + "</span>" + info("Criterio de sacrificio: si la evaluación suma " + n + " puntos en dos evaluaciones seguidas, se sacrifica al receptor."); });
+      h = h.replace(", hora provisional: anota el fin en Cirugía → Receptor).", ').</p><p class="hora-prov"><span class="chip aj">Hora provisional del tiempo 0</span>' + info("Hasta que se anote la hora de fin de la cirugía del receptor en Cirugía → Receptor, el tiempo 0 se toma a las 12:00 del día del trasplante."));
+    }
+    return h;
+  }
   function tiraViva(e) {
     var t0 = H.inicioPerf(e.ID), prox = H.proximoPunto(e.ID); if (!t0) return '<div class="aviso info">' + ico("info") + '<div>La perfusión no ha empezado: regístrala en <a href="#/exp/' + idq(e) + '/quirofano">Quirófano</a>.</div></div>';
     return '<div class="cronos dos"><div class="crono activo"><div class="et">Perfusión · día ' + (Math.floor(C.horasEntre(t0, new Date()) / 24) + 1) + '</div><div class="t" data-crono="' + esc(t0) + '">--:--:--</div></div>' +
@@ -181,26 +199,65 @@
   var GAS_IDS = ["pH", "pO2", "pCO2", "sO2", "HCO3", "BE", "Hb", "Lactato", "Glucosa", "Na", "K", "Ca", "Cl"];
   function preTabla(e, tipo) {
     var nota = { gas: "Basal del donante de hígado: con el animal intubado y antes de empezar la cirugía. Pre-perfusión: una sola jeringa del perfusato con la HDF ya en marcha; sus valores son los del punto 0 h de la perfusión (se ven y se editan en los dos sitios). No se toma basal del donante de sangre.",
-      bq: "Pre-perfusión: tubo de heparina de litio pediátrico, citrato pediátrico y tubo amarillo. Son los valores del punto 0 h de la perfusión.", inmuno: "La inmunología solo se hace en la basal y en la pre-perfusión (mientras el laboratorio central no permita más puntos)." }[tipo];
+      bq: "Pre-perfusión: tubo de heparina de litio pediátrico, citrato pediátrico y tubo amarillo. Son los valores del punto 0 h de la perfusión.", inmuno: "La inmunología se hace en la pre-perfusión (del tubo amarillo) y después cada 24 h durante la perfusión, del tubo amarillo de las 24 h y del punto de las 10:00 de cada día (pestaña Perfusión → Inmunología). No se toma en la basal." }[tipo];
     var vars = tipo === "gas" ? C.MUESTRAS.ART.vars : tipo === "bq" ? C.MUESTRAS.PERF.vars.filter(function (v) { return GAS_IDS.indexOf(v.id) === -1; }) : C.MUESTRAS.INMUNO.vars;
-    return '<p class="muy-tenue">' + esc(nota) + "</p>" + pieTabla(e) + tablaHoja(e, COLS_PRE, vars, { objM: tipo === "gas" ? "ART" : tipo === "bq" ? "PERF" : null, titulo: tipo === "gas" ? "Gasometría basal y pre-perfusión" : tipo === "bq" ? "Bioquímica basal y pre-perfusión" : "Inmunología basal y pre-perfusión" });
+    // v0.7.1: la inmunología no tiene basal; la columna «Basal» solo aparece si ya hay datos guardados en ella
+    var cols = tipo === "inmuno" && !H.med(e.ID).some(function (m) { return m.Muestra === "BASAL_LD" && !m.Borrado && vars.some(function (v) { return v.id === m.Variable; }); }) ? COLS_PRE.slice(1) : COLS_PRE;
+    var tit = tipo === "gas" ? "Gasometría basal y pre-perfusión" : tipo === "bq" ? "Bioquímica basal y pre-perfusión" : "Inmunología de la pre-perfusión";
+    return titInfo(tit, nota) + pieTabla(e) + tablaHoja(e, cols, vars, { objM: tipo === "gas" ? "ART" : tipo === "bq" ? "PERF" : null, titulo: tit });
   }
+  // v0.7.1: título con su (i) (las notas importantes no van en gris debajo)
+  function titInfo(tit, nota, nivel) { return '<div class="tit-info"><' + (nivel || "h3") + ">" + esc(tit) + "</" + (nivel || "h3") + ">" + info(nota) + "</div>"; }
+  H.titInfo = titInfo;
   function pieTabla(e) { return '<div class="pie-hoja"><span class="muy-tenue">Enter o ↓ pasan a la celda de abajo · fuera de objetivo en rojo · también puedes <a href="#/exp/' + idq(e) + '/seguimiento/pdf">subir el informe del laboratorio</a></span></div>'; }
   function inmunoPerf(e, q) {
-    var hay = H.med(e.ID).some(function (m) { return m.Muestra === "INMUNO"; });
-    return '<div class="aviso info">' + ico("info") + '<div>La inmunología solo se hace en la <a href="#/exp/' + idq(e) + '/seguimiento/pre/inmuno">basal y en la pre-perfusión</a>. Si el laboratorio central admite otro punto, súbelo con «Subir PDF» o añade la columna.</div></div>' +
-      '<div class="pie-hoja">' + (H.puede("registrar") ? '<button class="bt mini" data-act="añadirPunto" data-exp="' + esc(e.ID) + '" data-m="INMUNO">' + ico("plus", "s") + "Punto fuera de protocolo</button>" : "") + "</div>" + (hay || (H.extraCols || {})[e.ID + "|INMUNO"] ? H.hojaHTML(e.ID, "INMUNO", { todos: true }) : '<p class="tenue">Sin puntos de inmunología durante la perfusión.</p>');
+    var pl = planInmuno(e.ID), hay = pl.length || H.med(e.ID).some(function (m) { return m.Muestra === "INMUNO"; });
+    return titInfo("Inmunología: pre-perfusión y cada 24 h", "La inmunología se toma en la pre-perfusión y cada 24 h durante la perfusión: del tubo amarillo (suero con gel) de las 24 h y del punto de las 10:00 de cada día (" + pl.map(function (p) { return p.punto; }).join(", ") + "). No hace falta un tubo más: sale del mismo tubo amarillo. Los informes del laboratorio de inmunología (Subir PDF) van a estos puntos según sus horas.") +
+      '<div class="pie-hoja">' + (H.puede("registrar") ? '<button class="bt mini" data-act="añadirPunto" data-exp="' + esc(e.ID) + '" data-m="INMUNO">' + ico("plus", "s") + (H.perfTerminada(e.ID) ? "Registro urgente" : "Punto fuera de protocolo") + "</button>" : "") + '<a class="muy-tenue" href="#/exp/' + idq(e) + '/seguimiento/pre/inmuno">Pre-perfusión</a></div>' + (hay || (H.extraCols || {})[e.ID + "|INMUNO"] ? H.hojaHTML(e.ID, "INMUNO", { todos: true }) : '<p class="tenue">Los puntos de inmunología aparecen al iniciar la perfusión.</p>');
   }
 
   // ============================================================== 6. Registrar (bloques alineados, epoprostenol, HDF con recomendaciones)
   H.registrarV7 = function (e, q) {
     var h = H.segExtra.registrar(e, ["registrar"], q), pa = H.puntoAhora(e.ID), puedo = H.puede("registrar");
     var mp = /<option value="([^"]*)" selected>/.exec(h), punto = mp ? mp[1].replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">") : null, mt = /data-m="FLUJO" data-p="[^"]*" data-t="([^"]*)" data-f="([^"]*)"/.exec(h);
-    var extra = '<div class="reg-hdf-extra">' + consejoCuerpo(e) + "</div>" + (puedo && pa ? '<div class="fila-flex"><button class="bt mini" data-act="hdfFijos" data-exp="' + esc(e.ID) + '" data-m="HDF" data-p="' + esc(pa.punto) + '" data-t="' + pa.t_h + '">' + ico("wand-sparkles", "s") + "Registrar los parámetros fijos de la HDF</button></div>" : "") +
-      '<p class="muy-tenue">Las variables de la HDF se registran cada hora las primeras 24 h (pestaña HDF) y después en los puntos del muestreo.</p>';
+    var extra = '<div class="reg-hdf-extra">' + consejoCuerpo(e) + "</div>" + '<div class="fila-flex reg-hdf-fila">' + (puedo && pa ? '<button class="bt mini" data-act="hdfFijos" data-exp="' + esc(e.ID) + '" data-m="HDF" data-p="' + esc(pa.punto) + '" data-t="' + pa.t_h + '">' + ico("wand-sparkles", "s") + "Registrar los parámetros fijos de la HDF</button>" : "") +
+      '<span class="et-info">Cuándo se registra la HDF' + info("Las variables de la HDF se registran cada hora las primeras 24 h (pestaña HDF) y después en los puntos del muestreo.") + "</span></div>";
     h = h.replace(/(<details class="reg-bloque" id="reg_hdf"[^>]*><summary>[\s\S]*?<\/summary><div class="dentro">)/, "$1" + extra);
+    h = cabeceraReg(e, h, punto, puedo);
+    h = h.replace('<p class="muy-tenue">El volumen es lo recogido desde la medición anterior; con él se calcula la producción (mL/h) y se ajusta la extracción de la HDF.</p>', '<p class="et-info">Qué volumen se anota' + info("El volumen de bilis es lo recogido desde la medición anterior; con él se calcula la producción (mL/h) y se ajusta la extracción de la HDF.") + "</p>");
     if (punto) h = h.replace('<div class="fila-flex" id="regDeriv"', epoHTML(e, punto, mt ? mt[1] : "", mt ? mt[2] : "", puedo) + '<div class="fila-flex" id="regDeriv"');
     return h;
+  };
+  // ---- v0.7.1: cabecera del registro alineada (punto · bloques · unidad de gases); los bloques (gris = sin datos, amarillo = incompleto,
+  //      verde = completo) son botones que abren el formulario de ese bloque del punto elegido
+  var BLOQUES_REG = { "Gasometrías": "gas", "Flujos": "flu", "Bilis": "bil", "Bioquímica": "bq", "HDF": "hdf", "Foto": "foto", "Falta la foto": "foto" };
+  function cabeceraReg(e, h, punto, puedo) {
+    var i = h.indexOf('<section class="tarjeta reg-cab">'); if (i === -1) return h; var j = h.indexOf("</section>", i); if (j === -1) return h;
+    var sec = h.slice(i, j + 10), sel = /<select id="regPunto"[\s\S]*?<\/select>/.exec(sec), res = /<div class="reg-resumen">([\s\S]*?)<\/div>/.exec(sec), uni = /<div class="segmentado" aria-label="Unidad de gases">[\s\S]*?<\/div>/.exec(sec);
+    if (!sel || !res) return h;
+    var chips = res[1].replace(/<span class="chip ?([a-z]*) ?">([^<]*)<\/span>/g, function (m0, cl, tx) {
+      var nom = String(tx).replace(/\s+\d+\/\d+$/, "").trim(), b = BLOQUES_REG[nom]; if (!b) return m0;
+      var est = cl === "ok" ? "completo" : cl === "aj" ? (b === "foto" ? "pendiente" : "incompleto") : "sin datos";
+      return '<button type="button" class="chip ' + cl + ' reg-ir" data-act="regIrBloque" data-b="' + b + '" data-exp="' + esc(e.ID) + '" data-p="' + esc(punto || "") + '" aria-label="' + esc(nom + " (" + est + "): abrir el formulario de este punto") + '" title="Abrir y rellenar">' + esc(tx) + "</button>";
+    });
+    var nueva = '<section class="tarjeta reg-cab"><div class="reg-cab-rej"><div class="campo reg-c-punto"><span class="et"><label for="regPunto">Punto de muestreo</label>' + info("Elige el punto y pulsa un bloque para abrir su formulario: gris = sin datos, amarillo = incompleto, verde = completo. Cada valor se guarda al salir de la casilla; en rojo, fuera del objetivo; debajo de cada casilla, el objetivo y el valor anterior." + (H.perfTerminada(e.ID) ? " La perfusión ha terminado: solo se pueden completar los puntos del muestreo hasta el fin (o un registro urgente)." : "")) + "</span>" + sel[0] + "</div>" +
+      '<div class="campo reg-c-bloques"><span class="et">Bloques de este punto</span><div class="reg-resumen">' + chips + (puedo ? "" : '<span class="chip">Solo lectura</span>') + "</div></div>" +
+      (uni ? '<div class="campo reg-c-unidad"><span class="et">Unidad de gases</span>' + uni[0] + "</div>" : "") + "</div></section>";
+    return h.slice(0, i) + nueva + h.slice(j + 10);
+  }
+  // ¿se puede registrar en este punto? Con la perfusión terminada, solo los puntos del muestreo hasta el fin (C.registroPermitido) o un registro urgente
+  function puntoPermitido(exp, punto) {
+    if (!H.perfTerminada(exp)) return true; if (urgentes(exp).some(function (u) { return u.punto === punto; })) return true;
+    var pts = puntosMuestreoHasta(exp), p = pts.filter(function (x) { return x.etiqueta === punto; })[0]; return !!p && C.registroPermitido(pts, p.fecha);
+  }
+  H.regPuntoPermitido = puntoPermitido;
+  H.acc.regIrBloque = function (el) {
+    var exp = el.getAttribute("data-exp"), b = el.getAttribute("data-b"), sel = H.$("#regPunto"), pto = (sel && sel.value) || el.getAttribute("data-p");
+    if (!puntoPermitido(exp, pto)) { H.toast("La perfusión ha terminado: «" + pto + "» no es un punto del muestreo hasta el fin. Usa «Registro urgente».", "error"); return; }
+    var d = H.$("#reg_" + b); if (!d) return; d.open = true; d.setAttribute("open", "");
+    try { d.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (x) { }
+    var inp = Array.prototype.filter.call(d.querySelectorAll(".dentro input:not([readonly]):not([disabled]):not([type=file]), .dentro select:not([disabled])"), function (x) { return !x.value; })[0] || d.querySelector(".dentro input:not([readonly]), .dentro button");
+    if (inp && inp.focus) try { inp.focus({ preventScroll: true }); } catch (x) { inp.focus(); }
   };
   // ---- epoprostenol (Veletri 5 µg/mL) según el flujo de la arteria hepática: propuesta a validar
   function epoRec(e, punto) {
@@ -261,8 +318,8 @@
   H.consejoHDFHTML = consejoCuerpo;
   function hdfFijaHTML() {
     var pm = cfgH().parametros, D = C.dializado(cfgH());
-    return '<section class="tarjeta hdf-fija"><div class="cabecera"><h3>Configuración de la HDF</h3><span class="chip">Siempre la misma</span></div><dl class="datos-exp cinco"><div><dt>Set</dt><dd>' + esc(pm.set) + "</dd></div><div><dt>Flujo de sangre</dt><dd>" + pm.Q_sangre + " mL/min</dd></div><div><dt>Flujo de diálisis</dt><dd>" + pm.Q_dialisis + " mL/h</dd></div><div><dt>Reposición " + esc(pm.Reposicion_modo) + "</dt><dd>" + pm.Reposicion + " mL/h</dd></div><div><dt>Temperatura</dt><dd>" + pm.Temp_min + "–" + pm.Temp_max + " °C</dd></div></dl>" +
-      '<p class="muy-tenue">' + esc(pm.liquido) + ". Dializado efectivo: Na⁺ " + D.Na + " · K⁺ " + H.n(D.K, 1) + " · Ca²⁺ " + D.Ca + " · Mg²⁺ " + D.Mg + " · HCO₃⁻ " + D.HCO3 + " mmol/L · fosfato " + H.n(D.P_mmol, 1) + " mmol/L · glucosa " + D.Glucosa_mg_dL + " mg/dL. Solo se recomienda la extracción (pasos de " + (cfgH().paso_mL_h || 10) + " mL/h).</p></section>";
+    return '<section class="tarjeta hdf-fija"><div class="cabecera"><h3>Configuración de la HDF</h3>' + info("Flujo de sangre, diálisis, reposición y temperatura son fijos. Solo se recomienda cambiar la extracción, en pasos de " + (cfgH().paso_mL_h || 10) + " mL/h; los demás parámetros solo cambian si lo indican las recomendaciones.") + '<span class="chip">Siempre la misma</span></div><dl class="datos-exp cinco"><div><dt>Set</dt><dd>' + esc(pm.set) + "</dd></div><div><dt>Flujo de sangre</dt><dd>" + pm.Q_sangre + " mL/min</dd></div><div><dt>Flujo de diálisis</dt><dd>" + pm.Q_dialisis + " mL/h</dd></div><div><dt>Reposición " + esc(pm.Reposicion_modo) + "</dt><dd>" + pm.Reposicion + " mL/h</dd></div><div><dt>Temperatura</dt><dd>" + pm.Temp_min + "–" + pm.Temp_max + " °C</dd></div></dl>" +
+      '<p class="muy-tenue">' + esc(pm.liquido) + ". Dializado efectivo: Na⁺ " + D.Na + " · K⁺ " + H.n(D.K, 1) + " · Ca²⁺ " + D.Ca + " · Mg²⁺ " + D.Mg + " · HCO₃⁻ " + D.HCO3 + " mmol/L · fosfato " + H.n(D.P_mmol, 1) + " mmol/L · glucosa " + D.Glucosa_mg_dL + " mg/dL.</p></section>";
   }
   function extraccionInicial(e) {
     var cfg = cfgH(), hz = C.num(cfg.horizonte_h) || 4, inf = C.infusionA(H.circadianoDe(e), new Date(), cfg).mL_h;
@@ -278,7 +335,7 @@
     var pa = H.puntoAhora(e.ID), puedo = H.puede("registrar");
     return H.hdfPanel(e) + consejoCuerpo(e) + alarmasCard(e, "HDF") + hdfFijaHTML() +
       (puedo && pa ? '<div class="fila-flex"><button class="bt" data-act="hdfFijos" data-exp="' + esc(e.ID) + '" data-m="HDF" data-p="' + esc(pa.punto) + '" data-t="' + pa.t_h + '">' + ico("wand-sparkles") + "Registrar los parámetros fijos en «" + esc(pa.punto) + "»</button></div>" : "") +
-      '<div class="pie-hoja">' + (puedo ? '<button class="bt mini" data-act="añadirPunto" data-exp="' + esc(e.ID) + '" data-m="HDF">' + ico("plus", "s") + (H.perfTerminada(e.ID) ? "Registro urgente" : "Punto fuera de protocolo") + "</button>" : "") + '<span class="muy-tenue">Cada hora las primeras 24 h y después en los puntos del muestreo · fuera de rango (provisional) en rojo · <a href="#/exp/' + idq(e) + '/seguimiento/perf/hdf?todos=1">ver todos los puntos</a></span></div>' +
+      '<div class="pie-hoja">' + (puedo ? '<button class="bt mini" data-act="añadirPunto" data-exp="' + esc(e.ID) + '" data-m="HDF">' + ico("plus", "s") + (H.perfTerminada(e.ID) ? "Registro urgente" : "Punto fuera de protocolo") + "</button>" : "") + '<span class="et-info">Cuándo se registra' + info("Las variables de la HDF se registran cada hora las primeras 24 h y después en los puntos del muestreo. Fuera del rango (provisional) de Configuración → HDF, la casilla sale en rojo.") + '</span><a class="muy-tenue" href="#/exp/' + idq(e) + '/seguimiento/perf/hdf?todos=1">ver todos los puntos</a></div>' +
       H.hojaHTML(e.ID, "HDF", { todos: q && q.todos === "1", vars: varsHDF() });
   };
   H.acc.hdfFijos = function (el) {
@@ -328,7 +385,7 @@
     var cambiaExt = Math.abs(rec - act) >= paso, nuevaRec = cambiaExt && (prev.rec !== rec) && (prev.rec === undefined || Math.abs(prev.rec - rec) >= 2 * paso || Date.now() - (prev.t || 0) > 36e5), nuevoCons = !!firma && firma !== prev.cons;
     if (!nuevaRec && !nuevoCons) return null;
     mem[exp] = { rec: cambiaExt ? rec : prev.rec, cons: firma, t: Date.now() }; try { localStorage.setItem("home_aviso_hdf", JSON.stringify(mem)); } catch (x) { }
-    var txt = (cambiaExt ? "Extracción recomendada " + H.n(rec, 0) + " mL/h" + (act !== null ? " (ahora " + H.n(act, 0) + " mL/h)" : "") + ". " : "") + cons.map(function (x) { return x.texto; }).join(" ");
+    var txt = (cambiaExt ? ["Extracción recomendada " + H.n(rec, 0) + " mL/h" + (act !== null ? " (ahora " + H.n(act, 0) + " mL/h)" : "")] : []).concat(cons.map(function (x) { return x.texto; })).join("\n");   // v0.7.1: una recomendación por línea
     var av = { ID: exp + "|hdf|" + Date.now(), Experimento: exp, Fecha_hora: new Date().toISOString(), Tipo: "hdf", Destino: "equipo", Vista: "exp:" + exp + ":seguimiento", Titulo: "HDF · " + exp + (cambiaExt ? ": cambiar la extracción a " + H.n(rec, 0) + " mL/h" : ": revisar los parámetros"), Texto: txt.slice(0, 900) };
     H.programarAvisos(exp, [av], ["hdf"]); return av;
   };
@@ -385,12 +442,12 @@
         (puedo ? '<input class="prot-prod" list="dlFarmacos" aria-label="Producto de ' + esc(C.nombreLinea(l)) + '" value="' + esc(x.producto) + '" data-cambio="protProducto" data-exp="' + esc(e.ID) + '" data-l="' + esc(l) + '">' : '<div class="muy-tenue">' + esc(x.producto) + "</div>") + '</td><td class="c-comp" data-et="Componentes">' + comps + '</td><td class="c-rit" data-et="' + (esHep ? "Anticoagulación" : "Ritmos (mL/h)") + '">' + ritmos + '</td><td class="num c-vol" data-et="Volumen al día">' + (vd ? H.n(vd, 1) + " mL" : "—") + '</td><td class="c-inf" data-et="Preparación"><button type="button" class="bt-info" data-act="infoPrep" data-exp="' + esc(e.ID) + '" data-l="' + esc(l) + '" aria-label="Cómo preparar ' + esc(C.nombreLinea(l)) + ' para ' + dias + ' días">' + ico("info", "s") + "</button></td></tr>";
     }).join("");
     var rs = circ.reescalado;
-    return '<section class="tarjeta"><div class="cabecera"><h2>Tabla de infusiones</h2>' + (p.confirmado_en ? '<span class="chip ok">' + ico("check", "s") + "Confirmada por " + esc(p.confirmado_por || "") + " el " + esc(H.fechaHora(p.confirmado_en)) + "</span>" : '<span class="chip aj">Sin confirmar</span>') + (hp.revisar ? '<span class="chip aj">Horario del protocolo por revisar</span>' : "") + "</div>" +
+    return '<section class="tarjeta"><div class="cabecera"><h2>Tabla de infusiones</h2>' + info("Los ritmos salen del horario circadiano del protocolo " + p.version + " (Configuración → Horario circadiano). La (i) de cada línea indica cómo prepararla para " + dias + " días. Desmarca las líneas que no se vayan a administrar: dejarán de verse en el horario y en el balance.") + (p.confirmado_en ? '<span class="chip ok">' + ico("check", "s") + "Confirmada por " + esc(p.confirmado_por || "") + " el " + esc(H.fechaHora(p.confirmado_en)) + "</span>" : '<span class="chip aj">Sin confirmar</span>') + (hp.revisar ? '<span class="chip aj">Horario del protocolo por revisar</span>' : "") + "</div>" +
       '<div class="rejilla dos"><div class="campo"><label class="et" for="protVer">Versión del protocolo</label><select id="protVer" data-cambio="protVersion" data-exp="' + esc(e.ID) + '"' + (puedo ? "" : " disabled") + ">" + C.VERSIONES.map(function (v) { return '<option value="' + v + '"' + (v === p.version ? " selected" : "") + ">" + v + " · " + esc(C.PROTOCOLOS[v].propuesto ? "propuesto" : C.PROTOCOLOS[v].ref) + "</option>"; }).join("") + '</select><div class="ayuda">' + esc(info0.notas || "") + '</div></div><div class="campo"><span class="et">Volumen de perfusato</span><div class="valor-fijo">' + H.n(V, 0) + ' mL</div><div class="ayuda">Referencia del protocolo: ' + H.n(C.num(hp.V_ref_mL) || vRef(), 0) + " mL</div></div></div>" +
       (rs ? '<div class="aviso aj">' + ico("scale") + "<div><b>Ritmos recalculados.</b> El volumen real (" + H.n(rs.V_real, 0) + " mL) se desvía " + H.n(rs.V_real - rs.V_ref, 0) + " mL de la referencia (" + H.n(rs.V_ref, 0) + " mL): para mantener las concentraciones, todos los ritmos del horario se multiplican por " + H.n(rs.factor, 3) + " y se redondean a 1 mL/h (insulina, 0,1 mL/h). Tachado, el ritmo original.</div></div>" : "") +
       '<datalist id="dlFarmacos">' + (H.farmacosCatalogo ? H.farmacosCatalogo() : []).map(function (m) { return '<option value="' + esc(m.Nombre) + '">'; }).join("") + "</datalist>" +
       '<div class="tabla-env"><table class="t tabla-prot tabla-inf"><colgroup><col class="c-chk"><col class="c-lin"><col class="c-comp"><col class="c-rit"><col class="c-vol"><col class="c-inf"></colgroup><thead><tr><th>Se administra</th><th>Línea y producto</th><th>Componentes · solución madre · dosis al día · concentración esperada</th><th>Ritmos del protocolo</th><th class="num">Volumen al día</th><th>Preparar</th></tr></thead><tbody>' + filas + "</tbody></table></div>" +
-      '<p class="muy-tenue">Los ritmos salen del horario circadiano del protocolo ' + esc(p.version) + ' (<a href="#/config/circadiano/' + esc(p.version) + '">Configuración → Horario circadiano</a>). La (i) de cada línea indica cómo prepararla para ' + dias + " días. Desmarca las líneas que no se vayan a administrar: dejarán de verse en el horario y en el balance.</p>" +
+      '<p class="muy-tenue">Horario del protocolo ' + esc(p.version) + ': <a href="#/config/circadiano/' + esc(p.version) + '">Configuración → Horario circadiano</a>.</p>' +
       (puedo ? '<button class="bt pri" data-act="protConfirmar" data-exp="' + esc(e.ID) + '">' + ico("clipboard-check") + (p.confirmado_en ? "Volver a confirmar" : "Confirmar la tabla de infusiones") + "</button>" : "") + "</section>";
   };
   H.acc.infoPrep = function (el) {
@@ -476,10 +533,10 @@
   H.tabsExp.cierre = function (e) {
     var ev = H.eventos(e.ID), d = H.usarForm(e.ID, "cierre", ""), puedo = H.puede("registrar"), dis = puedo ? "" : " disabled", esTx = d.motivo === MOT_TX, est = d.motivo ? (esTx ? "Trasplante" : "Finalizado") : null, cerrado = e.Estado === "Finalizado" || e.Estado === "Trasplante";
     return '<section class="tarjeta cierre"><div class="cabecera"><h2>Fin de la perfusión</h2><span id="indGuardado" class="guardado">' + ico("check", "s") + "Guardado automático</span></div>" +
-      '<div class="rejilla dos cierre-rej"><div class="campo"><label class="et" for="cFin">Fecha y hora de fin</label><div class="con-ahora"><input id="cFin" type="datetime-local" value="' + H.aLocal(ev.fin_perfusion || e.Fin_perfusion || "") + '"' + dis + ">" + (puedo ? '<button type="button" class="bt mini" data-act="ahoraFH" data-id="cFin">Ahora</button>' : "") + '</div><div class="ayuda">El cronómetro de la perfusión se para a esta hora.</div></div>' +
-      '<div class="campo"><label class="et" for="cPeso">Peso final del hígado</label><div class="unidad-in"><input id="cPeso" inputmode="decimal" data-num="1" value="' + esc(e.Peso_higado_final_g || "") + '"' + dis + '><span>g</span></div><div class="ayuda">Antes del trasplante o de la necropsia.</div></div>' +
-      '<div class="campo"><label class="et" for="cMot">Motivo de finalización</label><select id="cMot" data-cambio="cierreMotivo" data-exp="' + esc(e.ID) + '"' + dis + '><option value="">—</option>' + MOTIVOS.map(function (m) { return '<option value="' + esc(m) + '"' + (m === d.motivo ? " selected" : "") + ">" + esc(m) + "</option>"; }).join("") + '</select><div class="ayuda">' + (est ? "El experimento pasará a «" + est + "»." : "Con «Trasplante del injerto» pasa a «Trasplante»; con cualquier otro, a «Finalizado».") + "</div></div>" +
-      (esTx ? '<div class="campo"><span class="et">Destino del injerto</span><div class="valor-fijo">Trasplante al receptor</div><div class="ayuda">Se abre el seguimiento del receptor.</div></div>' : H.campo("destino", "Destino del injerto", d.destino, { tipo: "select", opciones: ["Necropsia y muestras", "Desechado"], ayuda: "&nbsp;" })) +
+      '<div class="rejilla dos cierre-rej"><div class="campo"><label class="et" for="cFin">Fecha y hora de fin' + info("El cronómetro de la perfusión se para a esta hora; después solo se pueden completar los puntos del muestreo hasta el fin o añadir un registro urgente.") + '</label><div class="con-ahora"><input id="cFin" type="datetime-local" value="' + H.aLocal(ev.fin_perfusion || e.Fin_perfusion || "") + '"' + dis + ">" + (puedo ? '<button type="button" class="bt mini" data-act="ahoraFH" data-id="cFin">Ahora</button>' : "") + "</div></div>" +
+      '<div class="campo"><label class="et" for="cPeso">Peso final del hígado' + info("Pésalo antes del trasplante o de la necropsia.") + '</label><div class="unidad-in"><input id="cPeso" inputmode="decimal" data-num="1" value="' + esc(e.Peso_higado_final_g || "") + '"' + dis + '><span>g</span></div></div>' +
+      '<div class="campo"><label class="et" for="cMot">Motivo de finalización' + info("Con «Trasplante del injerto» el experimento pasa a «Trasplante» y se abre el seguimiento del receptor; con cualquier otro, a «Finalizado».") + '</label><select id="cMot" data-cambio="cierreMotivo" data-exp="' + esc(e.ID) + '"' + dis + '><option value="">—</option>' + MOTIVOS.map(function (m) { return '<option value="' + esc(m) + '"' + (m === d.motivo ? " selected" : "") + ">" + esc(m) + "</option>"; }).join("") + "</select>" + (est ? '<div class="cierre-est"><span class="chip ' + (esTx ? "info" : "") + '">Pasará a «' + est + "»</span></div>" : "") + "</div>" +
+      (esTx ? '<div class="campo"><span class="et">Destino del injerto</span><div class="valor-fijo">Trasplante al receptor</div></div>' : H.campo("destino", "Destino del injerto", d.destino, { tipo: "select", opciones: ["Necropsia y muestras", "Desechado"] })) +
       H.campo("obs", "Observaciones finales", d.obs, { tipo: "textarea", ancho: true }) + "</div>" +
       (esTx ? '<div class="aviso info">' + ico("heart-pulse") + '<div><b>Trasplante del injerto.</b> Se abren <a href="#/exp/' + idq(e) + '/cirugia">Cirugía → receptor</a> y <a href="#/exp/' + idq(e) + '/seguimiento/post">Seguimiento → Post-trasplante</a> para el receptor HOME-LR-' + esc(String(e.ID).replace("HOME-", "")) + ".</div></div>" : "") +
       (puedo ? '<button class="bt pri" data-act="cerrarExp" data-exp="' + esc(e.ID) + '">' + ico("circle-check") + (cerrado ? "Actualizar el fin de la perfusión" : "Finalizar la perfusión") + "</button>" : "") + "</section>";
@@ -500,8 +557,8 @@
   // ============================================================== 13. Post-trasplante: observaciones por día al marcar un evento; bioquímica con el diseño de la perfusión
   function t0Rec(e) { var rf = H.form(e.ID, "receptor", "LR") || {}, base = rf.fecha || e.Fecha_trasplante, finQx = H.leerRuta(rf, "qx.fin"); return base ? C.aFecha(C.diaISO(C.aDia(base)) + "T" + (finQx || "12:00") + ":00") : null; }
   H.postBq = function (e) {
-    var t0 = t0Rec(e), cols = C.PUNTOS_REC.map(function (h) { return { m: "REC", p: h + " h", et: h + " h", t: h, f: t0 ? new Date(t0.getTime() + h * 36e5).toISOString() : "" }; });
-    return '<p class="muy-tenue">Receptor HOME-LR-' + esc(String(e.ID).replace("HOME-", "")) + (t0 ? " · tiempo 0 = fin de la cirugía del trasplante (" + esc(H.diaCorto(t0) + " " + H.hora(t0)) + ")" : "") + '.</p><section class="tarjeta"><div class="cabecera"><h3>Bioquímica y gasometría del receptor</h3></div>' + pieTabla(e) + tablaHoja(e, cols, C.MUESTRAS.REC.vars, { objM: "PERF", titulo: "Bioquímica y gasometría del receptor" }) + "</section>";
+    var t0 = t0Rec(e), cols = [{ m: "REC", p: "Basal", et: "Basal", sub: "antes del trasplante", t: null, f: "" }].concat(C.PUNTOS_REC.map(function (h) { return { m: "REC", p: h + " h", et: h + " h", t: h, f: t0 ? new Date(t0.getTime() + h * 36e5).toISOString() : "" }; }));   // v0.7.1: basal del receptor
+    return '<p class="muy-tenue">Receptor HOME-LR-' + esc(String(e.ID).replace("HOME-", "")) + (t0 ? " · tiempo 0 = fin de la cirugía del trasplante (" + esc(H.diaCorto(t0) + " " + H.hora(t0)) + ")" : "") + '.</p><section class="tarjeta"><div class="cabecera"><h3>Bioquímica y gasometría del receptor</h3>' + info("Basal del receptor (antes del trasplante) y seguimiento a las 0, 3, 6, 12, 24… h del fin de la cirugía. Los informes del laboratorio con el NHC del receptor (" + (nhcCfg().nhc_receptor || "—") + ") van a esta tabla.") + "</div>" + pieTabla(e) + tablaHoja(e, cols, C.MUESTRAS.REC.vars, { objM: "PERF", titulo: "Bioquímica y gasometría del receptor" }) + "</section>";
   };
   H.postSupervision = function (e) {
     var t0 = t0Rec(e), puedo = H.puede("registrar"), dis = puedo ? "" : " disabled", sup = H.usarForm(e.ID, "receptor_sup", "LR"), rf = H.form(e.ID, "receptor", "LR") || {}, peso = C.num(rf.peso_kg), L = H.leerRuta;
@@ -516,7 +573,7 @@
           '<td><label class="check"><input type="checkbox" data-k="' + k + 'muestras" data-cambio="campoForm"' + (L(sup, k + "muestras") ? " checked" : "") + dis + "> Tomadas</label></td>" + '<td><input aria-label="Buprex a las ' + r.h + ' h" value="' + esc(L(sup, k + "buprex") || "") + '" data-k="' + k + 'buprex" data-cambio="campoForm" placeholder="dosis…"' + dis + "></td>" + med(r.h, "tac", r.tacrolimus) + med(r.h, "met", r.metpret) + med(r.h, "cef", r.cefoxitina) + "</tr>"; }).join("") +
         (conEv || L(sup, ko) ? '<tr class="obs-dia"><td colspan="7"><label class="et" for="obsD' + dd + '">Observaciones del día ' + dd + "</label><textarea id=\"obsD" + dd + '" rows="2" data-k="' + ko + '" data-cambio="campoForm" placeholder="Estado del receptor, incidencias, cambios de pauta…"' + dis + ">" + esc(L(sup, ko) || "") + "</textarea></td></tr>" : "");
     }).join("");
-    return '<p class="muy-tenue">Receptor HOME-LR-' + esc(String(e.ID).replace("HOME-", "")) + (t0 ? " · tiempo 0 = fin de la cirugía del trasplante (" + esc(H.diaCorto(t0) + " " + H.hora(t0)) + ")" : "") + '. Al marcar un evento (extracción, muestras o medicación) se abren las observaciones de ese día.</p><section class="tarjeta"><div class="cabecera"><h3>Supervisión post-trasplante</h3><span id="indGuardado" class="guardado">' + ico("check", "s") + 'Guardado automático</span></div><div class="tabla-env"><table class="t tabla-sup"><thead><tr><th>Hora</th><th>Extracción</th><th>Muestras</th><th>Buprex</th><th>Tacrolimus</th><th>Metpret</th><th>Cefoxitina</th></tr></thead><tbody>' + filas +
+    return '<p class="muy-tenue">Receptor HOME-LR-' + esc(String(e.ID).replace("HOME-", "")) + (t0 ? " · tiempo 0 = fin de la cirugía del trasplante (" + esc(H.diaCorto(t0) + " " + H.hora(t0)) + ")" : "") + '.</p><section class="tarjeta"><div class="cabecera"><h3>Supervisión post-trasplante</h3>' + info("Al marcar un evento de una hora (extracción, muestras o medicación) se abren las observaciones de ese día.") + '<span id="indGuardado" class="guardado">' + ico("check", "s") + 'Guardado automático</span></div><div class="tabla-env"><table class="t tabla-sup"><thead><tr><th>Hora</th><th>Extracción</th><th>Muestras</th><th>Buprex</th><th>Tacrolimus</th><th>Metpret</th><th>Cefoxitina</th></tr></thead><tbody>' + filas +
       '</tbody></table></div><div class="rejilla dos">' + H.campo("obs", "Observaciones generales", sup.obs, { tipo: "textarea", ancho: true }) + H.campo("reportado", "Reportado por", sup.reportado || (S.usuario || {}).nombre, {}) + "</div></section>";
   };
 
@@ -525,54 +582,73 @@
   var NOM_DEST = { ART: "Gasometría arterial", POR: "Gasometría portal", CAV: "Gasometría cava", PERF: "Bioquímica del perfusato", BILIS: "Bilis", INMUNO: "Inmunología", REC: "Receptor", PRE: "Pre-perfusión (= 0 h)", BASAL_LD: "Basal del donante de hígado" };
   function opcionesPunto(exp) {
     var t0 = H.inicioPerf(exp), o = [{ v: "Basal", et: "Basal (donante de hígado)", t: null }, { v: "Pre", et: "Pre-perfusión (= 0 h)", t: 0 }];
-    if (t0) C.puntosMuestreo(t0, S.cfg.general.dias_perfusion, S.cfg.muestreo).forEach(function (p) { if (p.t_h > 0) o.push({ v: p.etiqueta, et: p.etiqueta + " · " + H.diaCorto(p.fecha) + " " + H.hora(p.fecha), t: p.t_h, f: p.fecha.toISOString() }); });
-    var e = H.exp(exp); if (e && C.tipoProc(e) === "trasplante") C.PUNTOS_REC.forEach(function (h) { o.push({ v: "REC|" + h + " h", et: "Receptor · " + h + " h", t: h, rec: true }); });
+    if (t0) C.puntosMuestreo(t0, S.cfg.general.dias_perfusion, S.cfg.muestreo).forEach(function (p) { if (p.t_h > 0) o.push({ v: p.etiqueta, et: p.etiqueta + " · " + H.diaCorto(p.fecha) + " " + H.hora(p.fecha) + (p.inmuno ? " · inmunología" : ""), t: p.t_h, f: p.fecha.toISOString(), inmuno: !!p.inmuno }); });
+    var e = H.exp(exp); if (e && C.tipoProc(e) === "trasplante") { o.push({ v: "REC|Basal", et: "Receptor · basal (antes del trasplante)", t: null, rec: true }); C.PUNTOS_REC.forEach(function (h) { o.push({ v: "REC|" + h + " h", et: "Receptor · " + h + " h", t: h, rec: true }); }); }
     urgentes(exp).forEach(function (u) { o.push({ v: u.punto, et: u.punto, t: u.t_h, f: u.fecha }); });
     return o;
   }
   function puntoPara(exp, inf) {
     var ops = opcionesPunto(exp), t0 = H.inicioPerf(exp);
+    // v0.7.1: el NHC decide donante/receptor (receptor: basal del receptor y seguimiento; donantes: basal, pre-perfusión y perfusión)
+    if (inf.muestra === "REC" || inf.sujeto === "receptor") {
+      var recs = ops.filter(function (o) { return o.rec; }); if (inf.horas === "basal" || inf.horas === "pre") return recs.some(function (o) { return o.v === "REC|Basal"; }) ? "REC|Basal" : null;
+      var hr = typeof inf.horas === "number" ? inf.horas : 0, rr = recs.filter(function (o) { return o.t !== null; }).sort(function (a, b) { return Math.abs(a.t - hr) - Math.abs(b.t - hr); })[0]; return rr ? rr.v : null;
+    }
     if (inf.horas === "basal") return "Basal"; if (inf.horas === "pre" || inf.horas === 0) return "Pre";
-    if (inf.muestra === "REC") { var hr = typeof inf.horas === "number" ? inf.horas : 0, rr = ops.filter(function (o) { return o.rec; }).sort(function (a, b) { return Math.abs(a.t - hr) - Math.abs(b.t - hr); })[0]; return rr ? rr.v : null; }
     var th = typeof inf.horas === "number" ? inf.horas : (t0 && inf.fecha ? C.horasEntre(t0, new Date(inf.fecha)) : null); if (th === null) return null;
-    var c = ops.filter(function (o) { return o.t !== null && !o.rec && o.v !== "Basal"; }).sort(function (a, b) { return Math.abs(a.t - th) - Math.abs(b.t - th); })[0]; return c ? c.v : null;
+    var cand = ops.filter(function (o) { return o.t !== null && !o.rec && o.v !== "Basal"; });
+    if (inf.muestra === "INMUNO" && cand.some(function (o) { return o.inmuno; })) cand = cand.filter(function (o) { return o.inmuno || o.v === "Pre"; });   // v0.7.1: la inmunología va a sus puntos (24 h, 48 h…)
+    var c = cand.sort(function (a, b) { return Math.abs(a.t - th) - Math.abs(b.t - th); })[0]; return c ? c.v : null;
   }
   function destino(r, punto) {
-    if (!punto) return null; if (/^REC\|/.test(punto)) return { m: "REC", p: punto.split("|")[1] };
+    if (!punto) return null; if (/^REC\|/.test(punto)) return { m: "REC", p: punto.split("|")[1] };   // «REC|Basal» = basal del receptor
     if (punto === "Basal") return { m: "BASAL_LD", p: "Basal" }; if (punto === "Pre") return { m: "PRE", p: "Pre" };
     return { m: r.muestra === "INMUNO" ? "INMUNO" : r.muestra, p: punto };
   }
+  function nhcCfg() { var g = S.cfg.general || {}; return { nhc_donantes: g.nhc_donantes, nhc_receptor: g.nhc_receptor }; }
+  // aviso de la verificación si el NHC del informe no cuadra con el destino elegido
+  function avisoNHC(inf, punto, exp) {
+    var g = nhcCfg(), n = inf.nhc, esRec = /^REC\|/.test(punto || ""), e = H.exp(exp), txTx = e && C.tipoProc(e) === "trasplante";
+    if (!n) return '<div class="aviso info aviso-nhc">' + ico("info") + "<div>No se ha encontrado el NHC en el informe: comprueba que el destino es el correcto (donantes " + esc(g.nhc_donantes || "—") + ", receptor " + esc(g.nhc_receptor || "—") + ").</div></div>";
+    if (!inf.sujeto) return '<div class="aviso aj aviso-nhc">' + ico("triangle-alert") + "<div>El NHC del informe (<b>" + esc(n) + "</b>) no coincide con los de Configuración → General (donantes " + esc(g.nhc_donantes || "—") + ", receptor " + esc(g.nhc_receptor || "—") + "): comprueba que el informe es de este experimento.</div></div>";
+    if (inf.sujeto === "receptor" && !txTx) return '<div class="aviso aj aviso-nhc">' + ico("triangle-alert") + "<div>El NHC del informe (<b>" + esc(n) + "</b>) es el del <b>receptor</b>, pero " + esc(exp || "el experimento") + " no tiene trasplante: elige el experimento correcto.</div></div>";
+    if (punto && inf.sujeto === "receptor" && !esRec) return '<div class="aviso aj aviso-nhc">' + ico("triangle-alert") + "<div>El NHC del informe (<b>" + esc(n) + "</b>) es el del <b>receptor</b>, pero el punto elegido es de los donantes o de la perfusión.</div></div>";
+    if (punto && inf.sujeto === "donante" && esRec) return '<div class="aviso aj aviso-nhc">' + ico("triangle-alert") + "<div>El NHC del informe (<b>" + esc(n) + "</b>) es el de los <b>donantes</b> (basal, pre-perfusión y perfusión), pero el punto elegido es del receptor.</div></div>";
+    return "";
+  }
+  H.avisoNHC = avisoNHC;
   function tieneVar(m, v) { return (C.MUESTRAS[m] || { vars: [] }).vars.some(function (x) { return x.id === v; }); }
   H.importarFilas = function (expActual, filas, texto) {
-    var inf = C.leerInformeLab(filas, texto), porPM = inf.codigo ? H.listaExp().filter(function (x) { return String(x.Codigo_PM || "").toUpperCase() === inf.codigo; })[0] : null, exp = porPM ? porPM.ID : expActual;
+    var inf = C.leerInformeLab(filas, texto, nhcCfg()), porPM = inf.codigo ? H.listaExp().filter(function (x) { return String(x.Codigo_PM || "").toUpperCase() === inf.codigo; })[0] : null, exp = porPM ? porPM.ID : expActual;
     IMP = { exp: expActual, inf: inf, destExp: exp, encontrado: !!porPM, punto: puntoPara(exp, inf), filas: [] };
     IMP.filas = inf.resultados.map(function (r) { return Object.assign({}, r, { sel: !r.censurado }); }); recalcDest(); return IMP;
   };
   function recalcDest() { IMP.filas.forEach(function (r) { var d = destino(r, IMP.punto); r.dest = d; r.ok = !!(d && tieneVar(d.m, r.variable)); if (!r.ok) r.sel = false; var x = d && r.ok ? H.valor(IMP.destExp, d.m, d.p, r.variable) : null; r.previo = x ? (C.num(x.Valor) !== null ? x.Valor : x.Texto) : null; }); }
   function verifHTML() {
     if (!IMP.inf) return ""; var inf = IMP.inf, ops = opcionesPunto(IMP.destExp), nSel = IMP.filas.filter(function (r) { return r.sel; }).length;
-    var cab = '<section class="tarjeta pdf-verif"><div class="cabecera"><h3>Verificación antes de guardar</h3><span class="chip ' + (nSel ? "pri" : "") + '">' + nSel + " de " + IMP.filas.length + " marcados</span></div>" +
-      '<dl class="datos-exp cinco"><div><dt>Observaciones del informe</dt><dd>' + esc(inf.observaciones || "—") + "</dd></div><div><dt>Código</dt><dd>" + esc(inf.codigo || "no encontrado") + "</dd></div><div><dt>Tipo de muestra</dt><dd>" + esc(inf.tipo || inf.muestra || "—") + "</dd></div><div><dt>Obtención de la muestra</dt><dd>" + esc(inf.fecha ? H.diaCorto(new Date(inf.fecha)) + " " + H.hora(new Date(inf.fecha)) : "—") + "</dd></div><div><dt>Horas del informe</dt><dd>" + esc(inf.horas === null ? "—" : String(inf.horas)) + "</dd></div></dl>" +
+    var cab = '<section class="tarjeta pdf-verif"><div class="cabecera"><h3>Verificación antes de guardar</h3>' + info("Revisa cada valor antes de guardarlo. Los valores censurados (<, >) vienen desmarcados: si los marcas, se guardan como texto (p. ej. «<3»). Si ya hay un valor en ese punto, se sustituye. El PDF no se guarda.") + '<span class="chip ' + (nSel ? "pri" : "") + '">' + nSel + " de " + IMP.filas.length + " marcados</span></div>" +
+      '<dl class="datos-exp cinco"><div><dt>Observaciones del informe</dt><dd>' + esc(inf.observaciones || "—") + "</dd></div><div><dt>Código</dt><dd>" + esc(inf.codigo || "no encontrado") + "</dd></div><div><dt>Tipo de muestra</dt><dd>" + esc(inf.tipo || inf.muestra || "—") + "</dd></div><div><dt>Obtención de la muestra</dt><dd>" + esc(inf.fecha ? H.diaCorto(new Date(inf.fecha)) + " " + H.hora(new Date(inf.fecha)) : "—") + "</dd></div><div><dt>Horas del informe</dt><dd>" + esc(inf.horas === null ? "—" : String(inf.horas)) + "</dd></div><div><dt>NHC</dt><dd>" + esc(inf.nhc ? inf.nhc + (inf.sujeto === "receptor" ? " · receptor" : inf.sujeto === "donante" ? " · donantes" : " · desconocido") : "no encontrado") + "</dd></div></dl>" + avisoNHC(inf, IMP.punto, IMP.destExp) +
       (IMP.encontrado ? "" : '<div class="aviso aj">' + ico("triangle-alert") + "<div>" + (inf.codigo ? "Ningún experimento tiene el código " + esc(inf.codigo) + ": elige el experimento." : "El informe no lleva un código HOME-PM-xx: elige el experimento.") + "</div></div>") +
       '<div class="rejilla dos"><div class="campo"><label class="et" for="impExp">Experimento</label><select id="impExp" data-cambio="impExp">' + H.listaExp().map(function (x) { return '<option value="' + esc(x.ID) + '"' + (x.ID === IMP.destExp ? " selected" : "") + ">" + esc(x.ID + (x.Codigo_PM ? " · " + x.Codigo_PM : "")) + "</option>"; }).join("") + '</select></div><div class="campo"><label class="et" for="impPunto">Punto de muestreo</label><select id="impPunto" data-cambio="impPunto"><option value="">— elige —</option>' + ops.map(function (o) { return '<option value="' + esc(o.v) + '"' + (o.v === IMP.punto ? " selected" : "") + ">" + esc(o.et) + "</option>"; }).join("") + '</select><div class="ayuda">El más cercano a las horas del informe.</div></div></div>';
     var filas = IMP.filas.map(function (r, i) {
       var conv = r.convertido ? "× " + H.n(r.valor / C.num(String(r.resultado).replace(/[<>=\s]/g, "").replace(",", ".")), 4) + " (" + esc(r.unidades) + " → " + esc(C.variable("PERF", r.variable).unidad) + ")" : "—";
       return '<tr class="' + (r.ok ? "" : "no-dest") + (r.censurado ? " censurado" : "") + '"><td class="chk"><input type="checkbox" aria-label="Guardar ' + esc(r.variable) + '"' + (r.sel ? " checked" : "") + (r.ok ? "" : " disabled") + ' data-cambio="impSel" data-i="' + i + '"></td><td><b>' + esc(C.variable(r.dest ? r.dest.m : "PERF", r.variable).nombre) + '</b><div class="muy-tenue">' + esc(r.prueba) + "</div></td><td class=\"num\">" + esc(r.resultado) + (r.censurado ? ' <span class="chip aj" title="Valor fuera del límite de detección">censurado</span>' : "") + "</td><td>" + esc(r.unidades || "") + "</td><td>" + conv +
-        '</td><td class="num"><b>' + (r.censurado ? esc(r.censurado + H.n(r.valor, 3)) : H.n(r.valor, 3)) + "</b></td><td>" + (r.dest ? esc((NOM_DEST[r.dest.m] || r.dest.m) + " · " + r.dest.p) : "—") + (r.ok ? "" : '<div class="muy-tenue">Sin casilla en esta muestra</div>') + (r.previo !== null && r.previo !== undefined ? '<div class="muy-tenue">Ya hay ' + esc(String(r.previo).replace(".", ",")) + ": se sustituye</div>" : "") + "</td></tr>";
+        '</td><td class="num"><b>' + (r.censurado ? esc(r.censurado + H.n(r.valor, 3)) : H.n(r.valor, 3)) + "</b></td><td>" + (r.dest ? esc((NOM_DEST[r.dest.m] || r.dest.m) + " · " + r.dest.p) : "—") + (r.ok ? "" : '<div class="muy-tenue">Sin casilla en esta muestra</div>') + (r.previo !== null && r.previo !== undefined ? '<div><span class="chip aj">Ya hay ' + esc(String(r.previo).replace(".", ",")) + ": se sustituye</span></div>" : "") + "</td></tr>";
     }).join("");
     return cab + '<div class="tabla-env"><table class="t tabla-imp"><thead><tr><th></th><th>Variable</th><th class="num">Resultado</th><th>Unidad del informe</th><th>Conversión</th><th class="num">Valor en HOME</th><th>Destino</th></tr></thead><tbody>' + filas + "</tbody></table></div>" +
       (inf.ignoradas.length ? '<details class="plegable"><summary>' + inf.ignoradas.length + " línea(s) del informe sin casilla en HOME</summary><div class=\"dentro\"><ul>" + inf.ignoradas.map(function (x) { return "<li>" + esc(x.prueba + " = " + x.resultado + " · " + x.motivo) + "</li>"; }).join("") + "</ul></div></details>" : "") +
-      '<p class="muy-tenue">Los valores censurados (&lt;, &gt;) vienen desmarcados: si los marcas, se guardan como texto (p. ej. «&lt;3»). El PDF no se guarda.</p><div class="fila-flex"><button class="bt" data-act="impTodos">Marcar todos los no censurados</button><button class="bt" data-act="impCancelar">Descartar</button><button class="bt pri" data-act="impGuardar"' + (nSel && IMP.punto ? "" : " disabled") + ">" + ico("save") + "Guardar los " + nSel + " valores marcados</button></div></section>";
+      '<div class="fila-flex"><button class="bt" data-act="impTodos">Marcar todos los no censurados</button><button class="bt" data-act="impCancelar">Descartar</button><button class="bt pri" data-act="impGuardar"' + (nSel && IMP.punto ? "" : " disabled") + ">" + ico("save") + "Guardar los " + nSel + " valores marcados</button></div></section>";
   }
   function repVerif() { var c = H.$("#pdfVerif"); if (c) c.innerHTML = verifHTML(); }
   H.pdfVerifHTML = verifHTML; H.IMP = function () { return IMP; };
   H.pdfPantalla = function (e) {
     if (!H.puede("registrar")) return '<div class="aviso info">' + ico("lock") + "<div>Tu usuario es de solo lectura: no puede importar informes.</div></div>";
     var prev = !!window.HOME_PREVIEW || location.protocol === "file:";
-    return '<section class="tarjeta pdf-imp"><div class="cabecera"><h3>Subir el informe del laboratorio</h3>' + info("Se lee el texto del PDF del Servicio de Análisis Clínicos (Hospital La Paz): código HOME-PM-xx y horas en «Observaciones», tipo de muestra (arterial, portal, cava, bilis, inmunología, receptor) y cada prueba con su resultado y unidad. Antes de guardar se muestran todos los valores para verificarlos. El PDF no se sube ni se guarda.") + "</div>" +
+    var g = nhcCfg();
+    return '<section class="tarjeta pdf-imp"><div class="cabecera"><h3>Subir el informe del laboratorio</h3>' + info("Se lee el texto del PDF del Servicio de Análisis Clínicos (Hospital La Paz): código HOME-PM-xx y horas en «Observaciones», tipo de muestra (arterial, portal, cava, bilis, inmunología, receptor), el NHC y cada prueba con su resultado y unidad. El NHC decide si es de los donantes (" + (g.nhc_donantes || "—") + ": basal, pre-perfusión y perfusión) o del receptor (" + (g.nhc_receptor || "—") + ": basal del receptor y seguimiento); se cambian en Configuración → General. Antes de guardar se muestran todos los valores para verificarlos. El PDF no se sube ni se guarda.") + "</div>" +
       '<div class="aviso info">' + ico("shield-check") + "<div>Solo se guardan los valores que confirmes en la pantalla de verificación; <b>el PDF no se guarda</b>.</div></div>" +
-      '<div class="rejilla dos"><div class="campo"><label class="et" for="pdfArchivo">Informe en PDF</label><input id="pdfArchivo" type="file" accept="application/pdf,.pdf" data-cambio="pdfArchivo" data-exp="' + esc(e.ID) + '"' + (prev ? " disabled" : "") + '><div class="ayuda">' + (prev ? "En la vista previa de un solo archivo no se puede cargar el lector de PDF: usa la versión publicada o pega el texto." : "El lector (pdf.js) se descarga la primera vez.") + "</div></div>" +
-      '<div class="campo"><label class="et" for="pdfTexto">… o pega el texto del informe</label><textarea id="pdfTexto" rows="4" placeholder="Selecciona todo el texto del PDF, cópialo y pégalo aquí"></textarea><div class="ayuda"><button class="bt mini" data-act="pdfTexto" data-exp="' + esc(e.ID) + '">' + ico("file-text", "s") + "Leer el texto</button></div></div></div>" +
+      '<div class="rejilla dos pdf-campos"><div class="campo"><span class="et"><label for="pdfArchivo">Informe en PDF</label>' + info(prev ? "En la vista previa de un solo archivo no se puede cargar el lector de PDF: usa la versión publicada o pega el texto." : "El lector de PDF (pdf.js) se descarga la primera vez que se usa: hace falta conexión.") + '</span><input id="pdfArchivo" type="file" accept="application/pdf,.pdf" data-cambio="pdfArchivo" data-exp="' + esc(e.ID) + '"' + (prev ? " disabled" : "") + ">" + (prev ? '<div class="pdf-acciones"><span class="chip aj">Solo en la versión publicada</span></div>' : "") + "</div>" +
+      '<div class="campo"><span class="et"><label for="pdfTexto">… o pega el texto del informe</label></span><textarea id="pdfTexto" rows="4" placeholder="Selecciona todo el texto del PDF, cópialo y pégalo aquí"></textarea><div class="pdf-acciones"><button class="bt mini" data-act="pdfTexto" data-exp="' + esc(e.ID) + '">' + ico("file-text", "s") + "Leer el texto</button></div></div></div>" +
       '<div id="pdfEstado" class="muy-tenue" role="status"></div></section><div id="pdfVerif">' + (IMP.exp === e.ID ? verifHTML() : "") + "</div>";
   };
   H.cargarPdfjs = function () {
@@ -612,6 +688,14 @@
     Promise.all(ps).then(function () { }, function () { }); H.toast(n + " valores guardados en " + exp + " · " + IMP.punto + "."); IMP = { exp: null, inf: null, filas: [] }; repVerif();
   };
 
+  // ---- v0.7.1: NHC de los donantes y del receptor en Configuración → General (editables; por defecto 3306230 y 3306231)
+  var cfgVistaPrev = H.vistas && H.vistas.config;
+  if (cfgVistaPrev) H.vistas.config = function (p) {
+    var h = cfgVistaPrev.apply(this, arguments); if (((p && p[0]) || "") !== "general") return h;
+    return h.replace('for="cfg_nhc_donantes">nhc_donantes</label>', 'for="cfg_nhc_donantes">NHC de los donantes' + info("NHC con el que el laboratorio identifica las muestras de los donantes: basal, pre-perfusión y perfusión. Al subir un informe se lee su NHC para elegir el destino.") + "</label>")
+      .replace('for="cfg_nhc_receptor">nhc_receptor</label>', 'for="cfg_nhc_receptor">NHC del receptor' + info("NHC con el que el laboratorio identifica las muestras del receptor: basal del receptor y seguimiento post-trasplante.") + "</label>");
+  };
+
   // ============================================================== 15. Resumen diario (aviso «resumen», destino «diario»): 14:00 o antes si el punto de las 10:00 está completo
   var REQ_RES = { ART: ["pH", "pO2", "pCO2"], POR: ["pH", "pO2", "pCO2"], CAV: ["pH", "pO2", "pCO2"], FLUJO: ["Q_AH", "Q_VP", "P_AH", "P_VP", "Temp"], PERF: ["Lactato", "Glucosa", "Urea", "Na", "K", "ALT", "AST", "LDH", "BilT", "Albumina"], BILIS: ["Volumen_mL"] };
   var NOM_RES = { ART: "gasometría arterial", POR: "gasometría portal", CAV: "gasometría cava", FLUJO: "flujos y presiones", PERF: "bioquímica (tubo amarillo)", BILIS: "volumen de bilis" };
@@ -625,8 +709,11 @@
   function v1(exp, m, p, v, d) { var x = H.valor(exp, m, p, v); return x && C.num(x.Valor) !== null ? H.n(x.Valor, d) : "—"; }
   function textoResumen(e, p, falta) {
     var x = e.ID, bx = H.balanceExp(e), db = H.derivadasBilis ? H.derivadasBilis(e, { punto: p.etiqueta }) || {} : {};
-    return "Punto " + p.etiqueta + ": lactato " + v1(x, "PERF", p.etiqueta, "Lactato", 1) + " mmol/L · pH arterial " + v1(x, "ART", p.etiqueta, "pH", 2) + " · urea " + v1(x, "PERF", p.etiqueta, "Urea", 0) + " mg/dL · ALT/AST " + v1(x, "PERF", p.etiqueta, "ALT", 0) + "/" + v1(x, "PERF", p.etiqueta, "AST", 0) + " U/L · bilis " + (db.Produccion_mLh !== undefined && db.Produccion_mLh !== null ? H.n(db.Produccion_mLh, 1) : "—") + " mL/h · flujos AH/VP " + v1(x, "FLUJO", p.etiqueta, "Q_AH", 0) + "/" + v1(x, "FLUJO", p.etiqueta, "Q_VP", 0) + " mL/min" +
-      (bx ? " · extracción HDF " + (bx.b.extraccion_actual === null ? "—" : H.n(bx.b.extraccion_actual, 0)) + " mL/h, balance " + H.n(bx.b.balance_mL, 0) + " mL" : "") + "." + (falta.length ? " Falta: " + falta.join("; ") + "." : " Punto completo.");
+    // v0.7.1: formato lista (una variable por línea, separadas por "\n")
+    return ["Punto " + p.etiqueta, "Lactato: " + v1(x, "PERF", p.etiqueta, "Lactato", 1) + " mmol/L", "pH arterial: " + v1(x, "ART", p.etiqueta, "pH", 2), "Urea: " + v1(x, "PERF", p.etiqueta, "Urea", 0) + " mg/dL", "ALT/AST: " + v1(x, "PERF", p.etiqueta, "ALT", 0) + "/" + v1(x, "PERF", p.etiqueta, "AST", 0) + " U/L",
+      "Bilis: " + (db.Produccion_mLh !== undefined && db.Produccion_mLh !== null ? H.n(db.Produccion_mLh, 1) : "—") + " mL/h", "Flujos AH/VP: " + v1(x, "FLUJO", p.etiqueta, "Q_AH", 0) + "/" + v1(x, "FLUJO", p.etiqueta, "Q_VP", 0) + " mL/min"]
+      .concat(bx ? ["Extracción HDF: " + (bx.b.extraccion_actual === null ? "—" : H.n(bx.b.extraccion_actual, 0)) + " mL/h", "Balance: " + H.n(bx.b.balance_mL, 0) + " mL"] : [])
+      .concat([falta.length ? "Falta: " + falta.join("; ") : "Punto completo"]).join("\n");
   }
   function memRes() { try { return JSON.parse(localStorage.getItem("home_resumen") || "{}") || {}; } catch (x) { return {}; } }
   // avisos de resumen de todos los días pendientes (el servidor cancela los «resumen» pendientes del experimento en cada llamada)
@@ -677,4 +764,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v07b.js"] = "0.7.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v07b.js"] = "0.7.1";

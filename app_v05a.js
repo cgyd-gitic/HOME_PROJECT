@@ -76,7 +76,7 @@
     return '<div class="segmentado alertas-filtro" role="tablist" aria-label="Filtrar alertas">' + [["todas", "Todas"], ["accion", "Requieren acción"], ["actualizacion", "Actualizaciones"]].map(function (x) { return '<button role="tab" aria-selected="' + (f === x[0]) + '" class="' + (f === x[0] ? "activo" : "") + '" data-act="filtroAlertas" data-f="' + x[0] + '"><span class="et-f">' + x[1] + '</span><span class="n">' + n[x[0]] + "</span></button>"; }).join("") + "</div>" +
       (sel.length ? '<ol class="lista-alertas">' + sel.map(function (x) {
         var nueva = esNueva(x, v, lei);
-        return '<li class="' + (x.tipo === "accion" ? "accion" : "upd") + (nueva ? " nueva" : "") + '"><a href="' + esc(x.href || "#/inicio") + '" data-cerrar-alertas>' + '<span class="ic">' + ico(x.icono || "bell", "s") + '</span><span class="tx"><b>' + esc(x.titulo) + "</b>" + (x.texto ? "<span>" + esc(x.texto) + "</span>" : "") + '</span><time datetime="' + esc(x.t.toISOString()) + '">' + esc(H.diaCorto(x.t) + " " + H.hora(x.t)) + "</time></a></li>";
+        return '<li class="' + (x.tipo === "accion" ? "accion" : "upd") + (nueva ? " nueva" : "") + '"><a href="' + esc(x.href || "#/inicio") + '" data-cerrar-alertas>' + '<span class="ic">' + ico(x.icono || "bell", "s") + '</span><span class="tx"><b>' + esc(x.titulo) + "</b>" + (x.texto ? (H.lineasAviso(x.texto).length > 1 ? H.textoAvisoHTML(x.texto, "", true) : "<span>" + esc(x.texto) + "</span>") : "") + '</span><time datetime="' + esc(x.t.toISOString()) + '">' + esc(H.diaCorto(x.t) + " " + H.hora(x.t)) + "</time></a></li>";
       }).join("") + "</ol>" : '<p class="tenue vacio-alertas">' + (f === "accion" ? "No hay nada pendiente de tu parte." : "Sin novedades en los últimos 7 días.") + "</p>") +
       '<p class="muy-tenue pie-alertas">Orden cronológico, de la más antigua a la más reciente. Actualizaciones de los últimos 7 días hechas por otras personas.</p>';
   }
@@ -318,4 +318,4 @@
   H.acc.quitarFotoPerfil = function () { guardarFoto(""); };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v05a.js"] = "0.7.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v05a.js"] = "0.7.1";

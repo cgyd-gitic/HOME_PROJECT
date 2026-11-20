@@ -128,17 +128,30 @@
     var P = H.planMuestreoInicio(e); if (!P) return "";
     var m = P.m, p = P.prox, nota = function (x) { return (x.tipo === "extra" ? "Solo EDTA y gasometrías (metabolismo posprandial)" : x.amarillo ? "Incluye el tubo amarillo diario" : "") ; };
     var proxHTML = p ? '<div class="im-prox"><div class="et">Próxima extracción · ' + esc(p.etiqueta) + '</div><div class="im-hora"><b>' + esc(H.diaCorto(p.fecha) + " " + H.hora(p.fecha)) + '</b> <span class="muy-tenue">· faltan <span data-cuenta="' + p.fecha.toISOString() + '">--:--</span></span></div>' +
-      '<ul class="im-tubos">' + listaTubos(p.tubos, m) + "</ul>" + '<div class="im-total">Volumen de sangre: <b>' + nf(p.mL) + " mL</b>" + (nota(p) ? ' <span class="muy-tenue">· ' + esc(nota(p)) + "</span>" : "") + (p.bilis ? '<div class="muy-tenue">También bilis (no cuenta para el volumen de sangre).</div>' : "") + "</div></div>"
+      '<ul class="im-tubos">' + listaTubos(p.tubos, m) + "</ul>" + '<div class="im-total">Volumen de sangre: <b>' + nf(p.mL) + " mL</b>" + (nota(p) ? ' <span class="muy-tenue">· ' + esc(nota(p)) + "</span>" : "") + (p.bilis ? ' <span class="chip">+ bilis</span>' + H.botonInfo("En este punto también se toma muestra de bilis: no cuenta para el volumen de sangre extraído.") : "") + "</div></div>"
       : '<div class="im-prox"><div class="et">Próxima extracción</div><div class="im-hora"><b>Protocolo de muestreo completado</b></div></div>';
-    var kp = function (et, v, sub) { return '<div class="kpi"><div class="et">' + esc(et) + '</div><div class="v">' + H.n(v, 1) + '<small>mL</small></div><div class="tend">' + sub + "</div></div>"; };
-    var kpis = '<div class="kpis im-kpis">' + kp("Extraído hasta ahora", P.extraido, P.hechos.length + " de " + P.pts.length + " puntos + pre-perfusión") + kp("Últimas 24 h", P.ult24, "según el plan de muestreo") + kp("Próximas 24 h", P.sig24, P.futuros.filter(function (x) { return x.fecha.getTime() <= Date.now() + 864e5; }).length + " extracciones") + kp("Total del protocolo", P.total, "pre-perfusión " + nf(P.pre) + " mL") + "</div>";
     var filas = P.futuros.slice(0, 8).map(function (x) { return "<tr><td><b>" + esc(x.etiqueta) + "</b></td><td>" + esc(H.diaCorto(x.fecha) + " " + H.hora(x.fecha)) + '</td><td class="envolver">' + esc(cortoTubos(x.tubos)) + (x.tipo === "extra" ? ' <span class="chip">metabolismo</span>' : "") + '</td><td class="num">' + nf(x.mL) + "</td></tr>"; }).join("");
     var c = m.completa || {}, txt = "Pre-perfusión: " + cortoTubos(m.pre) + " (" + nf(P.pre) + " mL). Primeras 24 h, a los " + horasTxt(m.dia1_h || []) + ": " + cortoTubos(c) + " (" + nf(mlTubos(c, m)) + " mL; a las 24 h, + amarillo). " +
       "Después, cada 12 h a las " + (m.diarias || []).join(" y ") + " (manda la hora del día), con el amarillo a las " + esc(m.amarillo_hora || "") + (m.extra_horas && m.extra_horas.length ? "; a las " + m.extra_horas.join(" y ") + ": " + cortoTubos(m.extra) + " (" + nf(mlTubos(m.extra, m)) + " mL) para los cálculos de metabolismo" : "") + ". Las muestras de bilis dependen de la bilis producida y no cuentan para el volumen.";
-    return '<h3 class="sub">Muestreo de la perfusión</h3><div class="ini-muestreo">' + proxHTML + kpis + "</div>" +
+    return '<h3 class="sub">Muestreo de la perfusión</h3><div class="ini-muestreo">' + proxHTML + "</div>" +
       '<details class="plegable im-plan"><summary>Próximas extracciones y esquema completo</summary><div class="dentro">' + (filas ? '<div class="tabla-env"><table class="t"><thead><tr><th>Punto</th><th>Hora</th><th>Tubos</th><th class="num">mL</th></tr></thead><tbody>' + filas + "</tbody></table></div>" : "") +
       '<p class="muy-tenue" style="margin:8px 0 0">' + esc(txt) + "</p></div></details>";
   };
+  // v0.7.1: volúmenes de sangre del muestreo → sección «Balance de volumen y HDF» de la misma tarjeta (mismo diseño de indicadores)
+  H.volumenesMuestreoHTML = function (e) {
+    var P = H.planMuestreoInicio(e); if (!P) return "";
+    var kp = function (et, v, sub) { return '<div class="kpi im-vol"><div class="et">' + esc(et) + '</div><div class="v">' + H.n(v, 1) + '<small>mL</small></div><div class="tend">' + sub + "</div></div>"; };
+    return kp("Muestreo · extraído hasta ahora", P.extraido, P.hechos.length + " de " + P.pts.length + " puntos + pre-perfusión") + kp("Muestreo · últimas 24 h", P.ult24, "según el plan de muestreo") +
+      kp("Muestreo · próximas 24 h", P.sig24, P.futuros.filter(function (x) { return x.fecha.getTime() <= Date.now() + 864e5; }).length + " extracciones") + kp("Muestreo · total del protocolo", P.total, "pre-perfusión " + nf(P.pre) + " mL");
+  };
+  // cierre del <div> que empieza en la posición i (cuenta los <div> anidados)
+  function finDiv(h, i) { var n = 0, re = /<div\b|<\/div>/g, m; re.lastIndex = i; while ((m = re.exec(h))) { n += m[0] === "</div>" ? -1 : 1; if (!n) return m.index; } return -1; }
+  function ponerVolumenes(h, vol) {
+    var cab = '<h3 class="sub">Balance de volumen y HDF</h3>', i = h.indexOf(cab), k = i === -1 ? -1 : h.indexOf('<div class="kpis kpis-ini">', i), f = k === -1 ? -1 : finDiv(h, k);
+    if (f !== -1) return h.slice(0, f) + vol + h.slice(f);
+    var bloque = cab + '<div class="kpis kpis-ini">' + vol + "</div>", j = h.indexOf('<h3 class="sub">Administración circadiana');
+    return j === -1 ? h.replace(/<\/section>\s*$/, bloque + "</section>") : h.slice(0, j) + bloque + h.slice(j);
+  }
   function recHDFInicio(e) {
     var h = H.recomendacionHDFInicio ? H.recomendacionHDFInicio(e) : H.consejoHDFHTML ? H.consejoHDFHTML(e) : "";
     if (!h) return "";
@@ -148,7 +161,7 @@
   var tarjPrev = H.tarjetaPerfusion;
   H.tarjetaPerfusion = function (e) {
     var h = tarjPrev.apply(this, arguments), ci = cfgIni(), mu = "", rec = "";
-    try { if (ci.muestreo !== false) mu = H.muestreoInicioHTML(e); } catch (x) { console.error(x); }
+    try { if (ci.muestreo !== false) { mu = H.muestreoInicioHTML(e); var vol = mu ? H.volumenesMuestreoHTML(e) : ""; if (vol) h = ponerVolumenes(h, vol); } } catch (x) { console.error(x); }
     try { if (ci.hdf_rec !== false) rec = recHDFInicio(e); } catch (x) { console.error(x); }
     if (mu) { var i = h.indexOf('<h3 class="sub">Alertas</h3>'); h = i === -1 ? h.replace(/<\/section>\s*$/, mu + "</section>") : h.slice(0, i) + mu + h.slice(i); }
     if (rec) { var j = h.indexOf('<h3 class="sub">Administración circadiana'); h = j === -1 ? h.replace(/<\/section>\s*$/, rec + "</section>") : h.slice(0, j) + rec + h.slice(j); }
@@ -253,7 +266,7 @@
       return '<td class="centro" data-et="' + esc(et) + '"><label class="check usr-chk"' + (ap ? "" : ' title="No se aplica a este rol"') + '><input type="checkbox" data-cambio="usrNotif" data-id="' + esc(u.ID) + '" data-k="' + k + '" aria-label="' + esc(et + " · " + (u.Nombre || u.Email)) + '"' + (v && ap ? " checked" : "") + (ap ? "" : " disabled") + "><span class=\"usr-chk-et\">" + esc(et) + "</span></label></td>";
     };
     return subUsuarios("usuarios") +
-      '<section class="tarjeta"><div class="cabecera"><h2>Usuarios con acceso</h2><button class="bt pri" data-act="nuevoUsr">' + ico("plus") + "Añadir usuario</button></div><p class=\"tenue\">" + H.ROLES.map(function (r) { return "<b>" + esc(r[1]) + "</b>: " + esc(r[2].charAt(0).toLowerCase() + r[2].slice(1)); }).join(". ") + ". Al añadir un usuario recibe un correo con la dirección de la web. Las solicitudes de alta están en la pestaña <a href=\"#/config/accesos\">Accesos</a>.</p>" +
+      '<section class="tarjeta"><div class="cabecera"><h2>Usuarios con acceso</h2>' + H.botonInfo("Al añadir un usuario recibe un correo con la dirección de la web. Las solicitudes de alta están en la pestaña Accesos.") + '<button class="bt pri" data-act="nuevoUsr">' + ico("plus") + "Añadir usuario</button></div><p class=\"tenue\">" + H.ROLES.map(function (r) { return "<b>" + esc(r[1]) + "</b>: " + esc(r[2].charAt(0).toLowerCase() + r[2].slice(1)); }).join(". ") + ". Solicitudes de alta: pestaña <a href=\"#/config/accesos\">Accesos</a>.</p>" +
       '<div class="tabla-env"><table class="t t-usuarios"><thead><tr><th>Usuario</th><th>Rol</th><th class="centro">Activo</th>' + NOTIF.map(function (n) { return '<th class="centro">' + esc(n[2]) + "</th>"; }).join("") + '<th class="centro">Gestor de inventario</th><th>Último acceso</th></tr></thead><tbody>' +
       l.map(function (u) {
         var em = String(u.Email || "").toLowerCase();
@@ -264,10 +277,10 @@
           '<td class="muy-tenue" data-et="Último acceso">' + esc(H.fechaHora(u.Ultimo_acceso) || "—") + "</td></tr>";
       }).join("") + "</tbody></table></div>" +
       (gestores.length ? "" : '<div class="aviso aj" style="margin-top:10px">' + ico("triangle-alert") + "<div>No hay ningún gestor de inventario: mientras tanto actúan como gestores todos los administradores (respaldo).</div></div>") + "</section>" +
-      '<section class="tarjeta"><div class="cabecera"><h2>Qué recibe cada casilla</h2></div><dl class="usr-ayuda">' + NOTIF.map(function (n) { return "<dt>" + esc(n[2]) + "</dt><dd>" + esc(n[3]) + "</dd>"; }).join("") +
+      '<section class="tarjeta"><div class="cabecera"><h2>Qué recibe cada casilla</h2>' + H.botonInfo("Una casilla sin tocar sigue el valor por defecto del rol: los avisos de la perfusión, activados para administradores e investigadores; los datos para revisar, para los administradores; el resumen diario, desactivado. Cada usuario puede cambiar sus notificaciones en «Mi cuenta».") + '</div><dl class="usr-ayuda">' + NOTIF.map(function (n) { return "<dt>" + esc(n[2]) + "</dt><dd>" + esc(n[3]) + "</dd>"; }).join("") +
       "<dt>" + esc(CAT_RESP) + "</dt><dd>Los participantes de cada experimento con la categoría «" + esc(CAT_RESP) + "» reciben <b>automáticamente</b> los avisos de esa perfusión, aunque no tengan marcada la casilla (puede haber varios). Si no tienen usuario en la app pero sí correo, los reciben por correo. Se asignan en el calendario, al programar o editar el experimento.</dd>" +
       "<dt>Gestor de inventario</dt><dd>Gestiona el inventario y los pedidos (solo administradores e investigadores; puede haber varios). Si no hay ninguno, lo hacen todos los administradores.</dd></dl>" +
-      '<p class="muy-tenue">Una casilla sin tocar sigue el valor por defecto del rol: los avisos de la perfusión, activados para administradores e investigadores; los datos para revisar, para los administradores; el resumen diario, desactivado. Cada usuario puede cambiar sus notificaciones en «Mi cuenta».</p></section>' +
+      "</section>" +
       '<section class="tarjeta"><div class="cabecera"><h2>Responsables de la perfusión</h2></div>' + (resp.length ? '<div class="tabla-env"><table class="t"><thead><tr><th>Experimento</th><th>Estado</th><th>Responsables</th></tr></thead><tbody>' + resp.map(function (x) {
         return '<tr><td><a href="#/exp/' + encodeURIComponent(x.e.ID) + '">' + esc(x.e.ID) + "</a></td><td>" + (H.estadoChip ? H.estadoChip(x.e.Estado) : esc(x.e.Estado || "")) + '</td><td class="envolver">' + (x.l.length ? esc(x.l.map(function (r) { return r.Nombre + (r.Email ? "" : " (sin correo)"); }).join(", ")) : '<span class="muy-tenue">Sin responsable asignado</span>') + "</td></tr>";
       }).join("") + "</tbody></table></div>" : '<p class="tenue">No hay experimentos programados.</p>') + "</section>";
@@ -312,7 +325,7 @@
   var iniPrev = H.seccionesExtra.inicio;
   H.seccionesExtra.inicio = function () {
     var c = cfgIni(), v = c.vista || "24h";
-    return '<section class="tarjeta"><div class="cabecera"><h2>Pantalla de inicio de todos los usuarios</h2></div><p class="tenue">Lo que elijas aquí es lo que ven todos los usuarios en Inicio (no hay preferencias personales). Cada persona puede cambiar la vista de la perfusión desde la cabecera solo durante la sesión: al volver a abrir la app vuelve a la que elijas aquí.</p>' +
+    return '<section class="tarjeta"><div class="cabecera"><h2>Pantalla de inicio de todos los usuarios</h2>' + H.botonInfo("Lo que elijas aquí es lo que ven todos los usuarios en Inicio (no hay preferencias personales). Cada persona puede cambiar la vista de la perfusión desde la cabecera solo durante la sesión: al volver a abrir la app vuelve a la que elijas aquí.") + "</div>" +
       '<div class="rejilla tres"><div class="campo"><label class="et" for="iniVista">Vista de la perfusión en curso</label><select id="iniVista" data-cambio="iniVista">' + [["24h", "Últimas 24 horas"], ["todo", "Toda la perfusión"], ["comparar", "Comparar con otras perfusiones"]].map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === v ? " selected" : "") + ">" + x[1] + "</option>"; }).join("") + "</select></div>" +
       '<label class="check ini-op"><input type="checkbox" data-cambio="iniOpcion" data-k="muestreo"' + (c.muestreo !== false ? " checked" : "") + "> Mostrar el esquema de muestreo</label>" +
       '<label class="check ini-op"><input type="checkbox" data-cambio="iniOpcion" data-k="hdf_rec"' + (c.hdf_rec !== false ? " checked" : "") + "> Mostrar la recomendación de la HDF</label></div></section>" + (iniPrev ? iniPrev.apply(this, arguments) : "");
@@ -389,4 +402,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v07a.js"] = "0.7.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v07a.js"] = "0.7.1";

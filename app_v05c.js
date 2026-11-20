@@ -246,7 +246,7 @@
     var a = an[rol]; if (!a) return seg + '<div class="vacio">Falta el animal ' + rol + ".</div>";
     var d = H.usarForm(e.ID, "cirugia", a.ID), peso = C.num(d.peso_kg) || C.num(a.Peso_llegada_kg), ev = H.eventos(e.ID), tt = C.tiempos(ev);
     H.formActivo(function (el) { var k = el.getAttribute("data-k"); if (k === "peso_kg" || /^premed\./.test(k) || /^morfo\./.test(k)) H.retrasar("rep", 900, H.repintar); if (k === "peso_higado_g") H.guardar("Experimentos", [{ ID: e.ID, Peso_higado_inicial_g: C.num(el.value) }], { sinRepintar: true }); });
-    var c = H.campo, html = seg + '<div class="fila-flex sep"><p class="tenue">' + (rol === "LD" ? "Datos generales → morfometría → premedicación → anestesia y cirugía (muestra basal antes de empezar) → hemodinámica → extracción del injerto." : "Solo hace falta si con el donante de hígado no se llega a " + H.n(S.cfg.general.volumen_sangre_mL || 2200, 0) + " mL de sangre.") + '</p><span id="indGuardado" class="guardado">' + ico("check", "s") + "Guardado automático</span></div>";
+    var c = H.campo, html = seg + '<div class="fila-flex sep"><p class="tenue">' + (rol === "LD" ? "Datos generales → morfometría → premedicación → anestesia y cirugía (muestra basal antes de empezar) → hemodinámica → extracción del injerto." : "Donante de sangre." + (H.v07b ? H.v07b.info("Solo hace falta si con el donante de hígado no se llega a " + H.n(S.cfg.general.volumen_sangre_mL || 2200, 0) + " mL de sangre.") : "")) + '</p><span id="indGuardado" class="guardado">' + ico("check", "s") + "Guardado automático</span></div>";
     html += '<section class="tarjeta"><div class="cabecera"><h3>Datos generales</h3></div><div class="rejilla cuatro">' + c("fecha", "Fecha del procedimiento", d.fecha || e.Fecha_cirugia || H.aFechaLocal(new Date()), { tipo: "date" }) +
       '<div class="campo"><label class="et">Identificación</label><input value="' + esc(a.ID + (a.Crotal ? " · crotal " + a.Crotal : "")) + '" disabled></div>' + c("peso_kg", "Peso pre-cirugía", d.peso_kg, { tipo: "number", u: "kg" }) + c("ayuno_h", "Horas de ayuno", d.ayuno_h, { tipo: "number", u: "h" }) + "</div></section>";
     html += morfometria(d, "morfo.");
@@ -288,4 +288,4 @@
   H.calculosPerfusato = function (e) { return sinSub(prepOrig(e, ["calculos"])); };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v05c.js"] = "0.7.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v05c.js"] = "0.7.1";

@@ -62,8 +62,8 @@
       '<section class="tarjeta cal-tarjeta"><div class="cabecera cal-nav"><a class="bt ico-solo" href="#/calendario?m=' + mesRel(-1) + '" aria-label="Mes anterior">' + ico("chevron-left") + '</a><h2>' + esc(nombreMes) + '</h2><a class="bt ico-solo" href="#/calendario?m=' + mesRel(1) + '" aria-label="Mes siguiente">' + ico("chevron-right") + '</a><a class="bt texto" href="#/calendario">Hoy</a></div>' +
       '<div class="cal2" aria-label="' + esc(nombreMes) + '"><div class="cal-cabs">' + ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(function (x) { return "<span>" + x + "</span>"; }).join("") + "</div>" + semanas + "</div>" +
       '<div class="cal-leyenda">' + Object.keys(FASES).map(function (f) { return '<span><i class="cal-barra f-' + f + '"></i>' + FASES[f] + "</span>"; }).join("") + '<span><i class="cal-barra f-perfusion prov"></i>Fecha provisional</span><span><i class="cal-barra f-perfusion"></i>Fecha confirmada</span></div></section>' +
-      '<section class="tarjeta"><div class="cabecera"><h2>Procedimientos programados</h2></div>' + (prox.length ? '<div class="progs">' + prox.map(tarjetaProg).join("") + "</div>" : '<p class="tenue">No hay procedimientos programados.' + (H.esAdmin() ? " Usa «Programar experimento» para reservar las fechas." : "") + "</p>") +
-      '<p class="muy-tenue" style="margin-top:10px">Al programar una fecha provisional se avisa a los participantes. Tres semanas antes, los administradores reciben el aviso para confirmarla; al confirmar, los participantes reciben la cita para su calendario y un recordatorio una semana antes de cada procedimiento.</p></section></div>';
+      '<section class="tarjeta"><div class="cabecera"><h2>Procedimientos programados</h2>' + H.botonInfo("Al programar una fecha provisional se avisa a los participantes. Tres semanas antes, los administradores reciben el aviso para confirmarla; al confirmar, los participantes reciben la cita para su calendario y un recordatorio una semana antes de cada procedimiento.") + "</div>" + (prox.length ? '<div class="progs">' + prox.map(tarjetaProg).join("") + "</div>" : '<p class="tenue">No hay procedimientos programados.' + (H.esAdmin() ? " Usa «Programar experimento» para reservar las fechas." : "") + "</p>") +
+      "</section></div>";
   };
   function pasado(e) { var hs = C.hitosExperimento(e, cfgP()); var fin = hs.length ? hs[hs.length - 1].fecha : e.Fecha_cirugia; return C.diasEntre(hoyISO(), fin) < 0 || e.Estado === "Finalizado"; }
   H.expPasado = pasado;
@@ -252,4 +252,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v05b.js"] = "0.7.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v05b.js"] = "0.7.1";

@@ -441,7 +441,7 @@
       var t = enHora(t0, h, d); if (t <= t0 || t > fin) return;
       var ev = porHora[h], aviso = new Date(t.getTime() - antelMin * 6e4);
       out.push({ ID: expId + "|circ|" + t.toISOString().slice(0, 16), Experimento: expId, Fecha_hora: aviso.toISOString(), Tipo: "circadiano", Destino: "equipo", Vista: "exp:" + expId + ":seguimiento",
-        Titulo: h + " · cambio de ritmo (día " + (Math.floor((t - t0) / 864e5) + 1) + ")", Texto: ev.map(function (c) { return nombreLinea(c.linea) + " → " + String(c.valor).replace(".", ",") + " " + c.unidad + (c.nota ? " (" + c.nota + ")" : ""); }).join(" · ") });
+        Titulo: h + " · cambio de ritmo (día " + (Math.floor((t - t0) / 864e5) + 1) + ")", Texto: ev.map(function (c) { return nombreLinea(c.linea) + " → " + String(c.valor).replace(".", ",") + " " + c.unidad + (c.nota ? " (" + c.nota + ")" : ""); }).join("\n") });   // v0.7.1: una línea por línea de infusión
     });
     return out;
   }
@@ -786,4 +786,4 @@
     dializado: dializado, consejoHDF: consejoHDF, SUPERVISION_REC: SUPERVISION_REC, PUNTOS_REC: PUNTOS_REC, EVAL_REC: EVAL_REC, sacrificioPorEvaluacion: sacrificioPorEvaluacion, MORFO: MORFO, GRUPOS_INICIO: GRUPOS_INICIO };
 });
 
-;(window.HOME_MODS = window.HOME_MODS || {})["calc.js"] = "0.7.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["calc.js"] = "0.7.1";

@@ -32,6 +32,7 @@
     return puede0(a);
   };
   function aviso(tipo, html, icono) { return '<div class="aviso ' + tipo + '">' + ico(icono || (tipo === "al" ? "circle-alert" : tipo === "ok" ? "circle-check" : tipo === "aj" ? "triangle-alert" : "info")) + "<div>" + html + "</div></div>"; }
+  function info(t) { return H.v07b && H.v07b.info ? H.v07b.info(t) : ""; }   // v0.7.1: botón (i) común (app_v07b)
   function soloGestor(txt) { return aviso("info", (txt || "Solo lectura: el inventario lo gestiona") + " " + (H.gestoresInventario().length ? "<b>" + esc(H.gestoresInventario().map(function (u) { return u.Nombre || u.Email; }).join(", ")) + "</b>" : "el gestor de inventario") + ".", "lock"); }
 
   // ============================================================== 1. Pestañas y secciones del material (las mismas en Preparación e Inventario)
@@ -142,7 +143,7 @@
     return { altas: altas, cambios: cambios, instrumental: ins, renombres: renombres };
   };
   H.acc.cargarCatalogo = function () {
-    if (!H.puede("inventario")) { H.toast("El catálogo lo carga el gestor de inventario.", "error"); return; }
+    if (!H.puede("inventario")) { var g = H.gestoresInventario(); H.modal({ titulo: "Cargar el catálogo de material", cuerpo: "<p>El catálogo de referencia lo carga el <b>gestor de inventario</b>" + (g.length ? " (" + esc(g.map(function (u) { return u.Nombre || u.Email; }).join(", ")) + ")" : " (sin ninguno marcado, los administradores)") + ".</p><p>Si te encargas tú del material, pide a un administrador que marque tu casilla en Configuración › Inventario › Gestores.</p>", pie: '<button class="bt pri" data-cerrar>Entendido</button>' }); return; }
     var p = H.planCatalogo(), filas = p.altas.concat(p.cambios.map(function (x) { return x.o; })).concat(p.instrumental);
     if (!filas.length) { H.toast("El catálogo ya está cargado y normalizado."); return; }
     var cuerpo = "<p>Se cargará el catálogo de referencia del protocolo (" + C.CATALOGO.length + " productos, con referencia, regla de cantidad y ubicación). El stock no cambia.</p><ul>" +
@@ -204,12 +205,14 @@
     if (d.ajuste_en) ajuste = aviso("ok", "Consumo recalculado con los " + H.n(d.ajuste_dias, 1) + " días reales el " + esc(H.fechaHora(d.ajuste_en)) + " (" + (d.ajuste_movs || []).length + " ajuste(s) en el inventario).");
     return '<div class="prep-resumen"><div><b>' + hechos + " / " + mats.length + "</b> comprobados · " + dias + (d.confirmado_en ? ' · <span class="chip ok">Descontado el ' + esc(H.fechaHora(d.confirmado_en)) + " por " + esc(d.confirmado_por || "") + "</span>" : "") + '</div><div class="fila-flex">' + acc + "</div></div>" + ajuste;
   }
-  var INTRO = { quirurgico: "Material quirúrgico de un solo uso. Se descuenta del inventario al confirmar el checklist.", fungible: "Fungible de perfusión, de hemodiafiltración y general. La cantidad se calcula con los días de perfusión y el plan de muestreo (tubos, microtubos, aceite mineral…); si la perfusión termina antes, se recalcula con los días reales.",
-    farmacos: "Fármacos, reactivos y soluciones con la cantidad que pide el protocolo para los días de perfusión. Este catálogo es el que se ofrece al actualizar la tabla de infusiones.", inventariable: "Equipos y cajas de instrumental: se comprueban pero no se consumen. El instrumental se cuenta después de cada cirugía y las cajas deben estar esterilizadas el día de la perfusión." };
+  var INTRO = { quirurgico: "Material quirúrgico de un solo uso.", fungible: "Fungible de perfusión, de hemodiafiltración y general.", farmacos: "Fármacos, reactivos y soluciones.", inventariable: "Equipos y cajas de instrumental." };
+  // v0.7.1: lo importante (cuándo se descuenta, cómo se calcula, qué no se consume) va en el botón (i)
+  var INTRO_INFO = { quirurgico: "Se descuenta del inventario al pulsar «Descontar del inventario» (checklist confirmado).", fungible: "La cantidad se calcula con los días de perfusión y el plan de muestreo (tubos, microtubos, aceite mineral…). Si la perfusión termina antes, se recalcula con los días reales.",
+    farmacos: "La cantidad es la que pide el protocolo para los días de perfusión. Este catálogo es el que se ofrece al actualizar la tabla de infusiones.", inventariable: "Se comprueban pero no se consumen. El instrumental se cuenta después de cada cirugía y las cajas deben estar esterilizadas el día de la perfusión." };
   var COLS = '<colgroup><col class="c-chk"><col class="c-mat"><col class="c-cant"><col class="c-real"><col class="c-stock"><col class="c-est"></colgroup>';
   function tablaPestana(e, s) {
     var d = formChk(e.ID), puedo = H.puede("registrar"), bloq = !!d.confirmado_en, dp = H.diasPerfusion(e), falta = [], mats = activos().filter(function (m) { return pestanaDe(m) === s && !esInstrumental(m); });
-    var cab = '<div class="fila-flex prep-cab"><p class="muy-tenue">' + INTRO[s] + "</p>" + (puedo ? '<span class="empuja"></span><button class="bt" data-act="chkTodoTab" data-exp="' + esc(e.ID) + '" data-tab="' + s + '"' + (bloq ? " disabled" : "") + ">" + ico("check-check", "s") + 'Marcar todo</button><button class="bt pri" data-act="anadirProducto" data-tab="' + s + '">' + ico("plus") + "Añadir</button>" : "") + "</div>";
+    var cab = '<div class="fila-flex prep-cab"><p class="muy-tenue">' + INTRO[s] + info(INTRO_INFO[s]) + "</p>" + (puedo ? '<span class="empuja"></span><button class="bt" data-act="chkTodoTab" data-exp="' + esc(e.ID) + '" data-tab="' + s + '"' + (bloq ? " disabled" : "") + ">" + ico("check-check", "s") + 'Marcar todo</button><button class="bt pri" data-act="anadirProducto" data-tab="' + s + '">' + ico("plus") + "Añadir</button>" : "") + "</div>";
     if (!mats.length) return cab + (s === "inventariable" ? "" : '<div class="vacio">' + ico(PESTANAS.filter(function (x) { return x[0] === s; })[0][2], "l") + "<p>No hay nada en esta pestaña todavía.</p><p class=\"tenue\">" + (H.puede("inventario") ? 'Carga el catálogo de referencia en <a href="#/inventario/' + s + '">Inventario</a> o pulsa «Añadir».' : "Pide al gestor de inventario que cargue el catálogo.") + "</p></div>");
     var html = porSeccion(mats, s).map(function (g) {
       return '<section class="tarjeta"><div class="cabecera"><h3>' + esc(g.nombre) + '</h3><span class="muy-tenue">' + g.items.length + ' producto(s)</span></div><div class="tabla-env"><table class="t tabla-chk v7">' + COLS + '<thead><tr><th><span class="sr">Comprobado</span></th><th>Material</th><th class="num">' + (s === "inventariable" ? "Necesario" : "Para " + dp.previstos + " días") + '</th><th class="num">' + (dp.terminada ? "Con " + H.n(dp.reales, 1) + " días reales" : "Días reales") + '</th><th class="num">Stock</th><th>Estado</th></tr></thead><tbody>' +
@@ -281,8 +284,8 @@
   H.cajasSinConfirmar = cajasSinConfirmar;
   function cajas(e) {
     var puedo = H.puede("registrar"), d = formIns(e.ID), hay = activos().some(esInstrumental), tx = C.tipoProc(e) === "trasplante", fin = terminada(e), sc = cajasSinConfirmar(e);
-    var cab = '<h3 class="sub v7d-sub">' + ico("briefcase-medical", "s") + " Cajas de instrumental y esterilización</h3>" +
-      '<p class="muy-tenue">Todo el material que entra en el campo debe estar esterilizado el día de la perfusión. Antes de la cirugía se confirma que cada caja está estéril y precintada; después se cuenta cada pieza y se marca el estado de la esterilización. Si una caja no queda esterilizada, se avisa al equipo.</p>' +
+    var cab = '<h3 class="sub v7d-sub">' + ico("briefcase-medical", "s") + " Cajas de instrumental y esterilización" + info("Todo el material que entra en el campo debe estar esterilizado el día de la perfusión. Antes de la cirugía se confirma que cada caja está estéril y precintada; después se cuenta cada pieza y se marca el estado de la esterilización. Si una caja no queda esterilizada, se avisa al equipo.") + "</h3>" +
+      '<p class="muy-tenue">Antes: estéril y precintada · después: recuento y esterilización.</p>' +
       (sc.length ? aviso("aj", "<b>Cirugía " + (C.diasEntre(C.diaISO(new Date()), e.Fecha_cirugia) === 0 ? "hoy" : "mañana") + ":</b> confirma que " + esc(sc.join(" y ")) + (sc.length > 1 ? " están estériles y precintadas." : " está estéril y precintada."), "triangle-alert") : "");
     if (!hay) return cab + '<div class="vacio">' + ico("scissors", "l") + "<p>Todavía no están las cajas de instrumental en el catálogo.</p>" + (H.puede("inventario") ? '<button class="bt pri" data-act="cargarCajas">' + ico("download") + "Cargar las cajas donante y receptor (B. Braun)</button>" : '<p class="tenue">Pide al gestor de inventario que las cargue.</p>') + "</div>";
     var sueltos = activos().filter(function (m) { return esInstrumental(m) && cajaDe(m) === "Instrumental suelto"; });
@@ -360,8 +363,7 @@
     var cats = SECCIONES[s].filter(function (c) { return CAJAS_N().indexOf(c) === -1 && c !== "Instrumental suelto"; }).map(function (c) { return c === "Material quirúrgico de un solo uso" ? "Material quirúrgico" : c; });
     if (s === "inventariable") cats = ["Equipos"].concat(CAJAS_N(), ["Instrumental suelto"]);
     var cuerpo = (ges ? "" : aviso("info", "El catálogo lo gestiona el gestor de inventario: se enviará como <b>solicitud de alta de producto</b>.")) +
-      '<p class="muy-tenue">Nombre en español con el formato del catálogo: nombre genérico + marca o modelo + dosis o concentración + envase (p. ej. «Hemofiltro HF03», «Taurocolato sódico hidratado 25 g»).</p>' +
-      '<div class="rejilla dos">' + campo("apN", "Nombre del producto", '<input id="apN" autocomplete="off" placeholder="' + (s === "farmacos" ? "Principio activo, marca, concentración y envase…" : "Nombre…") + '">') +
+      '<div class="rejilla dos">' + campo("apN", "Nombre del producto" + info("Nombre en español con el formato del catálogo: nombre genérico + marca o modelo + dosis o concentración + envase (p. ej. «Hemofiltro HF03», «Taurocolato sódico hidratado 25 g»)."), '<input id="apN" autocomplete="off" placeholder="' + (s === "farmacos" ? "Principio activo, marca, concentración y envase…" : "Nombre…") + '">') +
       campo("apT", "Tipo", '<select id="apT">' + tipos.map(function (t) { return "<option>" + t + "</option>"; }).join("") + "</select>") +
       campo("apC", "Sección", '<select id="apC">' + cats.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + "</select>") +
       campo("apU", "Unidad", '<input id="apU" value="' + (s === "farmacos" ? "vial" : "unidad") + '" autocomplete="off">') +
@@ -387,20 +389,30 @@
     var id = el && el.getAttribute && el.getAttribute("data-id"), m = id ? H.fila("Material", id) : { ID: "MAT-" + H.uid(), Activo: true, Stock_inicial: 0, Tipo: "Fungible", Categoria: "Fungible general", Ubicacion: UB[0] }, ges = H.puede("inventario"), nuevo = !id;
     if (!m) return;
     function val(k) { return m[k] === undefined || m[k] === null ? "" : m[k]; }
-    function f(k, et, o) { o = o || {}; return campo("em_" + k, et, '<input id="em_' + k + '"' + (o.num ? ' inputmode="decimal" data-num="1"' : "") + ' value="' + esc(String(val(k)).replace(o.num ? "." : "\u0000", ",")) + '" autocomplete="off"' + (o.dis || !ges ? " disabled" : "") + ">", o.ayuda); }
+    function f(k, et, o) { o = o || {}; return campo("em_" + k, et, '<input id="em_' + k + '"' + (o.tipo ? ' type="' + o.tipo + '"' : "") + (o.num ? ' inputmode="decimal" data-num="1"' : "") + ' value="' + esc(String(val(k)).replace(o.num ? "." : "\u0000", ",")) + '" autocomplete="off"' + (o.dis || !ges ? " disabled" : "") + ">", o.ayuda); }
     function sel(k, et, ops, nombres) { var v = val(k) || ops[0]; if (ops.indexOf(v) === -1) ops = [v].concat(ops); return campo("em_" + k, et, '<select id="em_' + k + '"' + (ges ? "" : " disabled") + ">" + ops.map(function (c, i) { return '<option value="' + esc(c) + '"' + (v === c ? " selected" : "") + ">" + esc((nombres && nombres[i]) || c || "—") + "</option>"; }).join("") + "</select>"); }
-    var reglas = [""].concat(Object.keys(C.REGLAS)), cat = H.buscarEnCatalogo(m);
-    if (m.Regla && reglas.indexOf(m.Regla) === -1) reglas.push(m.Regla);
-    H.modal({ titulo: nuevo ? "Nuevo material" : (ges ? "Editar " : "Ficha de ") + m.Nombre, ancho: true, cuerpo: (ges ? "" : soloGestor()) + '<div class="rejilla dos">' + f("Nombre", "Nombre", { ayuda: "Formato: nombre genérico + marca o modelo + dosis o concentración + envase, en español." + (cat && cat.Nombre !== m.Nombre ? " En el catálogo: «" + esc(cat.Nombre) + "»." : "") }) + sel("Categoria", "Sección", H.CATS_MAT) + f("Unidad", "Unidad") + f("Referencia", "Referencia") + f("Proveedor", "Proveedor") +
+    var cat = H.buscarEnCatalogo(m), hist = H.expedientesHist(m), ex = H.expedienteEstado(m), inactivo = m.Activo === false || m.Activo === "FALSE";
+    var expHTML = '<h3 class="sub">Tipo y vía de suministro' + info("Inventariable e instrumental: no se consumen ni se reponen. Farmacia: entra en la lista descargable para la farmacia del hospital. Contrato menor (CM) o licitación: genera pedidos al proveedor con el nº de expediente; las unidades restantes = adjudicadas − consumidas antes de HOME − pedidas desde HOME. Cuando el expediente se acaba, abre uno nuevo: el anterior queda en el historial.") + "</h3>" +
+      '<div class="rejilla dos">' + sel("Tipo", "Tipo", H.TIPOS_MAT) + sel("Via", "Vía de suministro", H.VIAS_MAT) + f("Expediente", "Nº de expediente (CM o licitación)") + f("Expediente_inicio", "Inicio del expediente", { tipo: "date" }) +
+      f("Unidades_contrato", "Unidades adjudicadas en el expediente", { num: 1 }) + f("Unidades_previas", "Consumidas antes de registrar en HOME" + info("Unidades de este expediente que ya se pidieron o gastaron antes de empezar a usar HOME. Se restan de las adjudicadas."), { num: 1 }) +
+      f("Email_proveedor", "Correo del proveedor para los pedidos") + "</div>" + (ex ? expedienteResumen(m, ex) : "") +
+      (ges && !nuevo ? '<div class="fila-flex v71-exp-acc"><button type="button" class="bt" data-act="expNuevo" data-id="' + esc(m.ID) + '">' + ico("folder-plus", "s") + "Abrir un nuevo expediente (CM o licitación)</button></div>" : "") +
+      (hist.length ? '<details class="plegable v71-hist"' + (ex && ex.estado === "al" ? " open" : "") + "><summary>Historial de expedientes (" + hist.length + ')</summary><div class="dentro"><div class="tabla-env"><table class="t tabla-exp"><thead><tr><th>Expediente</th><th>Vía</th><th>Inicio</th><th>Cierre</th><th class="num">Adjudicadas</th><th class="num">Consumidas</th><th class="num">Restantes</th><th>Cerrado por</th></tr></thead><tbody>' +
+        hist.slice().reverse().map(function (x) { var cons = (C.num(x.Previas) || 0) + (C.num(x.Pedidas) || 0), adj = C.num(x.Adjudicadas); return "<tr><td><b>" + esc(x.Expediente || "—") + "</b></td><td>" + esc(x.Via || "") + "</td><td>" + esc(x.Inicio ? H.fechaDMA(x.Inicio) : "—") + "</td><td>" + esc(x.Fin ? H.fechaDMA(x.Fin) : "—") + '</td><td class="num">' + H.n(adj, 0) + '</td><td class="num">' + H.n(cons, 0) + '</td><td class="num">' + (adj === null ? "—" : H.n(adj - cons, 0)) + "</td><td>" + esc(x.Cerrado_por || "") + "</td></tr>"; }).join("") + "</tbody></table></div></div></details>" : "");
+    var cuerpo = (ges ? "" : soloGestor()) + (inactivo ? aviso("aj", "<b>Dado de baja</b>: no aparece en el inventario ni en la preparación. Sus movimientos se conservan.", "archive") : "") +
+      '<div class="rejilla dos">' + f("Nombre", "Nombre", { ayuda: cat && cat.Nombre !== m.Nombre ? "En el catálogo: «" + esc(cat.Nombre) + "»." : "" }) + sel("Categoria", "Sección", H.CATS_MAT) + f("Unidad", "Unidad") + f("Referencia", "Referencia") + f("Proveedor", "Proveedor") +
       campo("em_Ubicacion", "Ubicación", selUbic("em_Ubicacion", m.Ubicacion, !ges)) +
-      f("Stock_inicial", "Stock inicial", { num: 1, dis: !nuevo, ayuda: "El stock actual = stock inicial + entradas − consumos." }) + f("Stock_minimo", "Stock mínimo (alerta)", { num: 1 }) + f("Por_perfusion", "Cantidad por perfusión (7 días)", { num: 1, ayuda: "Se usa si no hay regla y para la reposición." }) +
-      sel("Regla", "Regla de cantidad", reglas, reglas.map(function (r) { return r ? C.reglaTexto(r) : "Sin regla (cantidad fija de la ficha)"; })) + f("Notas", "Notas") + "</div>" +
-      '<h3 class="sub">Tipo y vía de suministro</h3><div class="rejilla dos">' + sel("Tipo", "Tipo", H.TIPOS_MAT) + sel("Via", "Vía de suministro", H.VIAS_MAT) + f("Expediente", "Nº de expediente (contrato menor o licitación)") + f("Unidades_contrato", "Unidades adjudicadas en el expediente", { num: 1, ayuda: C.num(m.Unidades_pedidas) ? "Pedidas hasta ahora: " + H.n(m.Unidades_pedidas, 0) : "" }) + f("Email_proveedor", "Correo del proveedor para los pedidos") + "</div>" +
-      '<p class="muy-tenue">Inventariable e instrumental: no se consumen ni se reponen. Farmacia: entra en la lista descargable para la farmacia del hospital. Contrato menor o licitación: genera pedidos al proveedor con el nº de expediente.</p>' +
-      (ges && !nuevo ? '<label class="check"><input type="checkbox" id="em_Activo"' + (m.Activo === false || m.Activo === "FALSE" ? "" : " checked") + "> Activo (desmarca para retirarlo del catálogo)</label>" : ""),
-      pie: '<button class="bt" data-cerrar>' + (ges ? "Cancelar" : "Cerrar") + "</button>" + (ges ? '<button class="bt pri" id="emOk">Guardar</button>' : ""),
-      alAbrir: function (d) { var ok = d.querySelector("#emOk"); if (!ok) return; ok.addEventListener("click", function () {
-        var o = { ID: m.ID }; ["Nombre", "Categoria", "Unidad", "Referencia", "Proveedor", "Ubicacion", "Notas", "Tipo", "Via", "Expediente", "Email_proveedor", "Regla"].forEach(function (k) { o[k] = d.querySelector("#em_" + k).value.trim(); }); o.Unidades_contrato = C.num(d.querySelector("#em_Unidades_contrato").value);
+      f("Stock_inicial", "Stock inicial", { num: 1, dis: !nuevo, ayuda: "Stock actual = inicial + entradas − consumos." }) + f("Stock_minimo", "Stock mínimo (alerta)", { num: 1 }) + f("Por_perfusion", "Cantidad por perfusión (7 días)", { num: 1, ayuda: "Para la regla «fija» y para la reposición." }) +
+      reglaCampo(m, ges) + f("Notas", "Notas") + "</div>" + expHTML +
+      (ges && !nuevo ? '<label class="check"><input type="checkbox" id="em_Activo"' + (inactivo ? "" : " checked") + "> Activo (desmarca para darlo de baja)</label>" : "");
+    var pie = '<button class="bt" data-cerrar>' + (ges ? "Cancelar" : "Cerrar") + "</button>" + (ges && !nuevo ? '<button class="bt peligro v71-borrar" id="emDel">' + ico("trash-2", "s") + (H.movimientosDe(m.ID).length ? "Dar de baja" : "Eliminar") + "</button>" : "") + (ges ? '<button class="bt pri" id="emOk">Guardar</button>' : "");
+    H.modal({ titulo: nuevo ? "Nuevo material" : (ges ? "Editar " : "Ficha de ") + m.Nombre, ancho: true, cuerpo: cuerpo, pie: pie,
+      alAbrir: function (d) {
+        reglaEnlazar(d, m); var del = d.querySelector("#emDel"); if (del) del.addEventListener("click", function () { d.close(); H.matEliminar(m.ID); });
+        var ok = d.querySelector("#emOk"); if (!ok) return; ok.addEventListener("click", function () {
+        var o = { ID: m.ID }; ["Nombre", "Categoria", "Unidad", "Referencia", "Proveedor", "Ubicacion", "Notas", "Tipo", "Via", "Expediente", "Expediente_inicio", "Email_proveedor"].forEach(function (k) { o[k] = d.querySelector("#em_" + k).value.trim(); });
+        o.Regla = reglaLeer(d, m); o.Unidades_contrato = C.num(d.querySelector("#em_Unidades_contrato").value); o.Unidades_previas = C.num(d.querySelector("#em_Unidades_previas").value);
+        if (o.Unidades_previas !== null && o.Unidades_previas < 0) { H.toast("Las unidades consumidas antes de HOME no pueden ser negativas.", "error"); return; }
         ["Stock_inicial", "Stock_minimo", "Por_perfusion"].forEach(function (k) { var i = d.querySelector("#em_" + k); if (!i.disabled) o[k] = C.num(i.value); }); var ac = d.querySelector("#em_Activo"); if (ac) o.Activo = ac.checked; else if (nuevo) o.Activo = true;
         if (CAJAS_N().indexOf(o.Categoria) !== -1 || o.Categoria === "Instrumental suelto") o.Tipo = "Instrumental";
         if (!o.Nombre) { H.toast("El nombre es obligatorio.", "error"); return; } H.guardar("Material", [o]); d.close(); }); } });
@@ -430,26 +442,28 @@
     var h2 = vInv0(["stock"], q).replace(/<nav class="pestanas">[\s\S]*$/, "");
     return h2.replace(/(<h1>Inventario<\/h1>)/, "$1" + botonesInv()) + navInv(s) + stockPestana(s) + "</div>";
   };
-  function botonesInv() { return (H.puede("inventario") ? '<button class="bt" data-act="cargarCatalogo">' + ico("list-checks") + "Cargar catálogo</button>" : "") + (H.esGestorInv() || H.esAdmin() ? '<a class="bt" href="#/config/inventario">' + ico("settings") + "Gestión del inventario</a>" : ""); }
+  // v0.7.1: «Cargar catálogo» visible para todos (sin ser gestor, explica quién lo carga) y con aviso si faltan productos del catálogo
+  function botonesInv() { return '<button class="bt v71-cat" data-act="cargarCatalogo"' + (H.puede("inventario") ? "" : ' aria-describedby="v71CatNo"') + ">" + ico("list-checks") + "Cargar catálogo</button>" + (H.esGestorInv() || H.esAdmin() ? '<a class="bt" href="#/config/inventario">' + ico("settings") + "Gestión del inventario</a>" : ""); }
   function navInv(s) {
     var mats = activos(), n = {}; mats.forEach(function (m) { var k = pestanaDe(m); n[k] = (n[k] || 0) + 1; });
     var solP = H.filas("Solicitudes").filter(function (x) { return x.Estado === "Pendiente"; }).length;
     var tabs = PESTANAS.map(function (x) { return [x[0], x[1], x[2], n[x[0]] || 0]; }).concat([["solicitudes", "Solicitudes" + (solP ? " (" + solP + ")" : ""), "shopping-cart"], ["movimientos", "Movimientos", "history"]]).concat(H.tabsInv());
     return '<nav class="pestanas inv-tabs">' + tabs.map(function (t) { return '<a href="#/inventario/' + t[0] + '" class="' + (t[0] === s ? "activo" : "") + '"' + (t[0] === s ? ' aria-current="page"' : "") + ">" + ico(t[2], "s") + t[1] + (t[3] !== undefined ? ' <span class="n">' + t[3] + "</span>" : "") + "</a>"; }).join("") + "</nav>";
   }
-  var COLS_INV = '<colgroup><col class="c-mat"><col class="c-ub"><col class="c-n"><col class="c-n"><col class="c-n"><col class="c-n"><col class="c-niv"><col class="c-acc"></colgroup>';
+  var COLS_INV = '<colgroup><col class="c-mat"><col class="c-ub"><col class="c-st"><col class="c-n"><col class="c-n"><col class="c-n"><col class="c-niv"><col class="c-acc"></colgroup>';
   function stockPestana(s) {
     var mats = activos().filter(function (m) { return pestanaDe(m) === s; }), ges = H.puede("inventario"), mov = H.puede("movimientos");
     var bajo = activos().filter(function (m) { var mn = C.num(m.Stock_minimo); return !sinConsumo(m) && mn !== null && H.stockDe(m) < mn; });
     var malUb = activos().filter(function (m) { return UB.indexOf(m.Ubicacion) === -1; });
     var cab = (bajo.length ? aviso("aj", "<b>" + bajo.length + " material(es) por debajo del mínimo:</b> " + esc(bajo.map(function (m) { return m.Nombre; }).join(", ")) + ". El gestor de inventario recibe un aviso al cruzar el mínimo.", "triangle-alert") : "") +
-      (malUb.length && ges ? aviso("info", "<b>" + malUb.length + " material(es) sin una ubicación válida.</b> Elige en la columna «Ubicación» uno de los tres sitios: " + esc(UB.join(" · ")) + ".") : "") + (ges ? "" : soloGestor());
-    if (!mats.length) return cab + '<div class="vacio">' + ico("package", "l") + "<p>No hay material en esta pestaña.</p>" + (ges ? '<p class="tenue">Pulsa «Cargar catálogo» para incorporar todo el material del protocolo, o «Nuevo material».</p>' : "") + "</div>";
+      (malUb.length && ges ? aviso("info", "<b>" + malUb.length + " material(es) sin una ubicación válida.</b> Elige en la columna «Ubicación» uno de los tres sitios: " + esc(UB.join(" · ")) + ".") : "") + (ges ? avisoCatalogo() + avisoExpedientes() : soloGestor());
+    var bajas = H.filas("Material").filter(function (m) { return (m.Activo === false || m.Activo === "FALSE") && pestanaDe(m) === s; });
+    if (!mats.length) return cab + bajasHTML(bajas, ges) + '<div class="vacio">' + ico("package", "l") + "<p>No hay material en esta pestaña.</p>" + (ges ? '<p class="tenue">Pulsa «Cargar catálogo» para incorporar todo el material del protocolo, o «Nuevo material».</p>' : "") + "</div>";
     return cab + porSeccion(mats, s).map(function (g) {
       return '<section class="tarjeta"><div class="cabecera"><h2>' + esc(g.nombre) + '</h2><span class="chip">' + g.items.length + '</span></div><div class="tabla-env"><table class="t tabla-inv">' + COLS_INV + '<thead><tr><th>Material</th><th>Ubicación</th><th class="num">Stock</th><th class="num">Mínimo</th><th class="num">' + (s === "inventariable" ? "Unidades" : "Por perfusión") + '</th><th class="num">Perfusiones</th><th>Nivel</th><th><span class="sr">Acciones</span></th></tr></thead><tbody>' +
         g.items.sort(function (a, b) { return String(a.Nombre).localeCompare(String(b.Nombre), "es"); }).map(function (m) {
           var st = H.stockDe(m), mn = C.num(m.Stock_minimo), pp = C.num(m.Por_perfusion), sc = sinConsumo(m), niv = st <= 0 ? "al" : mn !== null && st < mn ? "aj" : "", ancho = mn ? Math.min(100, st / (mn * 2) * 100) : 100, nivT = niv === "al" ? "Agotado" : niv ? "Bajo mínimo" : "Correcto";
-          return '<tr data-id="' + esc(m.ID) + '"><td><span class="nom"><b>' + esc(m.Nombre) + "</b></span>" + (H.chipsMat ? H.chipsMat(m) : "") + '<span class="muy-tenue ref">' + (m.Referencia ? "Ref. " + esc(m.Referencia) : "") + (m.Regla ? (m.Referencia ? " · " : "") + esc(C.reglaTexto(m.Regla)) : "") + "</span></td>" +
+          return '<tr data-id="' + esc(m.ID) + '"><td><span class="nom"><b>' + esc(m.Nombre) + "</b></span>" + (H.chipsMat ? H.chipsMat(m) : "") + '<span class="muy-tenue ref">' + (m.Referencia ? "Ref. " + esc(m.Referencia) : "") + (m.Regla && !sc ? (m.Referencia ? " · " : "") + esc(C.reglaTexto(m.Regla)) : "") + "</span></td>" +
             "<td>" + (ges ? '<select class="sel-ub" aria-label="Ubicación de ' + esc(m.Nombre) + '" data-cambio="matUbic" data-id="' + esc(m.ID) + '">' + (UB.indexOf(m.Ubicacion) === -1 ? '<option value="" selected>— elige —</option>' : "") + UB.map(function (u) { return "<option" + (u === m.Ubicacion ? " selected" : "") + ">" + esc(u) + "</option>"; }).join("") + "</select>" : '<span class="' + (UB.indexOf(m.Ubicacion) === -1 ? "muy-tenue" : "") + '">' + esc(m.Ubicacion || "—") + "</span>") + "</td>" +
             '<td class="num"><b>' + H.n(st, 1) + "</b> " + esc(m.Unidad || "") + '</td><td class="num">' + H.n(mn, 1) + '</td><td class="num">' + H.n(pp, 1) + '</td><td class="num">' + (!sc && pp ? H.n(Math.floor(st / pp), 0) : "—") + "</td>" +
             '<td><div class="barra-stock ' + niv + '" title="' + nivT + '"><i style="width:' + ancho + '%"></i></div><span class="sr">' + nivT + "</span></td>" +
@@ -457,7 +471,7 @@
             (ges ? '<button class="bt mini" data-act="editarMat" data-id="' + esc(m.ID) + '" aria-label="Editar ' + esc(m.Nombre) + '">' + ico("pencil", "s") + "</button>" : '<button class="bt mini" data-act="verMat" data-id="' + esc(m.ID) + '" aria-label="Ver la ficha de ' + esc(m.Nombre) + '">' + ico("info", "s") + "</button>") +
             (H.puede("solicitar") ? '<button class="bt mini" data-act="nuevaSol" data-id="' + esc(m.ID) + '" aria-label="Solicitar ' + esc(m.Nombre) + '">' + ico("shopping-cart", "s") + "</button>" : "") + "</div></td></tr>";
         }).join("") + "</tbody></table></div></section>";
-    }).join("");
+    }).join("") + bajasHTML(bajas, ges);
   }
 
   // ============================================================== 7. CONFIGURACIÓN › INVENTARIO (antes «Reposición» + «Pedidos») y PROEX
@@ -481,8 +495,15 @@
     else if (sub === "pedidos") cuerpo = cfgPedidosHTML() + pedidosHTML();
     else { var keep = H.esAdmin; H.esAdmin = function () { return true; }; try { cuerpo = H.seccionesExtra.reposicion(); } finally { H.esAdmin = keep; }
       if (!adm) cuerpo = cuerpo.replace(/data-cambio="repCampo"/g, 'data-cambio="repCampo" disabled');
-      if (!ges) cuerpo = cuerpo.replace('data-act="repEnviar"', 'data-act="repEnviar" disabled'); }
+      if (!ges) cuerpo = cuerpo.replace('data-act="repEnviar"', 'data-act="repEnviar" disabled');
+      cuerpo = infoReposicion(cuerpo); }
     return '<div class="v7d-inv">' + estado + nav + cuerpo + "</div>";
+  }
+  // v0.7.1: textos de la reposición (v0.2) con reglas → botón (i); queda una línea descriptiva
+  function infoReposicion(h) {
+    return h.replace(/<h2>Aviso de reposición de material<\/h2><\/div><p class="tenue">([^<]*)<\/p>/, function (x, t) { return "<h2>Aviso de reposición de material" + info(t.replace("a los administradores", "a los gestores de inventario")) + '</h2></div><p class="tenue">Correo diario con la lista de material a reponer.</p>'; })
+      .replace(/<p class="muy-tenue">(Fórmula \(igual en la web y en el servidor\)[^<]*)<\/p>/, function (x, t) { return '<p class="muy-tenue">A reponer: mínimo + una perfusión − stock.' + info(t) + "</p>"; })
+      .replace(/<span class="muy-tenue">(El asunto indica si es antes o después[^<]*)<\/span>/, function (x, t) { return info(t); });
   }
   function gestoresHTML() {
     var adm = H.esAdmin(), l = H.filas("Usuarios").filter(function (u) { return u.Activo !== false && u.Activo !== "FALSE"; });
@@ -495,8 +516,8 @@
   }
   H.acc.gestorInv = function (el) { if (!H.esAdmin()) return; H.guardar("Usuarios", [{ ID: el.getAttribute("data-id"), Gestor_inventario: el.checked }]).then(function () { H.pintarMarco(); H.repintar(); }, function () { }); H.toast(el.checked ? "Gestor de inventario añadido." : "Gestor de inventario retirado."); };
   function cfgPedidosHTML() {
-    var c = S.cfg.pedidos || C.DEF.pedidos || {}, adm = H.esAdmin(), K = [["envio_automatico", "Enviar los pedidos automáticos sin revisar (true/false)"], ["cc", "Copia de los pedidos a (correos, separados por comas)"], ["asunto", "Asunto del pedido ({expediente}, {proveedor})"], ["texto", "Texto del pedido"], ["firma", "Firma"]];
-    return '<details class="plegable"><summary>Parámetros de los pedidos</summary><div class="dentro"><div class="rejilla dos">' + K.filter(function (k) { return c.hasOwnProperty(k[0]); }).map(function (k) { var v = c[k[0]], l = Array.isArray(v); return campo("cfgp_" + k[0], esc(k[1]), '<input id="cfgp_' + k[0] + '" value="' + esc(l ? v.join(", ") : String(v)) + '" data-cambio="cfgCampo" data-c="pedidos" data-k="' + k[0] + '" data-lista="' + (l ? "t" : "") + '" autocomplete="off"' + (adm ? "" : " disabled") + ">"); }).join("") + "</div>" + (adm ? "" : '<p class="muy-tenue">Los parámetros los cambia un administrador.</p>') + "</div></details>";
+    var c = Object.assign({ aviso_expediente_pct: 20 }, S.cfg.pedidos || C.DEF.pedidos || {}), adm = H.esAdmin(), K = [["envio_automatico", "Enviar los pedidos automáticos sin revisar (true/false)"], ["cc", "Copia de los pedidos a (correos, separados por comas)"], ["asunto", "Asunto del pedido ({expediente}, {proveedor})"], ["texto", "Texto del pedido"], ["firma", "Firma"], ["aviso_expediente_pct", "Aviso de fin de expediente: cuando queden menos del … % de las unidades adjudicadas"]];   // v0.7.1
+    return '<details class="plegable"><summary>Parámetros de los pedidos</summary><div class="dentro"><div class="rejilla dos">' + K.filter(function (k) { return c.hasOwnProperty(k[0]); }).map(function (k) { var v = c[k[0]], l = Array.isArray(v); return campo("cfgp_" + k[0], esc(k[1]), '<input id="cfgp_' + k[0] + '" value="' + esc(l ? v.join(", ") : String(v)) + '" data-cambio="cfgCampo" data-c="pedidos" data-k="' + k[0] + '" data-lista="' + (l ? "t" : "") + '"' + (k[0] === "aviso_expediente_pct" ? ' inputmode="numeric" data-num="1"' : "") + ' autocomplete="off"' + (adm ? "" : " disabled") + ">"); }).join("") + "</div>" + (adm ? "" : '<p class="muy-tenue">Los parámetros los cambia un administrador.</p>') + "</div></details>";
   }
   // PROEX (procedimientos autorizados) y datos del censo
   C.DEF.proex = { defecto: "084.6/23", lista: [{ codigo: "084.6/23", proyecto: "PI23", ip: "FONDEVILA", activo: true }], especie: "SUIDO", cepa: "LW", sala: "Grandes 1" };
@@ -505,7 +526,7 @@
   H.proexDe = function (e) { return (e && String(e.PROEX || "").trim()) || cfgProex().defecto; };
   function seccionProex() {
     var c = cfgProex();
-    return '<section class="tarjeta"><div class="cabecera"><h2>PROEX de la investigación</h2><button class="bt pri" data-act="proexNuevo">' + ico("plus") + "Añadir PROEX</button></div><p class=\"tenue\">Procedimientos autorizados. Cada experimento lleva el suyo (se elige al programarlo o editarlo); el marcado como «por defecto» es el que se asigna si no se indica. El censo mensual hace una fila por PROEX.</p>" +
+    return '<section class="tarjeta"><div class="cabecera"><h2>PROEX de la investigación ' + H.botonInfo("Procedimientos autorizados. Cada experimento lleva el suyo (se elige al programarlo o editarlo); el marcado como «por defecto» es el que se asigna si no se indica. El censo mensual hace una fila por PROEX.") + '</h2><button class="bt pri" data-act="proexNuevo">' + ico("plus") + "Añadir PROEX</button></div>" +
       '<div class="tabla-env"><table class="t tabla-proex"><thead><tr><th>PROEX</th><th>Proyecto</th><th>IP (censo)</th><th>Por defecto</th><th>Activo</th><th class="num">Experimentos</th></tr></thead><tbody>' + c.lista.map(function (x, i) {
         var n = H.filas("Experimentos").filter(function (e) { return H.proexDe(e) === x.codigo; }).length;
         return '<tr><td><input value="' + esc(x.codigo) + '" aria-label="Código PROEX" data-cambio="proexCampo" data-i="' + i + '" data-k="codigo" autocomplete="off"></td><td><input value="' + esc(x.proyecto || "") + '" aria-label="Proyecto" data-cambio="proexCampo" data-i="' + i + '" data-k="proyecto" autocomplete="off" placeholder="PI24…"></td><td><input value="' + esc(x.ip || "") + '" aria-label="Investigador principal" data-cambio="proexCampo" data-i="' + i + '" data-k="ip" autocomplete="off"></td>' +
@@ -604,8 +625,8 @@
   function censoHTML() {
     var c = selCenso(), anios = {}, h = new Date().getFullYear(); [h - 1, h, h + 1].forEach(function (a) { anios[a] = 1; }); H.filas("Experimentos").forEach(function (e) { var a = Number(String(e.Fecha_cirugia || "").slice(0, 4)); if (a > 2000) anios[a] = 1; });
     var d = c.mes ? H.censoDatos(c.anio, c.mes) : null;
-    return '<section class="tarjeta censo-sec"><div class="cabecera"><h2>' + ico("file-spreadsheet", "s") + ' Censo mensual de animales</h2><span class="muy-tenue">Formato «MODELO CENSO ANIMALES»</span></div>' +
-      '<p class="tenue">Una fila por PROEX con los cerdos del proyecto: <b>Nº animales</b> = presentes algún día del mes (los dos donantes desde su llegada hasta la cirugía y el receptor desde su llegada hasta el sacrificio); <b>Nº animales usados</b> = los dos donantes en el mes de la cirugía y el receptor en el del trasplante. Solo se rellenan nuestros datos (SUIDOS en los totales).</p>' +
+    return '<section class="tarjeta censo-sec"><div class="cabecera"><h2>' + ico("file-spreadsheet", "s") + " Censo mensual de animales" + info("Nº animales = cerdos presentes algún día del mes (los dos donantes desde su llegada hasta la cirugía y el receptor desde su llegada hasta el sacrificio). Nº animales usados = los dos donantes en el mes de la cirugía y el receptor en el del trasplante. Solo se rellenan nuestros datos (SUIDOS en los totales).") + '</h2><span class="muy-tenue">Formato «MODELO CENSO ANIMALES»</span></div>' +
+      '<p class="tenue">Una fila por PROEX con los cerdos del proyecto.</p>' +
       '<div class="fila-flex censo-sel"><div class="campo"><label class="et" for="censoMes">Mes</label><select id="censoMes" data-cambio="censoSel" data-k="mes">' + C.MESES.map(function (m, i) { return '<option value="' + (i + 1) + '"' + (c.mes === i + 1 ? " selected" : "") + ">" + m.charAt(0) + m.slice(1).toLowerCase() + "</option>"; }).join("") + '<option value="0"' + (!c.mes ? " selected" : "") + ">Todo el año (una hoja por mes)</option></select></div>" +
       '<div class="campo"><label class="et" for="censoAnio">Año</label><select id="censoAnio" data-cambio="censoSel" data-k="anio">' + Object.keys(anios).sort().map(function (a) { return '<option value="' + a + '"' + (Number(a) === c.anio ? " selected" : "") + ">" + a + "</option>"; }).join("") + "</select></div>" +
       '<button class="bt pri" data-act="censoDescargar">' + ico("download") + "Descargar el censo (.xlsx)</button></div>" +
@@ -668,12 +689,260 @@
       else { s = (g.refs || []).map(function (r) { return ref(r[0], r[1], r[2], r[3]); }).join("") + '<path d="' + g.d + '" fill="none" stroke="' + c + '" stroke-width="2"/>' + flecha(g.ini[0], g.ini[1], g.ini[2], g.ini[3], c) + flecha(g.fin[0], g.fin[1], g.fin[2], g.fin[3], c); }
       return '<g class="mf-cota" data-m="' + k + '">' + s + et(g.et[0], g.et[1], k, c) + "</g>";
     }
-    return { VB: VB, COL: COL, G: G, cerdo: cerdo, svg: function (solo) { return '<svg class="morfo-svg" data-zoom viewBox="' + VB + '" role="img" aria-label="Cerdo Large White de perfil con las medidas morfométricas">' + cerdo + (solo ? "" : Object.keys(G).map(cota).join("")) + "</svg>"; } };
+    return { VB: VB, COL: COL, G: G, cerdo: cerdo, cota: cota, svg: function (solo) { return '<svg class="morfo-svg" data-zoom viewBox="' + VB + '" role="img" aria-label="Cerdo Large White de perfil con las medidas morfométricas">' + cerdo + (solo ? "" : Object.keys(G).map(cota).join("")) + "</svg>"; } };
   }
 
   var MF = morfoFabrica();
   H.MORFO_VB = MF.VB; H.MORFO_COL = MF.COL; H.MORFO_GEOM = MF.G;
   H.morfoSVG = function (soloCerdo) { return soloCerdo ? MF.cerdo : MF.svg(false); };
+
+  // ============================================================== 10. v0.7.1 · Materiales: regla de cantidad simplificada, expedientes (CM / licitación) con
+  // historial, eliminar o dar de baja material, y vídeo de cómo tomar las medidas morfométricas dentro de la app.
+  // ---- 10.1 Regla de cantidad: 5 opciones claras; cada una con sus parámetros. Se guarda la misma clave de C.REGLAS (compatibles con el catálogo).
+  var MODOS_REGLA = [["fijo", "Fija por perfusión"], ["dia", "Por día de perfusión"], ["muestra", "Por muestra o tubo (plan de muestreo)"], ["protocolo", "Según el protocolo"], ["a_demanda", "Solo si hace falta (no se prepara)"]];
+  var OPC_DIA = [["por_dia", "Una cantidad al día"], ["prop7", "Proporcional a los días (la «cantidad por perfusión» es para 7 días)"]];
+  var OPC_MUESTRA = [["tubo:LH", "1 por tubo de heparina de litio (LH)"], ["tubo:EDTA", "1 por tubo de EDTA"], ["tubo:AMA", "1 por tubo de suero con gel (amarillo)"], ["tubo:CIT", "1 por tubo de citrato (azul)"], ["tubo:GAS", "1 por jeringa de gasometría"],
+    ["puntas", "Puntas de pipeta: 1 por tubo de EDTA"], ["microtubos", "Microtubos: 3 por EDTA + 2 por bilis + 2 por filtrado"], ["aceite_bilis", "Aceite mineral: 2,5 mL por muestra de bilis"]];
+  function opcProtocolo(actual) {
+    var l = ["heparina", "periolimel", "fosfato", "usos_sonda"]; C.CATALOGO.forEach(function (c) { if (/^protocolo:/.test(c.Regla) && l.indexOf(c.Regla) === -1) l.push(c.Regla); });
+    if (actual && l.indexOf(actual) === -1) l.push(actual); return l.map(function (r) { return [r, r === "usos_sonda" ? "Usos de la sonda de flujo (1 en el donante; +2 con trasplante)" : C.reglaTexto(r)]; });
+  }
+  H.REGLA_MODOS = MODOS_REGLA;
+  // clave de C.REGLAS → {modo, p (opción), n (cantidad al día)}
+  H.reglaPartes = function (r) {
+    r = String(r || "").trim(); var m;
+    if (!r || r === "fijo") return { modo: "fijo", p: r };
+    if (r === "prop7") return { modo: "dia", p: "prop7", n: 1 };
+    if ((m = /^por_dia:(.+)$/.exec(r))) return { modo: "dia", p: "por_dia", n: C.num(m[1]) || 1 };
+    if (/^tubo:/.test(r) || /^(puntas|microtubos|aceite_bilis)$/.test(r)) return { modo: "muestra", p: r };
+    if (r === "a_demanda") return { modo: "a_demanda", p: "" };
+    return { modo: "protocolo", p: r };   // heparina, periolimel, fosfato, usos_sonda, protocolo:… o un texto propio (se conserva)
+  };
+  // {modo, p, n} → clave; «antes» conserva «sin regla» ("") si sigue siendo fija
+  H.reglaDe = function (o, antes) {
+    o = o || {};
+    if (o.modo === "fijo") return antes === "" || antes === undefined || antes === null ? (o.p === "fijo" ? "fijo" : "") : "fijo";
+    if (o.modo === "dia") return o.p === "prop7" ? "prop7" : "por_dia:" + String(C.num(o.n) > 0 ? C.num(o.n) : 1).replace(",", ".");
+    if (o.modo === "muestra") return OPC_MUESTRA.some(function (x) { return x[0] === o.p; }) ? o.p : "tubo:EDTA";
+    if (o.modo === "a_demanda") return "a_demanda";
+    return o.p || "heparina";
+  };
+  function reglaSub(modo, pa, ges) {
+    var dis = ges ? "" : " disabled";
+    function selO(ops, v, et) { return '<select id="em_ReglaP" aria-label="' + et + '"' + dis + ">" + ops.map(function (x) { return '<option value="' + esc(x[0]) + '"' + (x[0] === v ? " selected" : "") + ">" + esc(x[1]) + "</option>"; }).join("") + "</select>"; }
+    if (modo === "dia") return selO(OPC_DIA, pa.p || "por_dia", "Cómo se reparte por día") + (pa.p === "prop7" ? "" : '<span class="cant-u v71-n"><input id="em_ReglaN" inputmode="decimal" data-num="1" aria-label="Cantidad al día" value="' + esc(String(pa.n || 1).replace(".", ",")) + '"' + dis + "><span>al día</span></span>");
+    if (modo === "muestra") return selO(OPC_MUESTRA, pa.p || "tubo:EDTA", "Qué muestra o tubo se cuenta");
+    if (modo === "protocolo") return selO(opcProtocolo(pa.p), pa.p || "heparina", "Cálculo del protocolo");
+    return "";
+  }
+  function reglaCampo(m, ges) {
+    var pa = H.reglaPartes(m.Regla);
+    return '<div class="campo v71-regla"><label class="et" for="em_ReglaModo">Regla de cantidad' + info("Fija: la «cantidad por perfusión» de la ficha. Por día: N al día de perfusión, o proporcional a los días reales. Por muestra o tubo: según el plan de muestreo (tubos, microtubos, aceite…). Según el protocolo: lo calcula el protocolo de la perfusión (heparina, nutrición, fosfato…). Solo si hace falta: no se prepara ni se descuenta.") + "</label>" +
+      '<select id="em_ReglaModo"' + (ges ? "" : " disabled") + ">" + MODOS_REGLA.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === pa.modo ? " selected" : "") + ">" + esc(x[1]) + "</option>"; }).join("") + "</select>" +
+      '<div class="v71-regla-sub" id="em_ReglaSub">' + reglaSub(pa.modo, pa, ges) + '</div><div class="ayuda" id="em_ReglaPrev"></div></div>';
+  }
+  function reglaLeer(d, m) {
+    var mo = d.querySelector("#em_ReglaModo"); if (!mo) return m.Regla || "";
+    var p = d.querySelector("#em_ReglaP"), n = d.querySelector("#em_ReglaN");
+    return H.reglaDe({ modo: mo.value, p: p ? p.value : H.reglaPartes(m.Regla).p, n: n ? C.num(n.value) : null }, m.Regla === undefined ? "" : m.Regla);
+  }
+  function reglaEnlazar(d, m) {
+    var mo = d.querySelector("#em_ReglaModo"), sub = d.querySelector("#em_ReglaSub"), prev = d.querySelector("#em_ReglaPrev"); if (!mo) return;
+    function vista() {
+      var r = reglaLeer(d, m), pp = d.querySelector("#em_Por_perfusion"), x = { Regla: r, Por_perfusion: pp ? C.num(pp.value) : m.Por_perfusion, Tipo: m.Tipo }, dias = diasPrevistos(), c = C.cantidadMaterial(x, { dias: dias, tx: false, circ: S.cfg.circadiano, protocolo: { lineas: protLineas(C.versionActual()) } });
+      if (prev) prev.textContent = r === "a_demanda" ? "No se prepara: se añade a mano si hace falta." : "Para " + dias + " días: " + n1(C.r(c || 0, 2)) + " " + (d.querySelector("#em_Unidad") ? d.querySelector("#em_Unidad").value : m.Unidad || "") + " (" + C.reglaTexto(r || "fijo") + ").";
+    }
+    mo.addEventListener("change", function () { var pa = mo.value === H.reglaPartes(m.Regla).modo ? H.reglaPartes(m.Regla) : { modo: mo.value, p: "", n: 1 }; sub.innerHTML = reglaSub(mo.value, pa, true); vista(); });
+    d.addEventListener("change", function (ev) { if (ev.target && /^em_(ReglaP|ReglaN|Por_perfusion|Unidad)$/.test(ev.target.id)) { if (ev.target.id === "em_ReglaP" && mo.value === "dia") { var pa = { modo: "dia", p: ev.target.value, n: 1 }; sub.innerHTML = reglaSub("dia", pa, true); } vista(); } });
+    vista();
+  }
+
+  // ---- 10.2 Expedientes (contrato menor «CM» o licitación): adjudicadas, consumidas antes de HOME, pedidas desde HOME, restantes e historial
+  // Almacenamiento: columnas de Material Expediente, Via, Expediente_inicio, Unidades_contrato (adjudicadas), Unidades_previas (consumidas antes de HOME),
+  // Unidades_pedidas (servidor: pedidos Enviado/Recibido de ese expediente) y Expedientes_JSON (historial de los expedientes cerrados).
+  if (C.DEF.pedidos && C.DEF.pedidos.aviso_expediente_pct === undefined) C.DEF.pedidos.aviso_expediente_pct = 20;
+  function pctAviso() { var v = C.num(((S.cfg && S.cfg.pedidos) || {}).aviso_expediente_pct); if (v === null) v = C.num((C.DEF.pedidos || {}).aviso_expediente_pct); return v === null ? 20 : v; }
+  H.expedientesHist = function (m) { try { var l = typeof (m && m.Expedientes_JSON) === "string" ? JSON.parse(m.Expedientes_JSON || "[]") : (m && m.Expedientes_JSON) || []; return Array.isArray(l) ? l : []; } catch (e) { return []; } };
+  H.expedienteEstado = function (m) {
+    if (!m || (!m.Expediente && !/^(Contrato menor|Licitación)$/.test(String(m.Via || "")))) return null;
+    var adj = C.num(m.Unidades_contrato), prev = C.num(m.Unidades_previas) || 0, ped = C.num(m.Unidades_pedidas) || 0, cons = C.r(prev + ped, 2), pct = pctAviso();
+    var rest = adj === null ? null : C.r(adj - cons, 2), umbral = adj === null ? null : Math.max(1, Math.ceil(adj * pct / 100 - 1e-9)), pp = C.num(m.Por_perfusion) || 0;
+    var estado = rest === null ? "" : rest <= 0 ? "al" : rest <= umbral || (pp > 0 && rest < pp) ? "aj" : "ok";
+    return { via: m.Via || "", expediente: m.Expediente || "", adjudicadas: adj, previas: prev, pedidas: ped, consumidas: cons, restantes: rest, umbral: umbral, pct: pct, estado: estado };
+  };
+  function expedienteResumen(m, x) {
+    if (x.adjudicadas === null) return aviso("info", "Indica las <b>unidades adjudicadas</b> para seguir lo que queda del expediente" + (x.expediente ? " " + esc(x.expediente) : "") + ".");
+    var ancho = x.adjudicadas > 0 ? Math.max(0, Math.min(100, x.restantes / x.adjudicadas * 100)) : 0;
+    var txt = "<b>" + esc(x.expediente || "Expediente sin nº") + "</b>" + (x.via ? " · " + esc(x.via) : "") + ": " + H.n(x.adjudicadas, 0) + " adjudicadas − " + H.n(x.previas, 0) + " consumidas antes de HOME − " + H.n(x.pedidas, 0) + " pedidas desde HOME = <b>" + H.n(Math.max(0, x.restantes), 0) + " restantes</b>.";
+    return '<div class="v71-exp-estado ' + x.estado + '"><div>' + txt + '</div><div class="barra-stock ' + (x.estado === "ok" ? "" : x.estado) + '" title="Unidades restantes"><i style="width:' + ancho + '%"></i></div></div>' +
+      (x.estado === "al" ? aviso("al", "<b>Expediente agotado.</b> Abre un nuevo contrato menor o licitación para seguir pidiendo este producto.", "triangle-alert") : x.estado === "aj" ? aviso("aj", "<b>El expediente se está acabando:</b> quedan " + H.n(x.restantes, 0) + " de " + H.n(x.adjudicadas, 0) + " (aviso por debajo del " + H.n(x.pct, 0) + " % o de lo que gasta una perfusión). Prepara el siguiente CM o licitación.", "triangle-alert") : "");
+  }
+  H.expedienteResumenHTML = function (m) { var x = H.expedienteEstado(m); return x ? expedienteResumen(m, x) : ""; };
+  function expAvisables() { return activos().filter(function (m) { if (sinConsumo(m)) return false; var x = H.expedienteEstado(m); return x && (x.estado === "aj" || x.estado === "al"); }); }
+  H.expedientesPorAgotar = expAvisables;
+  function avisoExpedientes() {
+    var l = expAvisables(); if (!l.length) return "";
+    return aviso(l.some(function (m) { return H.expedienteEstado(m).estado === "al"; }) ? "al" : "aj", "<b>" + l.length + " expediente(s) agotados o a punto de agotarse:</b> " + l.map(function (m) { var x = H.expedienteEstado(m); return '<button type="button" class="bt mini" data-act="editarMat" data-id="' + esc(m.ID) + '">' + esc(m.Nombre) + " · " + esc(x.expediente || "sin nº") + " · quedan " + H.n(Math.max(0, x.restantes), 0) + "/" + H.n(x.adjudicadas, 0) + "</button>"; }).join(" ") + " Ábrelos para iniciar el siguiente CM o licitación.", "file-warning");
+  }
+  function avisoCatalogo() {
+    var p; try { p = H.planCatalogo(); } catch (e) { return ""; }
+    return p.altas.length ? aviso("info", "<b>Faltan " + p.altas.length + " producto(s) del catálogo de referencia</b> del protocolo en el inventario. " + '<button type="button" class="bt mini pri" data-act="cargarCatalogo">' + ico("list-checks", "s") + "Cargar catálogo</button>") : "";
+  }
+  // chip del expediente en las tablas: restantes / adjudicadas (antes: pedidas / adjudicadas)
+  H.chipsMat = function (m) {
+    var c = ""; if (m.Tipo && m.Tipo !== "Fungible") c += ' <span class="chip' + (m.Tipo === "Inventariable" ? " info" : "") + '">' + esc(m.Tipo) + "</span>";
+    if (m.Via) c += ' <span class="chip pri">' + esc(m.Via) + "</span>";
+    var x = m.Expediente ? H.expedienteEstado(m) : null;
+    if (x) c += ' <span class="chip v71-chip-exp' + (x.estado === "al" ? " al" : x.estado === "aj" ? " aj" : "") + '" title="Expediente: unidades restantes / adjudicadas">' + esc(m.Expediente) + (x.adjudicadas !== null ? " · quedan " + H.n(Math.max(0, x.restantes), 0) + "/" + H.n(x.adjudicadas, 0) : "") + "</span>";
+    return c;
+  };
+  function pedidasDe(id, exp, inicio) {
+    var e = String(exp || "").trim().toLowerCase(), t0 = inicio ? C.aFecha(inicio) : null, s = 0;
+    H.filas("Pedidos").forEach(function (p) {
+      if (!/^(Enviado|Recibido)$/.test(p.Estado || "")) return; var pe = String(p.Expediente || "").trim().toLowerCase(), f = C.aFecha(p.Fecha);
+      if (e && (pe ? pe !== e : t0 && f && f < t0)) return;
+      var ls = []; try { ls = typeof p.Lineas_JSON === "string" ? JSON.parse(p.Lineas_JSON || "[]") : p.Lineas_JSON || []; } catch (er) { ls = []; }
+      ls.forEach(function (l) { if (l.Material === id) s += C.num(l.Cantidad) || 0; });
+    });
+    return C.r(s, 2);
+  }
+  H.pedidasExpediente = pedidasDe;
+  H.acc.expNuevo = function (el) {
+    if (!H.puede("inventario")) return; var m = H.fila("Material", el.getAttribute("data-id")); if (!m) return;
+    var dlg = el.closest && el.closest("dialog"); if (dlg) dlg.close();
+    var x = H.expedienteEstado(m) || { adjudicadas: C.num(m.Unidades_contrato), previas: C.num(m.Unidades_previas) || 0, pedidas: C.num(m.Unidades_pedidas) || 0 }, hoy = C.diaISO(new Date()), via = /^(Contrato menor|Licitación)$/.test(m.Via || "") ? m.Via : "Contrato menor";
+    var antes = m.Expediente || x.adjudicadas !== null ? aviso("info", "El expediente actual <b>" + esc(m.Expediente || "sin nº") + "</b>" + (m.Via ? " (" + esc(m.Via) + ")" : "") + " se cierra hoy y pasa al historial" + (x.adjudicadas !== null ? " con " + H.n(x.adjudicadas, 0) + " adjudicadas, " + H.n((x.previas || 0) + (x.pedidas || 0), 0) + " consumidas y " + H.n(x.adjudicadas - (x.previas || 0) - (x.pedidas || 0), 0) + " restantes" : "") + ".") : "";
+    var cuerpo = antes + '<div class="rejilla dos">' + campo("enVia", "Vía", '<select id="enVia">' + ["Contrato menor", "Licitación"].map(function (v) { return "<option" + (v === via ? " selected" : "") + ">" + v + "</option>"; }).join("") + "</select>") +
+      campo("enExp", "Nº del nuevo expediente", '<input id="enExp" autocomplete="off" placeholder="CM-2027-…">') + campo("enIni", "Inicio", '<input id="enIni" type="date" value="' + hoy + '">') +
+      campo("enAdj", "Unidades adjudicadas", '<input id="enAdj" inputmode="decimal" data-num="1">') + campo("enPrev", "Consumidas antes de registrar en HOME", '<input id="enPrev" inputmode="decimal" data-num="1" value="0">') +
+      campo("enProv", "Proveedor", '<input id="enProv" autocomplete="off" value="' + esc(m.Proveedor || "") + '">') + campo("enMail", "Correo del proveedor", '<input id="enMail" autocomplete="off" value="' + esc(m.Email_proveedor || "") + '">') + '</div><div class="msg-error" id="enErr" role="alert"></div>';
+    H.modal({ titulo: "Nuevo expediente · " + m.Nombre, ancho: true, cuerpo: cuerpo, pie: '<button class="bt" data-cerrar>Cancelar</button><button class="bt pri" id="enOk">' + ico("folder-plus") + "Abrir el expediente</button>",
+      alAbrir: function (d) { d.querySelector("#enOk").addEventListener("click", function () {
+        var g = function (i) { return d.querySelector("#" + i).value.trim(); }, nx = g("enExp"), adj = C.num(g("enAdj")), prev = C.num(g("enPrev")) || 0, err = d.querySelector("#enErr");
+        if (nx.length < 2) { err.textContent = "Escribe el nº del nuevo expediente."; return; }
+        if (m.Expediente && nx.toLowerCase() === String(m.Expediente).trim().toLowerCase()) { err.textContent = "Es el mismo nº que el expediente actual."; return; }
+        if (adj === null || adj <= 0) { err.textContent = "Indica las unidades adjudicadas (mayor que 0)."; return; }
+        if (prev < 0 || prev > adj) { err.textContent = "Las consumidas antes de HOME deben estar entre 0 y las adjudicadas."; return; }
+        var hist = H.expedientesHist(m), ini = g("enIni") || hoy;
+        if (m.Expediente || x.adjudicadas !== null) hist.push({ Expediente: m.Expediente || "", Via: m.Via || "", Inicio: m.Expediente_inicio || "", Fin: hoy, Adjudicadas: x.adjudicadas, Previas: x.previas || 0, Pedidas: x.pedidas || 0, Proveedor: m.Proveedor || "", Cerrado_por: (S.usuario || {}).nombre || "", Cerrado_en: new Date().toISOString() });
+        var o = { ID: m.ID, Via: g("enVia"), Expediente: nx, Expediente_inicio: ini, Unidades_contrato: adj, Unidades_previas: prev, Proveedor: g("enProv"), Email_proveedor: g("enMail"), Expedientes_JSON: JSON.stringify(hist), Unidades_pedidas: pedidasDe(m.ID, nx, ini) };   // Unidades_pedidas: lo recalcula el servidor
+        H.guardar("Material", [o]); d.close(); H.toast("Expediente " + nx + " abierto para «" + m.Nombre + "»; el anterior queda en el historial.");
+      }); } });
+  };
+  // campana: avisos de expediente para los gestores
+  var accExp = H.alertasAccion;
+  H.alertasAccion = function () {
+    var out = accExp ? accExp() : []; if (!H.esGestorInv()) return out;
+    expAvisables().forEach(function (m) { var x = H.expedienteEstado(m); out.push({ id: "expd|" + m.ID + "|" + (m.Expediente || "") + "|" + x.estado, t: new Date(), icono: "file-warning", titulo: (x.estado === "al" ? "Expediente agotado · " : "Expediente a punto de agotarse · ") + m.Nombre, texto: (m.Expediente || "sin nº") + " · quedan " + H.n(Math.max(0, x.restantes), 0) + " de " + H.n(x.adjudicadas, 0) + ": abre el siguiente CM o licitación", href: "#/inventario/" + pestanaDe(m), tipo: "accion" }); });
+    return out;
+  };
+
+  // ---- 10.3 Eliminar material: sin historial se borra (webBorrar, borrado lógico en el servidor); con movimientos, solicitudes o pedidos se da de baja (Activo = false)
+  H.movimientosDe = function (id) { return H.filas("Movimientos").filter(function (x) { return x.Material === id; }); };
+  function historialDe(id) {
+    var mv = H.movimientosDe(id).length, so = H.filas("Solicitudes").filter(function (x) { return x.Material === id; }).length, pe = 0;
+    H.filas("Pedidos").forEach(function (p) { var ls = []; try { ls = typeof p.Lineas_JSON === "string" ? JSON.parse(p.Lineas_JSON || "[]") : p.Lineas_JSON || []; } catch (e) { ls = []; } if (ls.some(function (l) { return l.Material === id; })) pe++; });
+    return { movimientos: mv, solicitudes: so, pedidos: pe, total: mv + so + pe };
+  }
+  H.historialMaterial = historialDe;
+  H.matEliminar = function (id) {
+    if (!H.puede("inventario")) { H.toast("El material lo elimina el gestor de inventario.", "error"); return Promise.resolve(false); }
+    var m = H.fila("Material", id); if (!m) return Promise.resolve(false); var h = historialDe(id);
+    if (h.total) {
+      var q = [h.movimientos ? h.movimientos + " movimiento(s)" : "", h.solicitudes ? h.solicitudes + " solicitud(es)" : "", h.pedidos ? h.pedidos + " pedido(s)" : ""].filter(Boolean).join(", ");
+      return H.confirmar("Dar de baja «" + m.Nombre + "»", "Tiene historial (" + q + "), así que no se borra: se da de baja. Deja de aparecer en el inventario y en la preparación, y se conserva todo su historial. Se puede reactivar desde «Dados de baja».", "Dar de baja", true).then(function (ok) { if (ok) { H.guardar("Material", [{ ID: id, Activo: false }]); H.toast("«" + m.Nombre + "» dado de baja."); } return ok; });
+    }
+    return H.confirmar("Eliminar «" + m.Nombre + "»", "No tiene movimientos, solicitudes ni pedidos. Se eliminará del catálogo (el servidor guarda la auditoría). No se puede deshacer desde la app.", "Eliminar", true).then(function (ok) { if (ok) { H.borrar("Material", [id]).catch(function () { }); H.toast("«" + m.Nombre + "» eliminado."); } return ok; });
+  };
+  H.acc.matEliminar = function (el) { H.matEliminar(el.getAttribute("data-id")); };
+  H.acc.matReactivar = function (el) { if (!H.puede("inventario")) return; H.guardar("Material", [{ ID: el.getAttribute("data-id"), Activo: true }]); H.toast("Material reactivado."); };
+  function bajasHTML(l, ges) {
+    if (!l.length) return "";
+    return '<details class="plegable v71-bajas"><summary>' + ico("archive", "s") + " Dados de baja (" + l.length + ')</summary><div class="dentro"><div class="tabla-env"><table class="t"><thead><tr><th>Material</th><th>Referencia</th><th class="num">Movimientos</th><th><span class="sr">Acciones</span></th></tr></thead><tbody>' +
+      l.sort(function (a, b) { return String(a.Nombre).localeCompare(String(b.Nombre), "es"); }).map(function (m) { return "<tr><td><b>" + esc(m.Nombre) + "</b></td><td>" + esc(m.Referencia || "—") + '</td><td class="num">' + H.movimientosDe(m.ID).length + '</td><td><div class="acc-mat">' + (ges ? '<button class="bt mini" data-act="matReactivar" data-id="' + esc(m.ID) + '">' + ico("archive-restore", "s") + "Reactivar</button>" : "") + '<button class="bt mini" data-act="verMat" data-id="' + esc(m.ID) + '" aria-label="Ficha de ' + esc(m.Nombre) + '">' + ico("info", "s") + "</button></div></td></tr>"; }).join("") + "</tbody></table></div></div></details>";
+  }
+
+  // ---- 10.4 Morfometría: «Cómo tomar las medidas» con Foto (lámina técnica) y Vídeo (animación paso a paso, sin archivos externos)
+  var CINTA = {
+    OBL: "Apoya el cero de la cinta en la nuca, entre las orejas, y llévala por encima del lomo, pegada a la línea dorsal, hasta la base de la cola.",
+    NL: "Cero en la nuca; lleva la cinta por la línea media del cuello hasta la cruz, el punto más alto entre las escápulas.",
+    BL1: "Cero en la base de la cola; tensa la cinta en línea recta por el costado hasta la punta del hombro.",
+    HSLD: "Con el animal de pie en suelo plano, apoya el cero en el suelo junto a la pata delantera y sube la cinta en vertical hasta la cruz (ayuda apoyar una regla en el lomo).",
+    HHIP: "Igual que la altura a la cruz, pero hasta la punta de la cadera: cinta vertical desde el suelo, sin seguir la curva del cuerpo.",
+    HGH: "Pasa la cinta alrededor del tórax justo detrás de las patas delanteras, perpendicular al lomo. Ajusta sin apretar y lee donde se cruza con el cero.",
+    MGH: "Rodea el tronco a mitad de camino entre las patas delanteras y las traseras, perpendicular al lomo y sin apretar.",
+    PGH: "Rodea el tronco justo delante de las patas traseras (flanco), perpendicular al lomo y sin apretar."
+  };
+  H.MORFO_CINTA = CINTA;
+  var VEL = [0.5, 1, 1.5, 2], DUR_PASO = 7000;
+  function trazo(g) { if (!g.e) return g.d; var e = g.e; return "M" + e[0] + "," + (e[1] - e[3]) + " A" + e[2] + "," + e[3] + " 0 1 1 " + e[0] + "," + (e[1] + e[3]) + " A" + e[2] + "," + e[3] + " 0 1 1 " + e[0] + "," + (e[1] - e[3]); }
+  function pasosMorfo() { return C.MORFO.map(function (m) { return { id: m.id, sigla: m.sigla, nombre: m.nombre, como: m.como, cinta: CINTA[m.sigla] || "", col: MF.COL[m.sigla] || "#0f766e", g: MF.G[m.sigla] }; }).filter(function (p) { return p.g; }); }
+  H.morfoPasos = pasosMorfo;
+  function morfoVideoHTML() {
+    var P = pasosMorfo();
+    return '<div class="v71-video"><div class="v71-pant"><svg class="morfo-svg v71-svg" viewBox="' + MF.VB + '" role="img" aria-label="Animación: cómo tomar las medidas morfométricas">' + MF.cerdo + '<g class="v71-capa"></g></svg><span class="v71-cont" aria-hidden="true"></span></div>' +
+      '<div class="v71-barra" aria-hidden="true"><i></i></div><div class="v71-rot" aria-live="polite"></div>' +
+      '<div class="v71-ctrl"><button type="button" class="bt" data-mfc="prev" aria-label="Medida anterior">' + ico("skip-back") + '</button><button type="button" class="bt pri" data-mfc="play" aria-label="Pausa">' + ico("pause") + '<span>Pausa</span></button><button type="button" class="bt" data-mfc="next" aria-label="Medida siguiente">' + ico("skip-forward") + "</button>" +
+      '<label class="v71-vel"><span>Velocidad</span><select data-mfc="vel" aria-label="Velocidad">' + VEL.map(function (v) { return '<option value="' + v + '"' + (v === 1 ? " selected" : "") + ">" + String(v).replace(".", ",") + "×</option>"; }).join("") + "</select></label></div>" +
+      '<div class="v71-pasos" role="tablist" aria-label="Medidas">' + P.map(function (p, k) { return '<button type="button" role="tab" data-mfk="' + k + '" style="--c:' + p.col + '">' + esc(p.sigla) + "</button>"; }).join("") + "</div></div>";
+  }
+  // reproductor: requestAnimationFrame (o setTimeout), se para al cerrar el diálogo o al volver a «Foto»
+  function morfoVideo(raiz) {
+    var P = pasosMorfo(), i = 0, t = 0, vel = 1, play = true, vivo = true, ult = null, NS = "http://www.w3.org/2000/svg", capa = raiz.querySelector(".v71-capa");
+    var raf = window.requestAnimationFrame ? function (f) { return window.requestAnimationFrame(f); } : function (f) { return setTimeout(function () { f(Date.now()); }, 40); };
+    try { if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { play = false; t = DUR_PASO; } } catch (e) { }
+    function el(n, a) { var e = document.createElementNS(NS, n); Object.keys(a).forEach(function (k) { e.setAttribute(k, a[k]); }); return e; }
+    function pintarPaso() {
+      var p = P[i]; capa.innerHTML = "";
+      P.forEach(function (q, j) { if (j < i) capa.appendChild(el("path", { d: trazo(q.g), fill: "none", stroke: q.col, "stroke-width": 3, opacity: 0.2, "stroke-linecap": "round" })); });
+      capa.appendChild(el("path", { d: trazo(p.g), class: "v71-cinta", fill: "none", stroke: "#f2c94c", "stroke-width": 9, "stroke-linecap": "round", pathLength: 100, "stroke-dasharray": "100 100", "stroke-dashoffset": 100 }));
+      capa.appendChild(el("path", { d: trazo(p.g), class: "v71-cinta v71-marcas", fill: "none", stroke: "#5b4a12", "stroke-width": 9, pathLength: 100, "stroke-dasharray": "0.4 2.1", opacity: 0 }));
+      var g = el("g", { class: "v71-cota", opacity: 0 }); g.innerHTML = MF.cota(p.sigla); capa.appendChild(g);
+      raiz.querySelector(".v71-rot").innerHTML = '<div class="v71-tit"><span class="v71-sig" style="background:' + p.col + '">' + esc(p.sigla) + "</span><b>" + esc(p.nombre) + "</b></div><p>" + esc(p.como) + '</p><p class="v71-cinta-t">' + ico("ruler", "s") + "<span>" + esc(p.cinta) + "</span></p>";
+      raiz.querySelector(".v71-cont").textContent = (i + 1) + " / " + P.length;
+      Array.prototype.forEach.call(raiz.querySelectorAll("[data-mfk]"), function (b, j) { b.classList.toggle("activo", j === i); b.setAttribute("aria-selected", String(j === i)); });
+      dibujar();
+    }
+    function dibujar() {
+      var f = Math.min(1, t / DUR_PASO), a = Math.min(1, f / 0.55), e = 1 - Math.pow(1 - a, 3), cs = capa.querySelectorAll(".v71-cinta"), mk = capa.querySelector(".v71-marcas"), co = capa.querySelector(".v71-cota");
+      if (cs[0]) cs[0].setAttribute("stroke-dashoffset", String(C.r(100 * (1 - e), 2)));
+      if (mk) mk.setAttribute("opacity", String(C.r(Math.max(0, Math.min(1, (f - 0.5) / 0.1)) * 0.85, 2)));
+      if (co) co.setAttribute("opacity", String(C.r(Math.max(0, Math.min(1, (f - 0.6) / 0.15)), 2)));
+      var b = raiz.querySelector(".v71-barra i"); if (b) b.style.width = C.r((i + f) / P.length * 100, 2) + "%";
+    }
+    function botonPlay() { var b = raiz.querySelector('[data-mfc="play"]'); if (!b) return; b.innerHTML = ico(play ? "pause" : "play") + "<span>" + (play ? "Pausa" : "Reproducir") + "</span>"; b.setAttribute("aria-label", play ? "Pausa" : "Reproducir"); }
+    function bucle(ahora) {
+      if (!vivo) return; if (!raiz.isConnected) { vivo = false; return; }
+      if (ult === null) ult = ahora; var dt = Math.max(0, Math.min(200, ahora - ult)); ult = ahora;
+      if (play) { t += dt * vel; if (t >= DUR_PASO) { i = (i + 1) % P.length; t = 0; pintarPaso(); } else dibujar(); }
+      raf(bucle);
+    }
+    function ir(k) { i = (k + P.length) % P.length; t = play ? 0 : DUR_PASO; pintarPaso(); }
+    raiz.addEventListener("click", function (ev) {
+      var b = ev.target.closest && ev.target.closest("[data-mfc],[data-mfk]"); if (!b || b.tagName === "SELECT") return; var c = b.getAttribute("data-mfc");
+      if (c === "play") { play = !play; if (play && t >= DUR_PASO) t = 0; botonPlay(); } else if (c === "prev") ir(i - 1); else if (c === "next") ir(i + 1); else if (b.hasAttribute("data-mfk")) ir(Number(b.getAttribute("data-mfk")));
+    });
+    var sv = raiz.querySelector('[data-mfc="vel"]'); if (sv) sv.addEventListener("change", function () { vel = Number(sv.value) || 1; });
+    pintarPaso(); botonPlay(); raf(bucle);
+    return { ir: ir, pausar: function () { play = false; botonPlay(); }, reproducir: function () { play = true; if (t >= DUR_PASO) t = 0; botonPlay(); }, parar: function () { vivo = false; }, estado: function () { return { paso: i, sigla: P[i].sigla, t: t, vel: vel, play: play, vivo: vivo }; } };
+  }
+  H.acc.infoMorfo = function () {
+    var foto = H.morfoSVG() + '<ol class="lista-morfo">' + C.MORFO.map(function (m) { return "<li><b>" + esc(m.sigla) + " · " + esc(m.nombre) + "</b><span>" + esc(m.como) + "</span></li>"; }).join("") + "</ol>" +
+      '<p class="v71-mf-nota">' + ico("ruler", "s") + " Cinta métrica flexible, animal de pie y tranquilo, cabeza en posición natural. Longitudes y alturas en línea recta; perímetros ajustando la cinta sin apretar. Anota en centímetros.</p>";
+    var seg = '<div class="segmentado v71-mf-seg" role="tablist"><button type="button" role="tab" data-mf="foto" class="activo" aria-selected="true">' + ico("image", "s") + '<span>Foto</span></button><button type="button" role="tab" data-mf="video" aria-selected="false">' + ico("video", "s") + "<span>Vídeo</span></button></div>";
+    H.modal({ titulo: "Cómo tomar las medidas", ancho: true, cuerpo: '<div class="v71-mf">' + seg + '<div class="v71-mf-foto">' + foto + '</div><div class="v71-mf-video" hidden></div></div>',
+      alAbrir: function (d) {
+        var rep = null, cv = d.querySelector(".v71-mf-video"), cf = d.querySelector(".v71-mf-foto");
+        d.querySelector(".v71-mf-seg").addEventListener("click", function (ev) {
+          var b = ev.target.closest("[data-mf]"); if (!b) return; var v = b.getAttribute("data-mf") === "video";
+          Array.prototype.forEach.call(d.querySelectorAll("[data-mf]"), function (x) { var on = x === b; x.classList.toggle("activo", on); x.setAttribute("aria-selected", String(on)); });
+          cf.hidden = v; cv.hidden = !v;
+          if (v) { if (!rep) { cv.innerHTML = morfoVideoHTML(); rep = morfoVideo(cv); } else rep.reproducir(); } else if (rep) rep.pausar();
+          H.morfoReproductor = rep;
+        });
+        d.addEventListener("close", function () { if (rep) rep.parar(); });
+      } });
+  };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v07d.js"] = "0.7.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v07d.js"] = "0.7.1";

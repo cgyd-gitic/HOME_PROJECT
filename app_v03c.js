@@ -302,7 +302,8 @@
     var ld = vol("LD"), bd = vol("BD"), tot = (ld || 0) + (bd || 0), falta = obj - tot;
     return '<div class="sangre"><div class="kpis"><div class="kpi"><div class="et">Sangre del donante de hígado</div><div class="v">' + (ld !== null ? H.n(ld, 0) : "—") + '<small>mL</small></div></div><div class="kpi"><div class="et">Sangre del donante de sangre</div><div class="v">' + (bd !== null ? H.n(bd, 0) : "—") + "<small>mL</small></div></div>" +
       '<div class="kpi ' + (ld === null && bd === null ? "" : falta <= 0 ? "ok" : "aj") + '"><div class="et">Total para la perfusión</div><div class="v">' + H.n(tot, 0) + "<small>/ " + H.n(obj, 0) + " mL</small></div></div></div>" +
-      '<p class="muy-tenue" style="margin:6px 0 10px">La perfusión usa siempre ' + H.n(obj, 0) + " mL, extraídos con el sistema de HDF. " + (ld === null && bd === null ? "Anota el volumen real extraído de cada animal." : falta > 0 ? "<b>Faltan " + H.n(falta, 0) + " mL</b>: se completan con el donante de sangre." : bd ? "Se ha completado con el donante de sangre." : "No ha hecho falta el donante de sangre.") + "</p></div>";
+      (ld === null && bd === null ? '<p class="muy-tenue" style="margin:6px 0 10px">Anota el volumen real extraído de cada animal.' + (H.v07b ? H.v07b.info("La perfusión usa siempre " + H.n(obj, 0) + " mL de sangre, extraídos con el sistema de HDF. Si con el donante de hígado no se llega, se completa con el donante de sangre.") : "") + "</p>" :   // v0.7.1: regla en (i)
+        '<div class="aviso ' + (falta > 0 ? "aj" : "ok") + '" style="margin:6px 0 10px">' + H.ico(falta > 0 ? "triangle-alert" : "circle-check") + "<div>" + (falta > 0 ? "<b>Faltan " + H.n(falta, 0) + " mL</b>: se completan con el donante de sangre." : bd ? "Se ha completado con el donante de sangre." : "No ha hecho falta el donante de sangre.") + (H.v07b ? H.v07b.info("La perfusión usa siempre " + H.n(obj, 0) + " mL de sangre, extraídos con el sistema de HDF.") : "") + "</div></div>") + "</div>";
   };
   H.basalHTML = function (e, d) {
     var m = H.med(e.ID).filter(function (x) { return x.Muestra === "BASAL_LD" && C.num(x.Valor) !== null; }), n = m.length, f = m.map(function (x) { return x.Fecha_hora; }).filter(Boolean).sort()[0], enlace = '<a class="bt mini" href="#/exp/' + encodeURIComponent(e.ID) + '/seguimiento/pre">' + ico("test-tube", "s") + (n ? "Ver la muestra basal" : "Registrar la muestra basal") + "</a>";
@@ -312,4 +313,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v03c.js"] = "0.7.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v03c.js"] = "0.7.1";

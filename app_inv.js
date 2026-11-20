@@ -350,8 +350,8 @@
     var u = S.usuario || {}, pa = H.pref("pushActivo"), tema = H.pref("tema") || "sistema";
     return "<div class=\"ancho\" style=\"max-width:820px\"><div class=\"titulo-pag\"><h1>Mi cuenta</h1></div>" +
       "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>" + esc(u.nombre || u.email) + "</h2><span class=\"chip pri\">" + esc(u.rol) + "</span></div><p class=\"tenue\">" + esc(u.email) + (S.demo ? " · modo demostración" : "") + "</p><button class=\"bt peligro\" data-act=\"salir\">" + ico("log-out") + "Cerrar sesión</button></section>" +
-      "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>Avisos en este dispositivo</h2></div>" +
-      "<p class=\"tenue\">Con la app abierta, los avisos programados suenan y aparecen en pantalla. Para recibirlos con la pantalla bloqueada activa las notificaciones push (en iPhone, instala antes la web: Safari → Compartir → Añadir a pantalla de inicio).</p>" +
+      "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>Avisos en este dispositivo</h2>" + H.botonInfo("Para recibir los avisos con la pantalla bloqueada o la app cerrada, activa las notificaciones push en este dispositivo. En iPhone, instala antes la web: Safari → Compartir → Añadir a pantalla de inicio.") + "</div>" +
+      "<p class=\"tenue\">Con la app abierta, los avisos programados suenan y aparecen en pantalla.</p>" +
       "<div class=\"fila-flex\">" + (pa ? "<button class=\"bt\" data-act=\"pushOff\">" + ico("bell") + "Desactivar notificaciones</button><button class=\"bt\" data-act=\"pushTest\">" + ico("send") + "Enviar prueba</button>" : "<button class=\"bt pri\" data-act=\"pushOn\">" + ico("bell-ring") + "Activar notificaciones</button>") + "<button class=\"bt\" data-act=\"probarAlarma\">" + ico("bell") + "Probar alarma en pantalla</button></div>" +
       "<div style=\"margin-top:10px;display:flex;flex-direction:column;gap:4px\"><label class=\"check\"><input type=\"checkbox\" data-cambio=\"prefChk\" data-k=\"sinSonido\"" + (H.pref("sinSonido") ? " checked" : "") + "> Silenciar el sonido de las alarmas</label><label class=\"check\"><input type=\"checkbox\" data-cambio=\"prefChk\" data-k=\"silenciar\"" + (H.pref("silenciar") ? " checked" : "") + "> No mostrar alarmas en este dispositivo</label></div></section>" +
       "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>Preferencias</h2></div><div class=\"rejilla dos\"><div class=\"campo\"><label class=\"et\" for=\"pTema\">Tema</label><select id=\"pTema\" data-cambio=\"prefTema\">" + [["sistema", "Según el sistema"], ["claro", "Claro"], ["oscuro", "Oscuro"]].map(function (t) { return "<option value=\"" + t[0] + "\"" + (t[0] === tema ? " selected" : "") + ">" + t[1] + "</option>"; }).join("") + "</select></div>" +
@@ -371,4 +371,4 @@
   H.acc.forzarSync = function () { S.online = true; H.enviarCola().then(H.sondear); H.toast("Sincronizando…"); };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_inv.js"] = "0.7.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_inv.js"] = "0.7.1";

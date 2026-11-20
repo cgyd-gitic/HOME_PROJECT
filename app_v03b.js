@@ -124,4 +124,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v03b.js"] = "0.7.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v03b.js"] = "0.7.1";

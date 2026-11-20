@@ -21,7 +21,8 @@
     diarias: ["10:00", "20:00"], amarillo_hora: "10:00",           // a partir de las 24 h, cada 12 h (manda la hora del día)
     extra_horas: ["14:00", "16:00"], extra: { EDTA: 1, GAS: 3 },   // EDTA + 3 gasometrías (arterial, portal y cava) para el metabolismo posprandial
     bilis_en_puntos: true, aceite_mL_bilis: 2.5, microtubos_EDTA: 3, microtubos_bilis: 2, microtubos_filtrado: 2,
-    biopsia_cada_h: 24, hdf_cada_h_dia1: 1, inmuno: "pre",          // la inmunología solo en la basal y en la pre-perfusión
+    biopsia_cada_h: 24, hdf_cada_h_dia1: 1, inmuno: "pre+24h",      // v0.7.1: inmunología en la pre-perfusión y cada 24 h (del tubo amarillo de las 24 h y de las 10:00)
+    inmuno_cada_h: 24,                                             // 0 = sin inmunología durante la perfusión
     antelacion_min: 10
   };
   function cfgM(m) { var d = DEF.muestreo; if (!m || m.version !== 7) return d; var o = {}; Object.keys(d).forEach(function (k) { o[k] = m[k] !== undefined ? m[k] : d[k]; }); return o; }
@@ -40,20 +41,27 @@
       m.diarias.forEach(function (hh) { var t = C.enHora(t0, hh, d).getTime(); if (t <= lim1 || t > fin) return; pon(t, "D" + (Math.floor((t - t0) / 864e5 + 1e-9) + 1) + " " + hh, "completa", m.completa, hh === m.amarillo_hora); });
       m.extra_horas.forEach(function (hh) { var t = C.enHora(t0, hh, d).getTime(); if (t <= lim1 || t > fin) return; pon(t, "D" + (Math.floor((t - t0) / 864e5 + 1e-9) + 1) + " " + hh, "extra", m.extra, false); });
     }
-    var vistos = {}; return out.sort(function (a, b) { return a.t_h - b.t_h; }).filter(function (p) { var k = Math.round(p.t_h * 60); if (vistos[k]) return false; vistos[k] = 1; return true; });
+    var vistos = {}; out = out.sort(function (a, b) { return a.t_h - b.t_h; }).filter(function (p) { var k = Math.round(p.t_h * 60); if (vistos[k]) return false; vistos[k] = 1; return true; });
+    // v0.7.1: inmunología cada 24 h en un punto con tubo amarillo (24 h y las 10:00), como mucho uno por cada 24 h (la pre-perfusión es la primera)
+    var ci = num(m.inmuno_cada_h), ult = 0; if (ci === null) ci = 24;
+    out.forEach(function (p) { p.inmuno = false; if (ci > 0 && p.amarillo && p.t_h - ult >= ci / 2) { p.inmuno = true; ult = p.t_h; } });
+    return out;
   }
+  // Puntos de inmunología de la perfusión (sin la pre-perfusión): [{t_h, fecha, etiqueta, …}]
+  function puntosInmuno(inicioISO, dias, m) { return puntosMuestreo(inicioISO, dias, m).filter(function (p) { return p.inmuno; }); }
   // Resumen del plan de muestreo (para el material): nº de tubos de cada tipo, muestras de bilis y de filtrado, mL
   function planMuestreo(dias, m, inicioISO) {
     m = cfgM(m); var t0 = inicioISO || "2026-01-05T10:00:00", pts = puntosMuestreo(t0, dias, m), tubos = sumaTubos(m.pre, {}), mL = mlDe(m.pre, m), bilis = 0, filt = 0;
     pts.forEach(function (p) { tubos = sumaTubos(tubos, p.tubos); mL += p.mL; if (p.bilis) bilis++; if (p.tipo === "completa") filt++; });
-    return { puntos: pts.length, completas: pts.filter(function (p) { return p.tipo === "completa"; }).length, tubos: tubos, mL: r(mL, 1), bilis: bilis, filtrado: filt + 1 };
+    return { puntos: pts.length, completas: pts.filter(function (p) { return p.tipo === "completa"; }).length, tubos: tubos, mL: r(mL, 1), bilis: bilis, filtrado: filt + 1, inmuno: pts.filter(function (p) { return p.inmuno; }).length + 1 };
   }
   function avisosMuestreo(expId, inicioISO, dias, m, antelMin) {
     m = cfgM(m); antelMin = antelMin === undefined ? m.antelacion_min : antelMin; var t0 = aFecha(inicioISO); if (!t0) return [];
-    function txt(p) { var l = []; Object.keys(p.tubos).forEach(function (k) { var n = p.tubos[k]; if (n) l.push(n + " × " + m.tubos[k].nombre.toLowerCase()); }); return l.join(", ") + (p.bilis ? " y bilis" : "") + " (" + String(p.mL).replace(".", ",") + " mL)."; }
+    // v0.7.1: Texto en formato lista (un elemento por línea, separados por "\n"; la viñeta la pone quien lo muestra)
+    function txt(p) { var l = []; Object.keys(p.tubos).forEach(function (k) { var n = p.tubos[k]; if (n) l.push(n + " × " + m.tubos[k].nombre); }); if (p.bilis) l.push("Bilis"); if (p.inmuno) l.push("+ inmunología (del tubo amarillo)"); l.push("Total: " + String(p.mL).replace(".", ",") + " mL"); return l.join("\n"); }
     var out = puntosMuestreo(inicioISO, dias, m).filter(function (p) { return p.t_h > 0; }).map(function (p) {
       return { ID: expId + "|muestra|" + p.t_h, Experimento: expId, Fecha_hora: new Date(p.fecha.getTime() - antelMin * 6e4).toISOString(), Tipo: "muestra", Destino: "equipo", Vista: "exp:" + expId + ":seguimiento",
-        Titulo: "Muestra " + p.etiqueta + " en " + antelMin + " min" + (p.tipo === "extra" ? " (EDTA + gasometrías)" : ""), Texto: txt(p) };
+        Titulo: "Muestra " + p.etiqueta + " en " + antelMin + " min" + (p.tipo === "extra" ? " (EDTA + gasometrías)" : "") + (p.inmuno ? " + inmunología" : ""), Texto: txt(p) };
     });
     if (m.biopsia_cada_h) for (var h = m.biopsia_cada_h; h <= (num(dias) || 7) * 24; h += m.biopsia_cada_h)
       out.push({ ID: expId + "|biopsia|" + h, Experimento: expId, Fecha_hora: new Date(t0.getTime() + (h * 60 - antelMin) * 6e4).toISOString(), Tipo: "muestra", Destino: "equipo", Vista: "exp:" + expId + ":seguimiento", Titulo: "Biopsia hepática " + h + " h en " + antelMin + " min", Texto: "Parénquima (parafina + criopreservación)." });
@@ -290,12 +298,29 @@
   // Unidades del informe que hay que convertir a las de la app: amonio µg/dL → µmol/L (× 0,5872); cortisol µg/dL → nmol/L (× 27,59)
   var UNIDAD_ORIGEN = { Amonio: /[µμu]g\/dL/i, Cortisol: /[µμu]g\/dL/i };   // micro: µ (U+00B5) o μ griega (U+03BC)
   function numeroLab(s) { var t = String(s || "").trim().replace(",", "."), m = /^([<>]=?)?\s*(-?\d+(?:\.\d+)?)$/.exec(t); if (!m) return null; return { v: Number(m[2]), cens: m[1] || "" }; }
-  // lineas: [{prueba, resultado, unidades, referencia}] (de pdf.js o de texto) · texto: todo el texto (para la cabecera)
-  function leerInformeLab(lineas, texto) {
+  // v0.7.1: NHC del informe. Donantes (basal, pre-perfusión y perfusión) y receptor (basal y seguimiento) tienen NHC distintos (Configuración → General).
+  if (DEF.general) { if (DEF.general.nhc_donantes === undefined) DEF.general.nhc_donantes = "3306230"; if (DEF.general.nhc_receptor === undefined) DEF.general.nhc_receptor = "3306231"; }
+  function soloDig(x) { return String(x === null || x === undefined ? "" : x).replace(/\D/g, ""); }
+  // Lectura robusta: el campo «Paciente» llega partido («NHC_33062» y «30» en otra línea, o «NHC_33062 / 30») y el NHC aparece además suelto («3306230»).
+  // Devuelve { nhc, sujeto: "donante"|"receptor"|null, candidatos }
+  function leerNHC(texto, opc) {
+    opc = opc || {}; var t = String(texto || ""), don = soloDig(opc.nhc_donantes !== undefined ? opc.nhc_donantes : (DEF.general || {}).nhc_donantes), rec = soloDig(opc.nhc_receptor !== undefined ? opc.nhc_receptor : (DEF.general || {}).nhc_receptor), cand = [];
+    var re = /NHC[_\s:]*(\d{3,})[\s\/_-]*(\d{1,4})?(?!\d)/gi, mm;
+    var nhcPat = []; while ((mm = re.exec(t))) { var a = mm[1], b = mm[2] || ""; if (b) { cand.push(a + b); nhcPat.push(a + b); } cand.push(a); }
+    var sueltos = t.match(/(?:^|[^\d.,\/])(\d{6,9})(?![\d.,\/])/g) || []; sueltos.forEach(function (x) { cand.push(x.replace(/\D/g, "")); });
+    var conocidos = [don, rec].filter(Boolean), nhc = null;
+    for (var i = 0; i < cand.length && !nhc; i++) if (conocidos.indexOf(cand[i]) !== -1) nhc = cand[i];
+    if (!nhc && nhcPat.length) nhc = nhcPat[0];   // NHC desconocido: el del campo «Paciente» (unido)
+    return { nhc: nhc, sujeto: nhc && nhc === rec ? "receptor" : nhc && nhc === don ? "donante" : null, candidatos: cand };
+  }
+  C.leerNHC = leerNHC;
+  // lineas: [{prueba, resultado, unidades, referencia}] (de pdf.js o de texto) · texto: todo el texto (para la cabecera) · opc: { nhc_donantes, nhc_receptor }
+  function leerInformeLab(lineas, texto, opc) {
     var obs = /Observaciones:\s*([^\n]+)/i.exec(texto || ""), o = obs ? obs[1].trim() : "", out = { observaciones: o, codigo: null, horas: null, muestra: null, fecha: null, resultados: [], ignoradas: [] };
     var mc = /(HOME-PM-\d+)/i.exec(o) || /(HOME-PM-\d+)/i.exec(texto || ""); if (mc) out.codigo = mc[1].toUpperCase();
     var mh = /(\d+(?:[.,]\d+)?)\s*(HORAS?|H|MIN(?:UTOS)?)\b/i.exec(o); if (mh) out.horas = Number(mh[1].replace(",", ".")) / (/^MIN/i.test(mh[2]) ? 60 : 1); if (/BASAL/i.test(o)) out.horas = "basal"; if (/PRE[- ]?PERF|PREPERF/i.test(o)) out.horas = "pre";
     var mt = /\(([^)]+)\)\s*$/.exec(o), tipo = mt ? mt[1].toUpperCase() : ""; out.muestra = /PORTAL/.test(tipo) ? "POR" : /CAVA/.test(tipo) ? "CAV" : /BILIS/.test(tipo) ? "BILIS" : /INMUNO/.test(tipo) ? "INMUNO" : /RECEPTOR/.test(tipo) ? "REC" : "ART"; out.tipo = tipo;
+    var nh = leerNHC(texto, opc); out.nhc = nh.nhc; out.sujeto = nh.sujeto; if (nh.sujeto === "receptor" && out.muestra !== "INMUNO") out.muestra = "REC";   // v0.7.1: el NHC del receptor manda
     var mf = /F\.\s*Obtenci[oó]n muestra:[\s\S]{0,200}?(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/i.exec(texto || "") || /(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/.exec(texto || "");
     if (mf) out.fecha = mf[3] + "-" + mf[2] + "-" + mf[1] + "T" + mf[4] + ":" + mf[5] + ":00";
     (lineas || []).forEach(function (l) {
@@ -339,8 +364,8 @@
   // ============================================================== 8. Objetivos revisados (pO₂ arterial con valores arteriales habituales)
   if (DEF.objetivos && DEF.objetivos.ART) DEF.objetivos.ART.pO2 = [80, 100];
 
-  C.puntosMuestreo = puntosMuestreo; C.avisosMuestreo = avisosMuestreo; C.puntosHDF = puntosHDF; C.registroPermitido = registroPermitido; C.cfgMuestreo = cfgM;
+  C.puntosMuestreo = puntosMuestreo; C.puntosInmuno = puntosInmuno; C.avisosMuestreo = avisosMuestreo; C.puntosHDF = puntosHDF; C.registroPermitido = registroPermitido; C.cfgMuestreo = cfgM;
   return C;
 });
 
-;(window.HOME_MODS = window.HOME_MODS || {})["calc7.js"] = "0.7.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["calc7.js"] = "0.7.1";

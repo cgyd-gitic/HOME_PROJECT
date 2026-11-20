@@ -196,8 +196,8 @@
   H.seccionesExtra.accesos = function () {
     var l = H.filas("Solicitudes_Acceso").slice().sort(function (a, b) { return (a.Estado === "Pendiente" ? 0 : 1) - (b.Estado === "Pendiente" ? 0 : 1) || String(b.Fecha).localeCompare(String(a.Fecha)); });
     var pend = l.filter(function (a) { return a.Estado === "Pendiente"; }), res = l.filter(function (a) { return a.Estado !== "Pendiente"; });
-    var html = "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>Solicitudes de alta</h2><span class=\"chip " + (pend.length ? "aj" : "ok") + "\">" + pend.length + " pendiente(s)</span></div>" +
-      "<p class=\"tenue\">Llegan desde «Solicitar alta» en la pantalla de acceso. Al aprobar, el usuario se crea con el rol elegido y recibe un correo de bienvenida con la dirección de la web. Al rechazar, recibe un correo con la nota.</p>";
+    var html = "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>Solicitudes de alta</h2>" + H.botonInfo("Al aprobar, el usuario se crea con el rol elegido y recibe un correo de bienvenida con la dirección de la web. Al rechazar, recibe un correo con la nota.") + "<span class=\"chip " + (pend.length ? "aj" : "ok") + "\">" + pend.length + " pendiente(s)</span></div>" +
+      "<p class=\"tenue\">Llegan desde «Solicitar alta» en la pantalla de acceso.</p>";
     html += pend.length ? pend.map(function (a) {
       var id = esc(a.ID), rs = H.normRol(a.Rol_solicitado || "COLABORADOR");
       return "<div class=\"acceso-sol\"><div class=\"datos\"><b>" + esc((a.Nombre || "") + " " + (a.Apellidos || "")) + "</b> · <a href=\"mailto:" + esc(a.Email) + "\">" + esc(a.Email) + "</a><div class=\"tenue\">" + esc([a.Cargo, a.Institucion].filter(Boolean).join(" · ")) + " · solicita <b>" + esc(H.nombreRol(rs)) + "</b> · " + esc(H.fechaHora(a.Fecha)) + "</div>" + (a.Comentario ? "<div class=\"muy-tenue\">«" + esc(a.Comentario) + "»</div>" : "") + "</div>" +
@@ -226,9 +226,9 @@
   var MUESTRAS_INI = ["PERF", "ART", "POR", "CAV", "BILIS", "FLUJO", "HDF", "INMUNO"];
   H.seccionesExtra.inicio = function () {
     var c = cfgIni(), sel = c.ultimos_valores || [], pp = proximaPerfusion();
-    return "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>Próxima perfusión</h2></div><div class=\"rejilla dos\"><div class=\"campo\"><label class=\"et\" for=\"iniFecha\">Fecha programada (manual)</label><input id=\"iniFecha\" type=\"date\" value=\"" + esc(c.proxima_perfusion || "") + "\" data-cambio=\"iniFecha\"></div>" +
+    return "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>Próxima perfusión</h2></div><div class=\"rejilla dos\"><div class=\"campo\"><label class=\"et et-i\" for=\"iniFecha\">Fecha programada (manual)</label>" + H.botonInfo("Si la dejas vacía se usa la fecha de cirugía más próxima de los experimentos planificados.") + "<input id=\"iniFecha\" type=\"date\" value=\"" + esc(c.proxima_perfusion || "") + "\" data-cambio=\"iniFecha\"></div>" +
       "<div class=\"campo\"><span class=\"et\">Se muestra ahora</span><div style=\"padding-top:8px\">" + (pp ? "<b>" + esc(H.fechaDMA(pp.fecha)) + "</b> " + (pp.manual ? "(fecha manual)" : "(Fecha de cirugía de " + esc(pp.exp.ID) + ")") : "<span class=\"tenue\">Ninguna</span>") + "</div></div></div>" +
-      "<p class=\"muy-tenue\">Si la dejas vacía se usa la fecha de cirugía más próxima de los experimentos planificados. Las fechas de cada experimento se programan en el <a href=\"#/calendario\">calendario</a>.</p></section>" +
+      "<p class=\"muy-tenue\">Las fechas de cada experimento se programan en el <a href=\"#/calendario\">calendario</a>.</p></section>" +
       "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>Alertas de la perfusión en curso</h2></div><p class=\"tenue\">Se listan los valores fuera del rango objetivo del <b>último registro</b> de cada muestra marcada.</p><div class=\"fila-flex\">" +
       ["ART", "POR", "CAV", "PERF", "FLUJO", "BILIS", "HDF"].map(function (m) { return "<label class=\"check\"><input type=\"checkbox\" data-cambio=\"iniAlerta\" data-m=\"" + m + "\"" + ((c.alertas_muestras || []).indexOf(m) !== -1 ? " checked" : "") + "> " + esc(NOMBRE_M[m]) + "</label>"; }).join("") + "</div></section>" +
       "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>Últimos valores</h2><button class=\"bt\" data-act=\"iniRestaurar\">" + ico("undo-2") + "Valores por defecto</button></div><p class=\"tenue\">Orden actual: " + esc(sel.map(function (k) { var p = k.split(":"), d = C.variable(p[0], p[1]); return d ? d.nombre + " (" + (NOMBRE_M[p[0]] || p[0]) + ")" : k; }).join(" · ")) + ". Las variables nuevas se añaden al final.</p>" +
@@ -287,4 +287,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v02.js"] = "0.7.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v02.js"] = "0.7.1";

@@ -2,7 +2,7 @@
    Los datos son SINTÉTICOS (generador con semilla) y se guardan solo en este navegador (IndexedDB). */
 (function () {
   "use strict";
-  var C = window.HOMECalc, DB = null, listo = null, VERSION_DEMO = 8;
+  var C = window.HOMECalc, DB = null, listo = null, VERSION_DEMO = 9;
   var TABLAS = ["Experimentos", "Animales", "Dieta", "Formularios", "Mediciones", "Eventos", "Avisos", "Material", "Movimientos", "Solicitudes", "Personal", "Usuarios", "Config", "Solicitudes_Acceso", "Fotos", "Pedidos"];
   function idb(op, v) { return new Promise(function (ok) { try { var r = indexedDB.open("home-demo", 1); r.onupgradeneeded = function () { r.result.createObjectStore("kv"); }; r.onsuccess = function () { var tx = r.result.transaction("kv", op === "get" ? "readonly" : "readwrite"), st = tx.objectStore("kv"); if (op === "get") { var q = st.get("db"); q.onsuccess = function () { ok(q.result); }; q.onerror = function () { ok(null); }; } else { st.put(v, "db"); tx.oncomplete = function () { ok(true); }; } }; r.onerror = function () { ok(null); }; } catch (e) { ok(null); } }); }
   var tGuardar = null; function persistir() { clearTimeout(tGuardar); tGuardar = setTimeout(function () { idb("put", DB); }, 400); }
@@ -26,7 +26,9 @@
       ["Periolimel N4E 1500 mL", "Fármacos y soluciones", "bolsa", 10, 7, 7], ["Heparina sódica 5000 U/mL (5 mL)", "Fármacos y soluciones", "vial", 30, 25, 22], ["Jeringa 50 mL", "Fungible general", "unidad", 80, 40, 30], ["Tubo de gasometría", "Fungible general", "unidad", 150, 100, 120], ["Guantes estériles 7,5", "Fungible general", "par", 60, 30, 20]];
     function via(m) { return m[1] === "Fármacos y soluciones" ? (/IGL/.test(m[0]) ? ["Reactivo", "Licitación", "EXP-2026-014", "Proveedor de perfusión (demo)", "pedidos-perfusion@example.org", 40] : ["Fármaco", "Farmacia", "", "", "", null])
       : m[1] === "Fungible de perfusión" ? ["Fungible", "Licitación", "EXP-2026-014", "Proveedor de perfusión (demo)", "pedidos-perfusion@example.org", 30] : m[1] === "HDF" ? ["Fungible", "Contrato menor", "CM-2026-031", "Proveedor de HDF (demo)", "pedidos-hdf@example.org", 60] : ["Fungible", "Otro", "", "", "", null]; }
-    MAT.forEach(function (m, i) { var v = via(m); add("Material", { ID: "MAT-D" + i, Nombre: m[0], Categoria: m[1], Unidad: m[2], Stock_inicial: m[3], Stock_minimo: m[4], Por_perfusion: m[5], Referencia: "REF-" + (1000 + i), Proveedor: v[3], Ubicacion: C.UBICACIONES[0], Activo: true, Tipo: v[0], Via: v[1], Expediente: v[2], Email_proveedor: v[4], Unidades_contrato: v[5], Unidades_pedidas: 0 }); });
+    MAT.forEach(function (m, i) { var v = via(m); add("Material", { ID: "MAT-D" + i, Nombre: m[0], Categoria: m[1], Unidad: m[2], Stock_inicial: m[3], Stock_minimo: m[4], Por_perfusion: m[5], Referencia: "REF-" + (1000 + i), Proveedor: v[3], Ubicacion: C.UBICACIONES[0], Activo: true, Tipo: v[0], Via: v[1], Expediente: v[2], Email_proveedor: v[4], Unidades_contrato: v[5], Unidades_pedidas: 0,
+      Unidades_previas: v[2] === "CM-2026-031" ? (m[1] === "HDF" && /Filtro/.test(m[0]) ? 56 : 20) : v[2] ? 4 : null, Expediente_inicio: v[2] === "CM-2026-031" ? "2026-03-02" : v[2] ? "2026-01-15" : "",   // v0.7.1: consumidas antes de HOME
+      Expedientes_JSON: /Filtro de hemodiafiltración/.test(m[0]) ? JSON.stringify([{ Expediente: "CM-2025-112", Via: "Contrato menor", Inicio: "2025-02-10", Fin: "2026-03-01", Adjudicadas: 48, Previas: 0, Pedidas: 48, Proveedor: "Proveedor de HDF (demo)", Cerrado_por: "Administrador demo" }]) : "" }); });
     (window.HOME && window.HOME.filasCajas ? window.HOME.filasCajas() : []).forEach(function (m) { add("Material", m); });   // v0.6: cajas de instrumental (B. Braun)
     [["Máquina de perfusión Liver Assist", "Equipos"], ["Monitor de hemodiafiltración Aquarius", "Equipos"], ["Termohigrómetro LIORQUE YGH5254", "Equipos"]].forEach(function (m, i) { add("Material", { ID: "MAT-I" + i, Nombre: m[0], Categoria: m[1], Unidad: "unidad", Stock_inicial: 1, Stock_minimo: 1, Por_perfusion: 0, Referencia: "", Proveedor: "", Ubicacion: C.UBICACIONES[0], Activo: true, Tipo: "Inventariable", Via: "", Expediente: "" }); });
     add("Solicitudes", { ID: "SOL-D1", Fecha: new Date(Date.now() - 2 * 864e5).toISOString(), Solicitante: "Investigador demo", Material: "MAT-D14", Cantidad: 6, Urgencia: "Urgente", Motivo: "Quedan 4 bolsas de IGL-1 y cada perfusión usa 3", Estado: "Pendiente" });
@@ -76,8 +78,7 @@
       function med(muestra, punto, tn, fecha, vals) { var th = C.r((fecha - ini) / H0, 3); Object.keys(vals).forEach(function (v) { if (vals[v] === null || !isFinite(vals[v])) return; T.Mediciones.push(meta({ ID: id + "|" + muestra + "|" + punto + "|" + v, Experimento: id, Muestra: muestra, Punto: punto, T_nominal_h: tn, Fecha_hora: fecha.toISOString(), T_real_h: th, Variable: v, Valor: C.r(vals[v], C.variable(muestra, v).dec + 1), Texto: "", Unidad: C.variable(muestra, v).unidad }, u, t)); }); }
       // basales de los donantes (v0.6: la línea de referencia de Inicio es la basal del donante de hígado)
       med("BASAL_LD", "Basal", null, new Date(ini.getTime() - 5 * 36e5), { pH: 7.42, pO2: 98, pCO2: 41, Hb: 10.2, Hto: 31, Lactato: gn(1.4, 0.2), HCO3: 25.5, BE: 1, K: 4.1, Na: 140, Cl: 101, Ca: 1.25, Glucosa: gn(95, 6), ALT: gn(42, 5), AST: gn(38, 6), LDH: gn(480, 40), GGT: gn(28, 3), BilT: 0.2, FA: gn(160, 12), Albumina: 3.4, ActPT: 92, Fibrinogeno: 210, Urea: gn(22, 3) });
-      // v0.7: sin basal del donante de sangre; la inmunología solo en la basal y en la pre-perfusión
-      med("BASAL_LD", "Basal", null, new Date(ini.getTime() - 5 * 36e5), { C3: gn(95, 8), C4: gn(13, 2), IgA: gn(62, 6), IgG: gn(1350, 90), IgM: gn(125, 12), PCR: gn(6, 1.2) });
+      // v0.7: sin basal del donante de sangre · v0.7.1: la inmunología se toma en la pre-perfusión y cada 24 h (tubo amarillo), no en la basal
       // PRE
       med("PRE", "Pre", null, new Date(ini.getTime() - 20 * 6e4), { pH: 7.08, pO2: 145, pCO2: 33, Hb: 8.9, Hto: 27, Lactato: gn(7.5, 0.8), HCO3: 11.5, BE: -15, K: 3.4, Cl: 104, Ca: 0.31, Na: 151, Glucosa: 465, Albumina: 2.1, Mg: 1.6, P: 4.8, Osm: 302, C3: gn(60, 6), C4: gn(8, 1.5), IgA: gn(40, 5), IgG: gn(900, 80), IgM: gn(80, 10), PCR: gn(5, 1) });
       var PRE0 = { pH: 1, pO2: 1, pCO2: 1, Hb: 1, Hto: 1, Lactato: 1, HCO3: 1, BE: 1, K: 1, Cl: 1, Ca: 1, Na: 1, Glucosa: 1, Albumina: 1, Mg: 1, P: 1, Osm: 1 };   // v0.7: la pre-perfusión es la toma del punto 0 h
@@ -97,6 +98,7 @@
           var po2 = r[1], hb = vals.Hb; med(r[0], p.etiqueta, p.t_h, f, (r[0] === "ART" ? function (o) { return sinPre(o, p.t_h); } : function (o) { return o; })({ pH: pHa - (r[0] === "CAV" ? 0.03 : 0) + gn(0, 0.005), pO2: po2, pCO2: pco2 + (r[0] === "CAV" ? 4 : 0) + gn(0, 0.8), sO2: C.sO2Hill(po2), HCO3: vals.HCO3, BE: vals.BE, Hb: hb, Lactato: vals.Lactato, Glucosa: vals.Glucosa, Na: vals.Na, K: vals.K, Ca: vals.Ca, Cl: vals.Cl }));
         });
         med("FLUJO", p.etiqueta, p.t_h, f, flujo(h, f, m));
+        if (p.inmuno) med("INMUNO", p.etiqueta, p.t_h, f, { C3: gn(60 + 4 * h / 24, 5), C4: gn(8 + 0.5 * h / 24, 1.2), IgA: gn(40, 5), IgG: gn(900 - 10 * h / 24, 70), IgM: gn(80, 9), PCR: gn(5 + 2 * h / 24 + 6 * m, 1) });   // v0.7.1
         if (!dia ? (p.t_h % 2 === 0) : true) med("BILIS", p.etiqueta, p.t_h, f, (function () { var vol = Math.max(0.2, (p.t_h <= 2 ? 1.5 : dia ? 12 : 6) * (1 - 0.6 * m) + gn(0, 0.8)); return { Volumen_mL: vol, Peso_g: vol * 1.01, pH: 7.6 + gn(0, 0.08) - 0.2 * m, BilT: 18 + gn(0, 3), Glucosa: 20 + gn(0, 5), HCO3: 30 + gn(0, 2), Na: 150 + gn(0, 3), K: 4.5 + gn(0, 0.3), Cl: 100 + gn(0, 3), Lactato: 1 + gn(0, 0.2), LDH: 60 + gn(0, 10) }; })());
       });
       function flujo(h, f, m) { var hd = hc(f), noche = hd >= 22 || hd < 8; return { P_AH: 60 + gn(0, 2), P_AH_sis: 88 + gn(0, 3), P_AH_dia: 50 + gn(0, 3), Q_AH: Math.max(60, 120 + 140 * (1 - Math.exp(-h / 3)) - 60 * m + gn(0, 15)), P_VP: 3 + gn(0, 0.3), Q_VP: Math.max(200, 560 + 380 * (1 - Math.exp(-h / 3)) - 150 * m + gn(0, 40)),
@@ -173,11 +175,13 @@
             if (prev && !eraNueva) Object.keys(f).forEach(function (k) { if (k !== "ID" && !pj.hasOwnProperty(k) && String(prev[k]) !== String(f[k])) pj[k] = prev[k] === undefined ? "" : prev[k]; });
             o.Validado = false; o.Validado_por = ""; o.Validado_en = ""; o.Previo_JSON = prev && !eraNueva && Object.keys(pj).length ? JSON.stringify(pj) : ""; }
         }
+        if (tabla === "Material" && (f.Expediente !== undefined || f.Expediente_inicio !== undefined)) o.Unidades_pedidas = pedidasExpDemo(o);   // v0.7.1: solo los pedidos del expediente actual
         if (idx[f.ID] !== undefined) l[idx[f.ID]] = o; else { idx[f.ID] = l.length; l.push(o); } out.push(o);
       });
       persistir(); return { ok: true, filas: out, ahora: t };
     },
     webBorrar: function (tok, tabla, ids) { var u = sesion(tok); if (/^(Material|Pedidos)$/.test(tabla)) reqGestor(u); else if (tabla === "Movimientos") { if (u.rol !== "ADMIN") reqGestor(u); } else if (/^(Config|Usuarios)$/.test(tabla)) req(u, ["ADMIN"]); else req(u, ["ADMIN", "INVESTIGADOR"]); var n = 0, t = ahoraISO(), val = VALIDABLES.indexOf(tabla) !== -1;
+      if (tabla === "Material") ids.forEach(function (id) { var k = vivas("Movimientos").filter(function (x) { return x.Material === id; }).length; if (k) throw new Error("No se puede borrar «" + id + "»: tiene " + k + " movimiento(s) en el inventario. Dalo de baja (Activo = false) para conservar el historial."); });   // v0.7.1
       DB.tablas[tabla].forEach(function (f) { if (ids.indexOf(f.ID) === -1 || f.Borrado === true) return; if (u.rol !== "ADMIN" && f.Creado_por !== u.email && f.Creado_por !== "demo") throw new Error("Sin permiso: solo puedes borrar tus propios registros.");
         var eraVal = !esPend(f); f.Borrado = true; meta(f, u.email, t); if (val) { if (u.rol === "ADMIN") { f.Validado = true; f.Previo_JSON = ""; } else { f.Validado = false; f.Previo_JSON = eraVal ? JSON.stringify({ Borrado: false }) : f.Previo_JSON || ""; } } n++; }); persistir(); return { ok: true, n: n }; },
     webValidar: function (tok, tabla, ids) { var u = sesion(tok); req(u, ["ADMIN"]); var t = ahoraISO(), n = 0, out = []; DB.tablas[tabla].forEach(function (f) { if (ids.indexOf(f.ID) === -1) return; if (esPend(f)) n++; f.Validado = true; f.Validado_por = u.email; f.Validado_en = t; f.Previo_JSON = ""; f.Actualizado_en = t; out.push(f); }); persistir(); return { ok: true, n: n, filas: out }; },
@@ -248,7 +252,7 @@
     webPedidoEnviar: function (tok, id, o) {
       var u = sesion(tok); reqGestor(u); var p = vivas("Pedidos").filter(function (x) { return x.ID === id; })[0], t = ahoraISO(); o = o || {}; if (!p) throw new Error("Pedido no encontrado."); if (p.Estado !== "Borrador") throw new Error("El pedido ya está " + String(p.Estado).toLowerCase() + ".");
       if (!p.Email_proveedor) throw new Error("Falta el correo del proveedor."); var ls = JSON.parse(p.Lineas_JSON || "[]"); if (!ls.length) throw new Error("El pedido no tiene líneas.");
-      ls.forEach(function (x) { var m = DB.tablas.Material.filter(function (y) { return y.ID === x.Material; })[0]; if (!m) return; var uc = C.num(m.Unidades_contrato), up = C.num(m.Unidades_pedidas) || 0; if (uc !== null && up + x.Cantidad > uc && !o.forzar) throw new Error("Supera las unidades del expediente: quedan " + Math.max(0, uc - up) + " de " + m.Nombre + "."); });
+      ls.forEach(function (x) { var m = DB.tablas.Material.filter(function (y) { return y.ID === x.Material; })[0]; if (!m) return; var uc = C.num(m.Unidades_contrato), up = (C.num(m.Unidades_pedidas) || 0) + (C.num(m.Unidades_previas) || 0); if (uc !== null && up + x.Cantidad > uc && !o.forzar) throw new Error("Supera las unidades del expediente: quedan " + Math.max(0, uc - up) + " de " + m.Nombre + "."); });
       ls.forEach(function (x) { var m = DB.tablas.Material.filter(function (y) { return y.ID === x.Material; })[0]; if (m) { m.Unidades_pedidas = (C.num(m.Unidades_pedidas) || 0) + x.Cantidad; meta(m, u.email, t); } });
       p.Estado = "Enviado"; p.Enviado_por = u.email; p.Enviado_en = t; p.Asunto = o.asunto || p.Asunto || ""; p.Texto = o.texto || ""; meta(p, u.email, t); persistir(); return { ok: true, pedido: p, nota: "Modo demostración: no se envía ningún correo." };
     },
@@ -273,6 +277,12 @@
     webPushProbar: function () { throw new Error("Las notificaciones push no funcionan en modo demostración."); },
     webPushSuscribir: function () { throw new Error("No disponible en modo demostración."); }, webPushBaja: function () { return { ok: true }; }, webPushEstado: function () { return { preparado: false, esta: false, dispositivos: 0 }; }
   };
+  // v0.7.1 · unidades pedidas del expediente actual (pedidos Enviado/Recibido con ese expediente; sin expediente, desde su inicio)
+  function pedidasExpDemo(m) {
+    var e = String(m.Expediente || "").trim().toLowerCase(), t0 = m.Expediente_inicio ? Date.parse(m.Expediente_inicio) : null, s = 0;
+    vivas("Pedidos").forEach(function (p) { if (!/^(Enviado|Recibido)$/.test(p.Estado || "")) return; var pe = String(p.Expediente || "").trim().toLowerCase(), tp = Date.parse(p.Fecha || ""); if (e && (pe ? pe !== e : t0 && tp && tp < t0)) return; JSON.parse(p.Lineas_JSON || "[]").forEach(function (x) { if (x.Material === m.ID) s += C.num(x.Cantidad) || 0; }); });
+    return s;
+  }
   // v0.7 · gestores de inventario: casilla Gestor_inventario (ADMIN o INVESTIGADOR activos); si no hay ninguno, los ADMIN (respaldo)
   function siNo(v) { return v === true || /^(true|sí|si|1|verdadero)$/i.test(String(v === undefined || v === null ? "" : v).trim()); }
   function gestores() { return DB.tablas.Usuarios.filter(function (x) { return x.Activo !== false && x.Borrado !== true && siNo(x.Gestor_inventario) && /^(ADMIN|INVESTIGADOR)$/.test(normRol(x.Rol)); }); }
@@ -286,4 +296,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["demo.js"] = "0.7.0";
+;(window.HOME_MODS = window.HOME_MODS || {})["demo.js"] = "0.7.1";

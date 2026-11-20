@@ -1039,11 +1039,17 @@ body { max-width: 100vw; }
   .cab.con-fila2 .chip-activo { font-size: 12.5px; }
 }
 
-/* ---------- logo HOME del riel alineado con los iconos de la cabecera (centro a 32 px) ---------- */
-.riel { top: calc(10px + env(safe-area-inset-top, 0px)); padding-top: 0; }
+/* ---------- logo HOME del riel (v0.7.1): entero dentro del riel, centrado y con el mismo margen que a los lados ----------
+   escritorio: riel de 68 px → logo de 38 px con 15 px a cada lado y 15 px arriba (12 px de relleno + 3 px del hueco de 44 px);
+   tableta: riel de 60 px → 11 px a cada lado y arriba (8 + 3). El centro del logo queda a 44 px (escritorio) / 40 px (tableta)
+   del borde superior; el de la cabecera está a 32 px: subir más el logo lo sacaría del borde redondeado del riel. */
+.riel { top: calc(10px + env(safe-area-inset-top, 0px)); padding-top: 12px; }
 .riel .riel-logo { width: 44px; height: 44px; flex: none; margin: 0 0 6px; }
 .riel .riel-logo svg { width: 38px; height: 38px; }
-@media (max-width: 1099px) { .riel { top: calc(10px + env(safe-area-inset-top, 0px)); } }
+@media (max-width: 1099px) { .riel { top: calc(10px + env(safe-area-inset-top, 0px)); padding-top: 8px; } }
+
+/* ---------- chip de usuario de la cabecera (v0.7.1): avatar redondo de 38 px como en la v0.6 ---------- */
+.usuario-cab > .avatar { width: 38px; height: 38px; min-height: 0; flex: none; border-radius: 50%; padding: 0; }
 
 /* ---------- Inicio: grupos de gráficos desplegables ---------- */
 details.g-grupo { margin: 14px 0 0; border-radius: var(--r); }
@@ -1058,7 +1064,8 @@ details.g-grupo > summary:focus-visible { outline: 2px solid var(--pri); outline
 details.g-grupo > .g-rejilla { margin-top: 12px; }
 
 /* ---------- Inicio: muestreo ---------- */
-.ini-muestreo { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr); gap: 12px; align-items: stretch; }
+.ini-muestreo { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: stretch; }   /* v0.7.1: los volúmenes pasan a «Balance de volumen y HDF» */
+.ini-muestreo .im-tubos { max-width: 560px; }
 .im-prox { background: var(--sup2); border-radius: var(--r); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .im-prox .et { font-size: 12.5px; color: var(--tenue); font-weight: 500; }
 .im-hora { font-size: 15px; }
@@ -1066,10 +1073,8 @@ details.g-grupo > .g-rejilla { margin-top: 12px; }
 .im-tubos li { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 6px; align-items: baseline; font-size: 13.5px; }
 .im-n { font-weight: 700; font-variant-numeric: tabular-nums; } .im-ml { color: var(--tenue); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .im-total { font-size: 13.5px; border-top: 1px solid var(--borde); padding-top: 6px; }
-.im-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
 details.im-plan { margin-top: 10px; }
 .ini-hdf-rec { margin-top: 14px; } .ini-hdf-rec > .cabecera h3 { font-size: 15px; }
-@media (max-width: 899px) { .ini-muestreo { grid-template-columns: 1fr; } }
 
 /* ---------- gráfico ampliado: zoom y desplazamiento ---------- */
 .g-ampliado { cursor: default; }
@@ -1171,6 +1176,21 @@ table.t-obj-gas { min-width: 560px; } table.t-obj-gas thead th:first-child { wid
 .obj-guion { text-align: center; color: var(--tenue); }
 @media (max-width: 599px) { table.t-obj:not(.t-obj-gas) th:nth-child(4), table.t-obj:not(.t-obj-gas) td:nth-child(4) { display: none; } table.t-obj:not(.t-obj-gas) th:nth-child(1) { width: 40%; } }
 
+/* ---------- v0.7.1 · botón (i) junto a la etiqueta de un campo ---------- */
+label.et.et-i { display: inline-block; }
+label.et.et-i + .bt-info { width: 24px; height: 24px; margin: -4px 0 0 2px; }
+.cabecera > h2 + .bt-info, .cabecera > h3 + .bt-info { margin-left: -4px; }
+.fila-info { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+.fila-info > label.check { margin: 0; }
+
+/* ---------- v0.7.1 · avisos en formato lista (un elemento por línea del Texto) ---------- */
+.al-texto { margin: 6px 0 0; } .al-texto p { margin: 0 0 4px; } .al-texto .al-sub { margin-top: 8px; }
+.aviso-lista { margin: 4px 0 0; padding-left: 20px; } .aviso-lista li { margin: 2px 0; line-height: 1.4; }
+.aviso-lista li::marker { color: var(--tenue); }
+.lista-alertas .tx .aviso-lista.en-linea { display: block; padding-left: 0; margin: 2px 0 0; white-space: normal; overflow: visible; }
+.lista-alertas .tx .aviso-lista.en-linea .aviso-li { display: block; position: relative; padding-left: 12px; white-space: normal; overflow: visible; text-overflow: clip; }
+.lista-alertas .tx .aviso-lista.en-linea .aviso-li::before { content: "•"; position: absolute; left: 1px; }
+
 /* HOME · v0.7 (b): seguimiento, HDF, tabla de infusiones, cierre, post-trasplante, importación de informes y configuración HDF/circadiano */
 /* (2) bloques del registro: casillas alineadas (la etiqueta ocupa siempre dos líneas y la pista una) */
 .reg-rejilla { align-items: start; }
@@ -1239,6 +1259,31 @@ details.circ-linea .dentro { padding: 0 12px 12px; }
 @media (max-width: 599px) { .circ-cab { display: none; } .circ-fila { grid-template-columns: 1fr 1fr 1fr 40px; } .circ-fila input[data-k=nota] { grid-column: 1 / -1; grid-row: 2; } }
 /* entradas de 16 px en pantallas táctiles (evita el zoom de iOS al enfocar) */
 @media (pointer: coarse) { .circ-fila input, .circ-fila select, .cfg-h input, .pdf-imp textarea, table.tabla-inf input, table.tabla-sup input, table.tabla-sup textarea { font-size: 16px; } }
+/* v0.7.1 (6) cabecera del registro: punto, bloques y unidad de gases en una rejilla con las etiquetas a la misma altura y los controles alineados abajo */
+.reg-cab-rej { display: grid; grid-template-columns: minmax(240px, 340px) minmax(0, 1fr) auto; gap: 8px 16px; align-items: end; }
+.reg-cab-rej > .campo { margin: 0; }
+.reg-cab-rej > .campo > .et { flex: none; display: flex; align-items: center; min-height: 28px; margin: 0 0 4px; gap: 0; }
+.reg-cab-rej select { width: 100%; min-width: 0; }
+.reg-cab-rej .reg-resumen { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: var(--alto-in, 40px); }
+.reg-cab-rej .segmentado { min-height: var(--alto-in, 40px); }
+button.chip.reg-ir { cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 500; min-height: 30px; padding: 3px 11px; }
+button.chip.reg-ir:hover, button.chip.reg-ir:focus-visible { box-shadow: 0 0 0 2px var(--pri-claro), inset 0 0 0 1px var(--pri); outline: none; }
+@media (max-width: 760px) { .reg-cab-rej { grid-template-columns: minmax(0, 1fr) auto; } .reg-cab-rej .reg-c-bloques { grid-column: 1 / -1; grid-row: 2; } }
+@media (max-width: 420px) { .reg-cab-rej { grid-template-columns: minmax(0, 1fr); } .reg-cab-rej .reg-c-bloques { grid-row: auto; } }
+.reg-hdf-fila { align-items: center; margin-top: 4px; }
+.et-info { display: inline-flex; align-items: center; font-size: 12.5px; color: var(--tenue); }
+/* títulos con (i) en lugar de notas grises */
+.tit-info { display: flex; align-items: center; gap: 2px; margin: 4px 0 8px; } .tit-info h2, .tit-info h3 { margin: 0; }
+.campo > .et .bt-info, label.et .bt-info { width: 24px; height: 24px; margin-left: 2px; }
+/* v0.7.1 (8) Subir PDF: «Informe en PDF» y «… o pega el texto» a la misma altura; la nota de la vista previa va en la (i) */
+.rejilla.pdf-campos { align-items: start; }
+.pdf-campos > .campo > .et { flex: none; min-height: 28px; align-items: center; margin-bottom: 4px; }
+.pdf-campos .pdf-acciones { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+.pdf-nhc { margin-top: 6px; }
+/* v0.7.1 (12) avisos del plan en formato lista (un elemento por línea) */
+td.aviso-txt > div { white-space: pre-line; }
+.hora-prov { margin: 4px 0 8px; display: flex; align-items: center; gap: 2px; }
+.cierre-est { margin-top: 6px; }
 
 /* v0.7 (c): Gráficas (diseño tipo Inicio, leyenda común, maquetación, ejes en inglés, bandas circadianas) */
 .g7-barra { margin-bottom: 10px; }
@@ -1279,11 +1324,14 @@ details.circ-linea .dentro { padding: 0 12px 12px; }
 .prep-tabs .punto-al { width: 8px; height: 8px; border-radius: 50%; background: var(--al, #dc2626); display: inline-block; margin-left: 2px; }
 .v7d-sub { display: flex; align-items: center; gap: 6px; margin-top: 18px; }
 /* inventario: mismas columnas en todas las pestañas */
-.tabla-inv { table-layout: fixed; width: 100%; min-width: 960px; }
-.tabla-inv col.c-ub { width: 300px; } .tabla-inv col.c-n { width: 88px; } .tabla-inv col.c-niv { width: 96px; } .tabla-inv col.c-acc { width: 150px; }
+.tabla-inv { table-layout: fixed; width: 100%; min-width: 1100px; }
+/* v0.7.1: anchos repartidos (antes la columna de acciones, 150 px, no cabía con 4 botones y la barra de «Nivel» quedaba debajo de ellos) */
+.tabla-inv col.c-mat { width: auto; } .tabla-inv col.c-ub { width: 230px; } .tabla-inv col.c-st { width: 104px; } .tabla-inv col.c-n { width: 86px; } .tabla-inv col.c-niv { width: 104px; } .tabla-inv col.c-acc { width: 200px; }
+.tabla-inv th { white-space: normal; line-height: 1.25; } .tabla-inv td { vertical-align: middle; }
+.tabla-inv .barra-stock { min-width: 0; width: 100%; max-width: 88px; }
 .tabla-inv .nom { display: block; overflow-wrap: anywhere; } .tabla-inv .ref { display: block; font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
 .tabla-inv .sel-ub { width: 100%; min-width: 0; font-size: 13px; }
-.tabla-inv .acc-mat { display: flex; flex-wrap: nowrap; gap: 4px; justify-content: flex-end; }
+.tabla-inv .acc-mat { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }   /* v0.7.1: si no caben, bajan de línea dentro de su celda */
 .inv-tabs .n { font-size: 11.5px; color: var(--muy-tenue); font-variant-numeric: tabular-nums; margin-left: 2px; }
 .v7d-inv .inv-sub { margin: 4px 0 12px; } .v7d-inv .inv-sub a { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
 .tabla-gest td label.check { margin: 0; }
@@ -1302,3 +1350,28 @@ html.tema-oscuro .morfo-svg[viewBox="0 0 720 380"] { background: #fbfaf6; }
 /* el texto largo (nombre, referencia, regla, etiquetas) se parte dentro de su columna, sin invadir la siguiente */
 table.t.tabla-inv td, table.t.tabla-chk.v7 td { white-space: normal; overflow-wrap: anywhere; } .tabla-inv td:first-child .chip, .tabla-chk.v7 .chip { white-space: normal; max-width: 100%; }
 .tabla-inv td:first-child, .tabla-chk.v7 td:nth-child(2) { overflow: hidden; }
+
+/* ---------------- v0.7.1 (d) · materiales ---------------- */
+.v71-regla select { width: 100%; } .v71-regla-sub { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; align-items: center; } .v71-regla-sub select { flex: 1 1 220px; min-width: 0; }
+.v71-regla-sub .v71-n input { width: 80px; }
+.v71-exp-estado { display: grid; gap: 6px; margin: 4px 0 10px; padding: 10px 12px; border-radius: 12px; background: var(--sup2, #f3f6f7); font-size: 13.5px; line-height: 1.45; }
+.v71-exp-estado .barra-stock { min-width: 0; width: 100%; height: 8px; }
+.v71-exp-acc { margin: 4px 0 10px; } .v71-hist { margin-top: 8px; } .tabla-exp td, .tabla-exp th { white-space: nowrap; }
+.v71-chip-exp { white-space: normal; } .v71-bajas { margin-top: 12px; } .v71-bajas summary { display: inline-flex; align-items: center; gap: 6px; }
+.m-pie .v71-borrar { margin-right: auto; }
+/* morfometría: Foto | Vídeo */
+.v71-mf-seg { margin-bottom: 10px; } .v71-mf-seg button { display: inline-flex; align-items: center; gap: 6px; }
+.v71-mf-nota { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0 0; font-size: 14px; line-height: 1.45; }
+.v71-pant { position: relative; } .v71-svg { width: 100%; height: auto; display: block; }
+.v71-cont { position: absolute; top: 8px; right: 10px; background: #0d2a2d; color: #fff; border-radius: 999px; padding: 2px 10px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.v71-barra { height: 6px; background: var(--borde, #dde3e5); border-radius: 999px; overflow: hidden; margin: 8px 0; } .v71-barra i { display: block; height: 100%; width: 0; background: var(--pri, #0f766e); }
+.v71-rot { min-height: 96px; } .v71-rot .v71-tit { display: flex; align-items: center; gap: 8px; font-size: 16px; } .v71-rot p { margin: 6px 0 0; line-height: 1.45; }
+.v71-sig { display: inline-block; color: #fff; border-radius: 999px; padding: 1px 10px; font-size: 13px; font-weight: 700; }
+.v71-cinta-t { display: flex; gap: 8px; align-items: flex-start; background: #fff7d6; color: #4a3b07; border-radius: 10px; padding: 8px 10px; }
+html.tema-oscuro .v71-cinta-t { background: #3a3110; color: #fbe9a8; }
+.v71-ctrl { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; } .v71-ctrl .bt { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; }
+.v71-vel { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: 13.5px; } .v71-vel select { width: auto; }
+.v71-pasos { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; } .v71-pasos button { border: 1px solid var(--borde, #cfd8db); background: transparent; color: inherit; border-radius: 999px; padding: 6px 12px; min-height: 36px; font: inherit; font-size: 13px; cursor: pointer; }
+.v71-pasos button.activo { background: var(--c, #0f766e); border-color: var(--c, #0f766e); color: #fff; font-weight: 700; }
+@media (max-width: 520px) { .v71-vel { margin-left: 0; } .v71-ctrl .bt span { display: none; } .v71-rot { min-height: 130px; } }
+@media (prefers-reduced-motion: reduce) { .v71-barra i { transition: none; } }
