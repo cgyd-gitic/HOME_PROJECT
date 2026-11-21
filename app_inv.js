@@ -268,9 +268,9 @@
   }
   H.acc.usrCampo = function (el) { var o = { ID: el.getAttribute("data-id") }; o[el.getAttribute("data-k")] = el.type === "checkbox" ? el.checked : el.value; H.guardar("Usuarios", [o], { sinRepintar: true }); };
   H.acc.nuevoUsr = function () {
-    H.modal({ titulo: "Añadir usuario", cuerpo: "<div class=\"campo\"><label class=\"et\" for=\"nuE\">Correo</label><input id=\"nuE\" type=\"email\" autocomplete=\"off\" spellcheck=\"false\"></div><div class=\"campo\"><label class=\"et\" for=\"nuN\">Nombre</label><input id=\"nuN\" autocomplete=\"off\"></div><div class=\"campo\"><label class=\"et\" for=\"nuR\">Rol</label><select id=\"nuR\">" + H.ROLES.slice().reverse().map(function (r) { return "<option value=\"" + r[0] + "\">" + esc(r[1]) + "</option>"; }).join("") + "</select></div>",
+    H.modal({ titulo: "Añadir usuario", cuerpo: "<div class=\"campo\"><label class=\"et\" for=\"nuE\">Correo</label><input id=\"nuE\" type=\"email\" autocomplete=\"off\" spellcheck=\"false\"></div><div class=\"rejilla dos\"><div class=\"campo\"><label class=\"et\" for=\"nuN\">Nombre</label><input id=\"nuN\" autocomplete=\"off\"></div><div class=\"campo\"><label class=\"et\" for=\"nuA\">Apellidos</label><input id=\"nuA\" autocomplete=\"off\"></div></div><div class=\"campo\"><label class=\"et\" for=\"nuR\">Rol</label><select id=\"nuR\">" + H.ROLES.slice().reverse().map(function (r) { return "<option value=\"" + r[0] + "\">" + esc(r[1]) + "</option>"; }).join("") + "</select></div>",
       pie: "<button class=\"bt\" data-cerrar>Cancelar</button><button class=\"bt pri\" id=\"nuOk\">Añadir</button>",
-      alAbrir: function (d) { d.querySelector("#nuOk").addEventListener("click", function () { var em = d.querySelector("#nuE").value.trim().toLowerCase(); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { H.toast("Correo no válido.", "error"); return; } if (H.filas("Usuarios").some(function (u) { return String(u.Email).toLowerCase() === em; })) { H.toast("Ese correo ya tiene usuario.", "error"); return; } H.guardar("Usuarios", [{ ID: "USR-" + H.uid(), Email: em, Nombre: d.querySelector("#nuN").value.trim(), Rol: d.querySelector("#nuR").value, Activo: true }]); d.close(); }); } });
+      alAbrir: function (d) { d.querySelector("#nuOk").addEventListener("click", function () { var em = d.querySelector("#nuE").value.trim().toLowerCase(); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { H.toast("Correo no válido.", "error"); return; } if (H.filas("Usuarios").some(function (u) { return String(u.Email).toLowerCase() === em; })) { H.toast("Ese correo ya tiene usuario.", "error"); return; } H.guardar("Usuarios", [{ ID: "USR-" + H.uid(), Email: em, Nombre: d.querySelector("#nuN").value.trim(), Apellidos: d.querySelector("#nuA").value.trim(), Rol: d.querySelector("#nuR").value, Activo: true }]); d.close(); }); } });
   };
   function personal() {
     var l = H.filas("Personal").slice().sort(function (a, b) { return String(a.Categoria + a.Nombre).localeCompare(String(b.Categoria + b.Nombre), "es"); });
@@ -349,7 +349,7 @@
   H.vistas.cuenta = function () {
     var u = S.usuario || {}, pa = H.pref("pushActivo"), tema = H.pref("tema") || "sistema";
     return "<div class=\"ancho\" style=\"max-width:820px\"><div class=\"titulo-pag\"><h1>Mi cuenta</h1></div>" +
-      "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>" + esc(u.nombre || u.email) + "</h2><span class=\"chip pri\">" + esc(u.rol) + "</span></div><p class=\"tenue\">" + esc(u.email) + (S.demo ? " · modo demostración" : "") + "</p><button class=\"bt peligro\" data-act=\"salir\">" + ico("log-out") + "Cerrar sesión</button></section>" +
+      "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>" + esc(H.nombreVisible ? H.nombreVisible(u) : u.nombre || u.email) + "</h2><span class=\"chip pri\">" + esc(u.rol) + "</span></div><p class=\"tenue\">" + esc(u.email) + (S.demo ? " · modo demostración" : "") + "</p><button class=\"bt peligro\" data-act=\"salir\">" + ico("log-out") + "Cerrar sesión</button></section>" +
       "<section class=\"tarjeta\"><div class=\"cabecera\"><h2>Avisos en este dispositivo</h2>" + H.botonInfo("Para recibir los avisos con la pantalla bloqueada o la app cerrada, activa las notificaciones push en este dispositivo. En iPhone, instala antes la web: Safari → Compartir → Añadir a pantalla de inicio.") + "</div>" +
       "<p class=\"tenue\">Con la app abierta, los avisos programados suenan y aparecen en pantalla.</p>" +
       "<div class=\"fila-flex\">" + (pa ? "<button class=\"bt\" data-act=\"pushOff\">" + ico("bell") + "Desactivar notificaciones</button><button class=\"bt\" data-act=\"pushTest\">" + ico("send") + "Enviar prueba</button>" : "<button class=\"bt pri\" data-act=\"pushOn\">" + ico("bell-ring") + "Activar notificaciones</button>") + "<button class=\"bt\" data-act=\"probarAlarma\">" + ico("bell") + "Probar alarma en pantalla</button></div>" +
@@ -371,4 +371,4 @@
   H.acc.forzarSync = function () { S.online = true; H.enviarCola().then(H.sondear); H.toast("Sincronizando…"); };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_inv.js"] = "0.7.1";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_inv.js"] = "0.7.2";

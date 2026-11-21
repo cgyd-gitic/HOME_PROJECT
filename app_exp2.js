@@ -383,4 +383,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_exp2.js"] = "0.7.1";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_exp2.js"] = "0.7.2";

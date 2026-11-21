@@ -193,7 +193,40 @@
       svg.setAttribute("viewBox", [z.x, z.y, w, h].map(function (v) { return Math.round(v * 100) / 100; }).join(" "));
       barra.querySelector(".g-amp-nivel").textContent = Math.round(z.s * 100) + " %"; vista.classList.toggle("ampliado", z.s > 1.001);
       barra.querySelector("[data-z=menos]").disabled = z.s <= 1.001; barra.querySelector("[data-z=mas]").disabled = z.s >= 7.999; barra.querySelector("[data-z=reset]").disabled = z.s <= 1.001;
+      if (sel) colocarEtq();
     }
+    // v0.7.2: tocar (o pulsar) un punto sin arrastrar → etiqueta con el valor, la unidad, el punto, la hora y el experimento
+    var etq = document.createElement("div"), sel = null, toque = null; etq.className = "g-amp-etq"; etq.hidden = true; etq.setAttribute("role", "status"); etq.setAttribute("aria-live", "polite"); vista.appendChild(etq);
+    var EXP = o.getAttribute("data-exp") || "", UNI = o.getAttribute("data-u") || "", DEC = C.num(o.getAttribute("data-dec")), T0 = C.num(o.getAttribute("data-t0"));
+    function puntoEn(cx, cy) {
+      var r = vista.getBoundingClientRect(); if (!r.width || !r.height) return null;
+      var w = W / z.s, h = Hh / z.s, sx = z.x + (cx - r.left) / r.width * w, sy = z.y + (cy - r.top) / r.height * h, tol = 22 * w / r.width, mejor = null, dm = Infinity;
+      Array.prototype.forEach.call(svg.querySelectorAll("circle.ge-punto"), function (c) { var d = Math.hypot(C.num(c.getAttribute("cx")) - sx, C.num(c.getAttribute("cy")) - sy); if (d < dm) { dm = d; mejor = c; } });
+      return dm <= tol ? mejor : null;
+    }
+    function colocarEtq() {
+      if (!sel) return; var r = vista.getBoundingClientRect(), w = W / z.s, h = Hh / z.s, rw = r.width || W, rh = r.height || Hh;
+      var px = (C.num(sel.getAttribute("cx")) - z.x) / w * rw, py = (C.num(sel.getAttribute("cy")) - z.y) / h * rh;
+      etq.style.left = Math.round(px) + "px"; etq.style.top = Math.round(py) + "px";
+      etq.classList.toggle("izq", px > rw * 0.62); etq.classList.toggle("abajo", py < rh * 0.3); etq.classList.toggle("fuera", px < 0 || py < 0 || px > rw || py > rh);
+    }
+    function mostrarPunto(c) {
+      if (sel) sel.classList.remove("sel"); sel = c; c.classList.add("sel");
+      var v = C.num(c.getAttribute("data-v")), t = C.num(c.getAttribute("data-t")), p = c.getAttribute("data-p") || "", dec = DEC === null ? 1 : DEC;
+      var reloj = T0 !== null && t !== null ? H.fechaHora(new Date(T0 + t * 3600000)) : "";
+      etq.innerHTML = '<b>' + esc(H.n(v, dec)) + (UNI ? " " + esc(UNI) : "") + "</b><span>" + (p ? "Punto " + esc(p) + " · " : "") + esc(H.n(t, 1)) + " h de perfusión</span>" + (reloj ? "<span>" + esc(reloj) + "</span>" : "") + (EXP ? "<span>" + esc(EXP) + "</span>" : "");
+      etq.hidden = false; colocarEtq();
+    }
+    function ocultarPunto() { if (sel) sel.classList.remove("sel"); sel = null; etq.hidden = true; }
+    H._zoomAmpliado_punto = { mostrar: mostrarPunto, ocultar: ocultarPunto, buscar: puntoEn };
+    vista.addEventListener("pointerdown", function (e) { toque = { x: e.clientX, y: e.clientY, t: Date.now(), n: Object.keys(ptr).length }; }, true);
+    vista.addEventListener("pointerup", function (e) {
+      var tq = toque; toque = null; if (!tq || tq.n > 0 || movido || Object.keys(ptr).some(function (k) { return String(k) !== String(e.pointerId); })) return;
+      if (Math.abs(e.clientX - tq.x) + Math.abs(e.clientY - tq.y) > 8 || Date.now() - tq.t > 800) return;
+      var c = e.target && e.target.closest ? e.target.closest("circle.ge-punto") : null; c = c || puntoEn(e.clientX, e.clientY);
+      if (c) mostrarPunto(c); else ocultarPunto();
+    });
+    vista.addEventListener("click", function (e) { var c = e.target && e.target.closest ? e.target.closest("circle.ge-punto") : null; if (c && c !== sel) mostrarPunto(c); });   // ratón/teclado sin eventos de puntero
     function zoomEn(f, fx, fy) { var w = W / z.s, h = Hh / z.s, px = z.x + (fx === undefined ? 0.5 : fx) * w, py = z.y + (fy === undefined ? 0.5 : fy) * h; z.s = Math.max(1, Math.min(8, z.s * f)); var w2 = W / z.s, h2 = Hh / z.s; z.x = px - (fx === undefined ? 0.5 : fx) * w2; z.y = py - (fy === undefined ? 0.5 : fy) * h2; aplicar(); }
     function mover(dxPx, dyPx) { var r = vista.getBoundingClientRect(), w = W / z.s, h = Hh / z.s; z.x -= dxPx * w / (r.width || W); z.y -= dyPx * h / (r.height || Hh); aplicar(); }
     function frac(cx, cy) { var r = vista.getBoundingClientRect(); return [r.width ? (cx - r.left) / r.width : 0.5, r.height ? (cy - r.top) / r.height : 0.5]; }
@@ -270,7 +303,7 @@
       '<div class="tabla-env"><table class="t t-usuarios"><thead><tr><th>Usuario</th><th>Rol</th><th class="centro">Activo</th>' + NOTIF.map(function (n) { return '<th class="centro">' + esc(n[2]) + "</th>"; }).join("") + '<th class="centro">Gestor de inventario</th><th>Último acceso</th></tr></thead><tbody>' +
       l.map(function (u) {
         var em = String(u.Email || "").toLowerCase();
-        return '<tr class="' + (activo(u) ? "" : "inactivo") + '"><td data-et="Usuario"><input value="' + esc(u.Nombre || "") + '" aria-label="Nombre de ' + esc(u.Email) + '" data-cambio="usrCampo" data-id="' + esc(u.ID) + '" data-k="Nombre" autocomplete="off" placeholder="Nombre…"><div class="muy-tenue usr-mail">' + esc(u.Email) + (em === yo ? ' · <b>tú</b>' : "") + "</div></td>" +
+        return '<tr class="' + (activo(u) ? "" : "inactivo") + '"><td data-et="Usuario"><input value="' + esc(u.Nombre || "") + '" aria-label="Nombre de ' + esc(u.Email) + '" data-cambio="usrCampo" data-id="' + esc(u.ID) + '" data-k="Nombre" autocomplete="off" placeholder="Nombre…"><input class="usr-ape" value="' + esc(u.Apellidos || "") + '" aria-label="Apellidos de ' + esc(u.Email) + '" data-cambio="usrCampo" data-id="' + esc(u.ID) + '" data-k="Apellidos" autocomplete="off" placeholder="Apellidos…"><div class="muy-tenue usr-mail">' + esc(u.Email) + (em === yo ? ' · <b>tú</b>' : "") + "</div></td>" +
           '<td data-et="Rol"><select aria-label="Rol de ' + esc(u.Email) + '" data-cambio="usrCampo" data-id="' + esc(u.ID) + '" data-k="Rol">' + H.ROLES.map(function (r) { return '<option value="' + r[0] + '"' + (r[0] === H.normRol(u.Rol) ? " selected" : "") + ">" + esc(r[1]) + "</option>"; }).join("") + "</select></td>" +
           '<td class="centro" data-et="Activo"><label class="check usr-chk"><input type="checkbox" aria-label="Activo · ' + esc(u.Nombre || u.Email) + '" data-cambio="usrCampo" data-id="' + esc(u.ID) + '" data-k="Activo"' + (activo(u) ? " checked" : "") + '><span class="usr-chk-et">Activo</span></label></td>' +
           NOTIF.map(function (n) { return casilla(u, n[0], n[2]); }).join("") + casilla(u, "Gestor_inventario", "Gestor de inventario") +
@@ -284,6 +317,13 @@
       '<section class="tarjeta"><div class="cabecera"><h2>Responsables de la perfusión</h2></div>' + (resp.length ? '<div class="tabla-env"><table class="t"><thead><tr><th>Experimento</th><th>Estado</th><th>Responsables</th></tr></thead><tbody>' + resp.map(function (x) {
         return '<tr><td><a href="#/exp/' + encodeURIComponent(x.e.ID) + '">' + esc(x.e.ID) + "</a></td><td>" + (H.estadoChip ? H.estadoChip(x.e.Estado) : esc(x.e.Estado || "")) + '</td><td class="envolver">' + (x.l.length ? esc(x.l.map(function (r) { return r.Nombre + (r.Email ? "" : " (sin correo)"); }).join(", ")) : '<span class="muy-tenue">Sin responsable asignado</span>') + "</td></tr>";
       }).join("") + "</tbody></table></div>" : '<p class="tenue">No hay experimentos programados.</p>') + "</section>";
+  };
+  // v0.7.2: si el ADMIN cambia su propio nombre o apellidos en la tabla, se actualiza la cabecera
+  var usrCampoPrev = H.acc.usrCampo;
+  H.acc.usrCampo = function (el) {
+    var r = usrCampoPrev.apply(this, arguments), k = el.getAttribute("data-k"), u = H.fila("Usuarios", el.getAttribute("data-id")), yo = String((S.usuario || {}).email || "").toLowerCase();
+    if ((k === "Nombre" || k === "Apellidos") && u && String(u.Email || "").toLowerCase() === yo && S.usuario) { S.usuario[k === "Nombre" ? "nombre" : "apellidos"] = el.value.trim(); if (H.guardarSesion) H.guardarSesion(); H.actualizarCabUsuario(); }
+    return r;
   };
   H.acc.usrNotif = function (el) {
     var o = { ID: el.getAttribute("data-id") }, k = el.getAttribute("data-k"); o[k] = el.checked;
@@ -306,11 +346,46 @@
       (soy.length ? '<div class="aviso info">' + ico("user-check") + "<div>Eres <b>" + esc(CAT_RESP.toLowerCase()) + "</b> en " + esc(soy.join(", ")) + ": recibirás sus avisos aunque desactives «Avisos de la perfusión en curso».</div></div>" : "") +
       '<p class="muy-tenue" style="margin-top:8px">Gestor de inventario: <b>' + (u.gestor_inventario ? "sí" + (u.gestor_respaldo ? " (como administrador, porque no hay ningún gestor asignado)" : "") : "no") + "</b>. Lo asigna un administrador en Configuración → Usuarios.</p></section>";
   }
+  // v0.7.2: «Datos personales»: nombre y apellidos (la cabecera muestra «Nombre Apellidos»)
+  function cuentaDatosHTML() {
+    var u = S.usuario || {};
+    return '<section class="tarjeta" id="misDatos"><div class="cabecera"><h2>Datos personales</h2>' + H.botonInfo("Tu nombre y tus apellidos. Arriba a la derecha y en la actividad del equipo aparece «Nombre Apellidos». El correo no se puede cambiar aquí: lo cambia un administrador en Configuración → Usuarios.") + "</div>" +
+      '<form id="fDatos" class="rejilla dos" novalidate><div class="campo"><label class="et" for="miNombre">Nombre</label><input id="miNombre" name="given-name" autocomplete="given-name" maxlength="60" value="' + esc(u.nombre || "") + '" placeholder="Nombre…"></div>' +
+      '<div class="campo"><label class="et" for="miApellidos">Apellidos</label><input id="miApellidos" name="family-name" autocomplete="family-name" maxlength="80" value="' + esc(u.apellidos || "") + '" placeholder="Apellidos…"></div></form>' +
+      '<div class="fila-flex"><button class="bt pri" data-act="miDatos">' + ico("save") + "Guardar</button><span class=\"muy-tenue\" id=\"misDatosPrev\">Se verá como: <b>" + esc(H.nombreVisible(u)) + "</b></span></div></section>";
+  }
   var cuentaPrev = H.vistas.cuenta;
   H.vistas.cuenta = function (p, q) {
     var h = cuentaPrev.apply(this, arguments), marca = '<section class="tarjeta"><div class="cabecera"><h2>Avisos en este dispositivo', i = h.indexOf(marca), extra = cuentaNotifHTML();
-    return i === -1 ? h.replace(/<\/div>\s*$/, extra + "</div>") : h.slice(0, i) + extra + h.slice(i);
+    h = i === -1 ? h.replace(/<\/div>\s*$/, extra + "</div>") : h.slice(0, i) + extra + h.slice(i);
+    var jp = h.indexOf('<section class="tarjeta perfil"'), j = jp === -1 ? -1 : h.indexOf("<section", jp + 10);   // justo después de la foto
+    if (j === -1) j = h.indexOf('<section class="tarjeta" id="accesoRapido"'); if (j === -1) j = h.indexOf('<section class="tarjeta notif-cuenta"');
+    return j === -1 ? h.replace(/<\/div>\s*$/, cuentaDatosHTML() + "</div>") : h.slice(0, j) + cuentaDatosHTML() + h.slice(j);
   };
+  // cabecera sin repintar todo el marco (no se pierde el foco de la tabla de usuarios)
+  H.actualizarCabUsuario = function () {
+    var u = S.usuario || {}, b = H.$(".usuario-cab"), n = H.nombreVisible(u); if (!b) return;
+    var t = b.querySelector(".usr-txt b"); if (t) t.textContent = n; b.setAttribute("aria-label", "Mi cuenta: " + n + " (" + H.nombreRol(u.rol) + ")");
+    var av = b.querySelector(".avatar"); if (av && H.avatarHTML) { var d = document.createElement("div"); d.innerHTML = H.avatarHTML(u, "av-cab"); if (d.firstChild) av.parentNode.replaceChild(d.firstChild, av); }
+  };
+  H.acc.miDatos = function (el) {
+    var iN = H.$("#miNombre"), iA = H.$("#miApellidos"); if (!iN || !iA) return;
+    var o = { nombre: iN.value.trim(), apellidos: iA.value.trim() };
+    if (!o.nombre) { H.toast("Escribe tu nombre.", "error"); iN.focus(); return; }
+    if (el) el.disabled = true;
+    H.api("webPerfilDatos", o).then(function (r) {
+      var nu = (r && r.usuario) || { nombre: o.nombre, apellidos: o.apellidos }; S.usuario = Object.assign({}, S.usuario, nu);
+      if (H.guardarSesion) H.guardarSesion();
+      if (H.upsertLocal && S.usuario.id) {
+        if (H.fila("Usuarios", S.usuario.id)) H.upsertLocal("Usuarios", [{ ID: S.usuario.id, Nombre: S.usuario.nombre, Apellidos: S.usuario.apellidos || "" }]);
+        if (H.fila("Equipo", S.usuario.id)) H.upsertLocal("Equipo", [{ ID: S.usuario.id, Nombre: H.nombreVisible(S.usuario) }]);
+        if (H.guardarCache) H.guardarCache();
+      }
+      H.actualizarCabUsuario(); H.toast("Datos guardados."); H.repintar();
+    }).catch(function (e) { if (el) el.disabled = false; H.toast(e.message || "No se han podido guardar los datos. Comprueba la conexión.", "error"); });
+  };
+  document.addEventListener("submit", function (e) { if (e.target && e.target.id === "fDatos") { e.preventDefault(); H.acc.miDatos(H.$("[data-act=miDatos]")); } });
+  document.addEventListener("input", function (e) { if (!e.target || (e.target.id !== "miNombre" && e.target.id !== "miApellidos")) return; var p = H.$("#misDatosPrev b"); if (p) p.textContent = H.nombreVisible({ nombre: (H.$("#miNombre") || {}).value, apellidos: (H.$("#miApellidos") || {}).value, email: (S.usuario || {}).email }); });
   H.acc.miNotif = function (el) {
     var k = el.getAttribute("data-k"), o = {}; o[k] = el.checked; el.disabled = true;
     H.api("webPerfilNotificaciones", o).then(function (r) {
@@ -380,6 +455,41 @@
     return '<div class="obj-par">' + [0, 1].map(function (i) { return '<input type="text" inputmode="decimal" data-num="1" aria-label="' + esc(nombre + (i ? " máximo" : " mínimo")) + '" value="' + esc(vNum(par[i])) + '" data-cambio="cfgObj" data-m="' + m + '" data-v="' + esc(v) + '" data-i="' + i + '">'; }).join('<span class="obj-guion">–</span>') + "</div>";
   }
   function defTxt(d) { var m = function (x) { return vNum(x).replace(/^-/, "−"); }; return d ? m(d[0]) + "–" + m(d[1]) : "—"; }
+  // ---- v0.7.2: referencia porcina del grupo (estandarización GITIC) y laboratorio del hospital (humanos, informativo)
+  function REFP() { return S.cfg.referencia_porcina || C.DEF.referencia_porcina; }
+  function refDe(v) { return (REFP().vars || {})[v] || null; }
+  function dec(vd) { return vd && vd.dec !== undefined ? vd.dec : 1; }
+  function nTxt(x, d) { return x === null || x === undefined ? "—" : H.n(x, d).replace(/^-/, "−"); }
+  function refTxt(x, vd) { var d = dec(vd); return x && x.n ? nTxt(x.mediana, d) + " [" + nTxt(x.p2_5, d) + "–" + nTxt(x.p97_5, d) + "] · n " + x.n : "—"; }
+  function labTxt(x, vd) { return x && x.lab ? x.lab.replace(/\s*-\s*/, "–").replace(/^-/, "−") + (x.lab_u && vd && x.lab_u !== vd.unidad ? " " + x.lab_u : "") : "—"; }
+  function igual(a, b) { return a && b && C.num(a[0]) === C.num(b[0]) && C.num(a[1]) === C.num(b[1]); }
+  function infoRef() {
+    var R = REFP(), ns = C.PERF_PORCINA.map(function (k) { var x = refDe(k); return (C.variable("PERF", k) || { nombre: k }).nombre + " " + (x ? x.n : "—"); }).join(", ");
+    return "Referencia porcina: " + R.fuente + ". Se muestra la mediana [P2,5–P97,5] y el número de animales (n) de cada variable; el rango que se aplica son esos percentiles redondeados con criterio clínico. n por variable: " + ns + ". Se actualizará al añadir más basales del grupo. " +
+      "Los rangos de HCO₃⁻, BE, Na⁺, K⁺, Ca²⁺, Cl⁻, fosfato, albúmina, osmolalidad y urea del perfusato pasan a ser la referencia porcina (antes, rangos humanos a validar); lactato, glucosa, Hb, Hto, cortisol, amonio y Mg siguen el criterio de perfusión y la gasometría (pH, pO₂, pCO₂) los objetivos del circuito. " +
+      "Laboratorio HULP: " + (R.lab_fuente || "intervalos humanos") + "; solo informativo. Un valor fuera de la referencia en un animal concreto es normal (desviación del animal). La estandarización no se dibuja en las gráficas.";
+  }
+  function celdasRef(v, vd, actual) {
+    var x = refDe(v), ok = x && x.rango && x.valida !== false && C.PERF_PORCINA.indexOf(v) !== -1;
+    return '<td class="centro" data-et="Referencia porcina">' + esc(refTxt(x, vd)) + '</td><td class="centro muy-tenue" data-et="Laboratorio HULP">' + esc(labTxt(x, vd)) + "</td><td class=\"centro\">" +
+      (ok ? (igual(actual, x.rango) ? '<span class="chip ok">' + ico("check", "s") + "Porcina</span>" : '<button class="bt mini" data-act="objPorcina" data-v="' + esc(v) + '" aria-label="Aplicar la referencia porcina a ' + esc(vd.nombre) + '">Aplicar ' + esc(defTxt(x.rango)) + "</button>") : "") + "</td>";
+  }
+  function avisoPorcina(O) {
+    var dif = C.PERF_PORCINA.filter(function (k) { var x = refDe(k); return x && x.rango && !igual((O.PERF || {})[k], x.rango); });
+    return dif.length ? '<div class="aviso aj">' + ico("sliders-horizontal") + "<div>" + dif.length + " rango(s) del perfusato guardados no siguen la referencia porcina (" + esc(dif.map(function (k) { return (C.variable("PERF", k) || { nombre: k }).nombre; }).join(", ")) + ').<div class="fila-flex"><button class="bt mini" data-act="objPorcinaTodas">' + ico("check", "s") + "Aplicar la referencia porcina a todas</button></div></div></div>" : "";
+  }
+  function tablaPorcina() {
+    var R = REFP(), vars = Object.keys(R.vars || {}), orden = (C.MUESTRAS.BASAL_LD.vars || []).map(function (x) { return x.id; });
+    vars.sort(function (a, b) { var ia = orden.indexOf(a), ib = orden.indexOf(b); return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib); });
+    var inf = "Colorea las muestras basales de los donantes (hígado y sangre) y las del receptor: verde dentro del rango, ámbar fuera. " + R.fuente + " (n por variable en la tabla). pH, pO₂ y pCO₂ basales son intraoperatorios: no valen como referencia y esas muestras se colorean con los objetivos arteriales (pO₂ 80–100 mmHg). Colesterol, ácido úrico e INR no forman parte del protocolo y no se consideran. En el perfusato la creatinina no se colorea: la HDF la depura y no hay aporte exógeno. La estandarización no se dibuja en las gráficas y se actualizará al añadir más basales.";
+    return '<section class="tarjeta obj-porcina"><div class="cabecera"><h2>Referencia porcina · basales y receptor</h2>' + H.botonInfo(inf) + '</div><div class="tabla-env"><table class="t t-obj t-obj-ref"><thead><tr><th>Variable</th><th>Unidad</th><th class="num">n</th><th class="centro">Mediana [P2,5–P97,5]</th><th class="centro">Rango aplicado</th><th class="centro">&lt; 35 kg · ≥ 35 kg</th><th class="centro">Laboratorio HULP</th><th>Nota</th></tr></thead><tbody>' +
+      vars.map(function (v) { var x = R.vars[v], vd = C.variable("BASAL_LD", v), d = dec(vd);
+        return '<tr><th scope="row"><span class="obj-var">' + esc(vd.nombre) + '</span></th><td class="muy-tenue">' + esc(vd.unidad || "") + '</td><td class="num" data-et="n">' + (x.n || "—") + '</td><td class="centro" data-et="Mediana [P2,5–P97,5]">' + esc(x.n ? nTxt(x.mediana, d) + " [" + nTxt(x.p2_5, d) + "–" + nTxt(x.p97_5, d) + "]" : "—") + '</td><td class="centro" data-et="Rango aplicado"><b>' + esc(x.rango && x.valida !== false ? defTxt(x.rango) : "—") + '</b></td><td class="centro muy-tenue" data-et="< 35 kg · ≥ 35 kg">' + esc(x.n_lt35 ? nTxt(x.mediana_lt35, d) + " (" + x.n_lt35 + ") · " + nTxt(x.mediana_ge35, d) + " (" + x.n_ge35 + ")" : "—") +
+          '</td><td class="centro muy-tenue" data-et="Laboratorio HULP">' + esc(labTxt(x, vd)) + '</td><td class="muy-tenue" data-et="Nota">' + esc(x.nota || "") + "</td></tr>"; }).join("") + "</tbody></table></div></section>";
+  }
+  function aplicarPorcina(lista) { var O = H.copia(S.cfg.objetivos); O.PERF = O.PERF || {}; lista.forEach(function (k) { var x = refDe(k); if (x && x.rango) O.PERF[k] = x.rango.slice(); }); H.guardarCfg("objetivos", O); H.repintar(); }
+  H.acc.objPorcina = function (el) { aplicarPorcina([el.getAttribute("data-v")]); };
+  H.acc.objPorcinaTodas = function () { aplicarPorcina(C.PERF_PORCINA); };
   H.seccionesExtra.objetivos = function () {
     var O = S.cfg.objetivos, D = C.DEF.objetivos, art = (O.ART || {}).pO2 || [], ok80 = C.num(art[0]) === 80 && C.num(art[1]) === 100;
     var varsGas = []; COMP_GAS.forEach(function (c) { Object.keys(O[c[0]] || {}).forEach(function (v) { if (varsGas.indexOf(v) === -1) varsGas.push(v); }); });
@@ -390,16 +500,17 @@
       }).join("") + "</tbody></table></div></section>";
     function tablaSimple(m, titulo) {
       var vs = Object.keys(O[m] || {}); if (!vs.length) return "";
-      return '<section class="tarjeta"><div class="cabecera"><h2>' + esc(titulo) + '</h2></div><div class="tabla-env"><table class="t t-obj"><thead><tr><th>Variable</th><th>Unidad</th><th class="centro">Mín. – máx.</th><th class="centro">Por defecto</th></tr></thead><tbody>' +
-        vs.map(function (v) { var vd = C.variable(m, v) || { nombre: v, unidad: "" }; return '<tr><th scope="row"><span class="obj-var">' + esc(vd.nombre) + '</span></th><td class="muy-tenue">' + esc(vd.unidad || "") + '</td><td class="centro">' + parIn(m, v, O[m][v], vd.nombre) + '</td><td class="centro muy-tenue">' + esc(defTxt((D[m] || {})[v])) + "</td></tr>"; }).join("") + "</tbody></table></div></section>";
+      var perf = m === "PERF";   // v0.7.2: referencia porcina del grupo y laboratorio del hospital por variable
+      return '<section class="tarjeta' + (perf ? " obj-ancho" : "") + '"><div class="cabecera"><h2>' + esc(titulo) + "</h2>" + (perf ? H.botonInfo(infoRef()) : "") + '</div><div class="tabla-env"><table class="t t-obj' + (perf ? " t-obj-perf" : "") + '"><thead><tr><th>Variable</th><th>Unidad</th><th class="centro">Mín. – máx.</th><th class="centro">Por defecto</th>' + (perf ? '<th class="centro">Referencia porcina</th><th class="centro">Laboratorio HULP</th><th></th>' : "") + "</tr></thead><tbody>" +
+        vs.map(function (v) { var vd = C.variable(m, v) || { nombre: v, unidad: "" }; return '<tr><th scope="row"><span class="obj-var">' + esc(vd.nombre) + '</span></th><td class="muy-tenue">' + esc(vd.unidad || "") + '</td><td class="centro">' + parIn(m, v, O[m][v], vd.nombre) + '</td><td class="centro muy-tenue" data-et="Por defecto">' + esc(defTxt((D[m] || {})[v])) + "</td>" + (perf ? celdasRef(v, vd, O[m][v]) : "") + "</tr>"; }).join("") + "</tbody></table></div></section>";
     }
     var otros = Object.keys(O).filter(function (m) { return ["ART", "POR", "CAV", "PERF", "FLUJO"].indexOf(m) === -1; }).map(function (m) { return tablaSimple(m, C.MUESTRAS[m] ? C.MUESTRAS[m].nombre : m); }).join("");
     return '<div class="aviso info">' + ico("info") + "<div>Rangos que colorean los valores en las hojas, alimentan las alertas de Inicio y el asesor de gases. Gasometrías y presiones en mmHg (1 kPa = 7,50 mmHg). La pO₂ arterial usa los valores arteriales habituales (80–100 mmHg), no la del protocolo del grupo.</div></div>" +
-      '<div class="aviso aj">' + ico("clock") + "<div><b>Pendiente de basales del grupo.</b> Los rangos por especie se ajustarán con los datos basales de nuestros experimentos y de los anteriores. Como son intraoperatorios, el pH y la oxigenación basales no se usarán como referencia.</div></div>" +
+      avisoPorcina(O) +
       (ok80 ? "" : '<div class="aviso aj">' + ico("triangle-alert") + "<div>La pO₂ arterial guardada es " + esc(defTxt(art)) + ' mmHg. <button class="bt mini" data-act="cfgPO2" data-a="80" data-b="100">Aplicar 80–100 mmHg</button></div></div>') +
       '<div class="fila-flex" style="margin-bottom:10px"><button class="bt" data-act="cfgRestaurar" data-k="objetivos">' + ico("undo-2") + "Valores por defecto</button></div>" +
-      '<div class="obj-rejilla">' + gas + tablaSimple("FLUJO", "Presiones y temperatura") + tablaSimple("PERF", "Perfusato (bioquímica)") + otros + "</div>";
+      '<div class="obj-rejilla">' + gas + tablaSimple("FLUJO", "Presiones y temperatura") + tablaSimple("PERF", "Perfusato (bioquímica)") + otros + "</div>" + tablaPorcina();
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v07a.js"] = "0.7.1";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v07a.js"] = "0.7.2";

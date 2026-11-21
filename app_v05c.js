@@ -288,4 +288,4 @@
   H.calculosPerfusato = function (e) { return sinSub(prepOrig(e, ["calculos"])); };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v05c.js"] = "0.7.1";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v05c.js"] = "0.7.2";

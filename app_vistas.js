@@ -38,7 +38,9 @@
     if (/^(FLUJO|RECAL)$/.test(muestra) && O.FLUJO && O.FLUJO[v]) return O.FLUJO[v];
     return null;
   };
-  H.claseValor = function (muestra, v, val) { var e = C.enRango(val, H.objetivo(muestra, v)); return e === null ? "" : e < 0 ? "v-bajo" : e > 0 ? "v-alto" : "v-ok"; };
+  // v0.7.2: basales de los donantes y receptor con la referencia porcina del grupo (pH, pO₂ y pCO₂ intraoperatorios no valen: objetivos arteriales); no se usa en las gráficas
+  H.rangoColor = function (muestra, v) { if ((C.MUESTRAS_BASALES || []).indexOf(muestra) === -1) return H.objetivo(muestra, v); return /^(pH|pO2|pCO2)$/.test(v) ? H.objetivo("ART", v) : C.rangoPorcino(v, S.cfg.referencia_porcina); };
+  H.claseValor = function (muestra, v, val) { var e = C.enRango(val, H.rangoColor(muestra, v)); return e === null ? "" : e < 0 ? "v-bajo" : e > 0 ? "v-alto" : "v-ok"; };
   H.unidadVisible = function (v, u) { return (v === "pO2" || v === "pCO2") && H.pref("kpa") ? "kPa" : u; };
   H.aVista = function (v, x) { var n = C.num(x); if (n === null) return ""; return (v === "pO2" || v === "pCO2") && H.pref("kpa") ? C.r(n / C.KPA, 2) : n; };
   H.deVista = function (v, x) { var n = C.num(x); if (n === null) return x; return (v === "pO2" || v === "pCO2") && H.pref("kpa") ? C.r(n * C.KPA, 2) : n; };
@@ -199,4 +201,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_vistas.js"] = "0.7.1";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_vistas.js"] = "0.7.2";

@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var C = window.HOMECalc, H = window.HOME = window.HOME || {};
-  var VERSION = "0.7.1";
+  var VERSION = "0.7.2";
   var S = H.S = { token: null, usuario: null, demo: false, cfg: null, t: {}, med: {}, medCargada: {}, cola: [], enviando: false, online: navigator.onLine !== false,
     ultima: null, pref: {}, avisosVistos: {}, pendienteRepintar: false, errores: [] };
   var TABLAS = ["Experimentos", "Animales", "Dieta", "Formularios", "Eventos", "Avisos", "Material", "Movimientos", "Solicitudes", "Personal", "Usuarios", "Config", "Solicitudes_Acceso", "Fotos", "Pedidos"];
@@ -178,6 +178,12 @@
   H.normRol = function (r) { r = String(r || "").toUpperCase().trim(); return ALIAS_ROL[r] || r; };
   H.nombreRol = function (r) { r = H.normRol(r); for (var i = 0; i < H.ROLES.length; i++) if (H.ROLES[i][0] === r) return H.ROLES[i][1]; return r; };
   H.rol = function () { return S.usuario ? H.normRol(S.usuario.rol) : ""; };
+  // v0.7.2: nombre visible «Nombre Apellidos» (sin repetir los apellidos si ya están en el nombre); sin nombre, el correo
+  H.nombreVisible = function (u) {
+    u = u || {}; var n = String(u.nombre || u.Nombre || "").trim(), a = String(u.apellidos || u.Apellidos || "").trim();
+    var t = !a ? n : !n ? a : n.toLowerCase().indexOf(a.toLowerCase()) !== -1 ? n : n + " " + a;
+    return t || String(u.email || u.Email || "");
+  };
   H.esAdmin = function () { return H.rol() === "ADMIN"; };
   H.puede = function (accion) {
     var r = H.rol(); if (!r) return false;
@@ -216,9 +222,9 @@
       "<div class=\"msg-error\" id=\"errAcc\" role=\"alert\"></div><button class=\"bt pri grande\" style=\"width:100%\" type=\"submit\">Enviar solicitud</button></form><p style=\"margin-top:12px\"><button class=\"bt texto\" id=\"volver\">Volver al acceso</button></p>";
     else if (paso === "alta_ok") cuerpo = "<h1>Solicitud enviada</h1><div class=\"aviso ok\">" + H.ico("circle-check") + "<div>" + esc(email || "Solicitud recibida. Un administrador revisará tu alta y te avisará por correo.") + "</div></div><p style=\"margin-top:12px\"><button class=\"bt\" id=\"volver\">Volver al acceso</button></p>";
     else cuerpo = "<h1 class=\"sr\">Acceso</h1>" +
-      "<form id=\"fEmail\" novalidate><div class=\"campo\"><label class=\"et\" for=\"email\">Correo</label><input id=\"email\" type=\"email\" name=\"username\" autocomplete=\"username webauthn\" spellcheck=\"false\" placeholder=\"nombre@salud.madrid.org…\" value=\"" + esc(email || localStorage.getItem("home_email") || "") + "\" required></div>" +
-      "<div class=\"campo\"><label class=\"et\" for=\"clave\">Contraseña <span class=\"muy-tenue\">(solo si la has definido)</span></label><input id=\"clave\" type=\"password\" name=\"password\" autocomplete=\"current-password\"><div class=\"ayuda\">Déjala vacía y te enviaremos un código de un solo uso al correo.</div></div>" +
-      "<div class=\"msg-error\" id=\"errAcc\" role=\"alert\"></div><button class=\"bt pri grande\" style=\"width:100%\" type=\"submit\">Continuar</button></form>" +
+      "<form id=\"fEmail\" novalidate><div class=\"campo\"><label class=\"et\" for=\"email\">Correo</label><input id=\"email\" type=\"email\" name=\"username\" autocomplete=\"username webauthn\" autocapitalize=\"none\" autocorrect=\"off\" spellcheck=\"false\" inputmode=\"email\" placeholder=\"nombre@salud.madrid.org…\" value=\"" + esc(email || localStorage.getItem("home_email") || "") + "\" required></div>" +
+      "<div class=\"campo\"><label class=\"et\" for=\"clave\">Contraseña <span class=\"muy-tenue\">(solo si la has definido)</span></label><input id=\"clave\" type=\"password\" name=\"password\" autocomplete=\"current-password\" autocapitalize=\"none\" autocorrect=\"off\" spellcheck=\"false\"><div class=\"ayuda\">Déjala vacía y te enviaremos un código de un solo uso al correo.</div></div>" +
+      "<div class=\"msg-error\" id=\"errAcc\" role=\"alert\"></div><button class=\"bt pri grande\" style=\"width:100%\" type=\"submit\" id=\"btEntrar\">Continuar</button></form>" +
       (H.passkeySoportado() ? "<button class=\"bt grande\" style=\"width:100%;margin-top:10px\" id=\"btPasskey\">" + H.ico("fingerprint") + "Entrar con Face ID, huella o llave del dispositivo</button>" : "") +
       "<div class=\"alta-enlace\"><span class=\"tenue\">¿Aún no tienes acceso?</span> <button class=\"bt texto\" id=\"irAlta\">" + H.ico("user-plus", "s") + "Solicitar alta</button></div>" +
       "<details class=\"plegable\" style=\"margin-top:16px\"" + (sinServidor() ? " open" : "") + "><summary>Modo demostración (sin servidor)</summary><div class=\"dentro\"><p class=\"tenue\">Datos simulados guardados solo en este navegador. Sirve para probar la app antes de instalar el servidor.</p>" +
@@ -230,13 +236,42 @@
     H.$$("[data-demo]").forEach(function (b) { b.addEventListener("click", function () { H.entrarDemo(b.getAttribute("data-demo")); }); });
     if (H.$("#volver")) H.$("#volver").addEventListener("click", function () { H.pantallaAcceso("email"); });
     if (H.$("#irAlta")) H.$("#irAlta").addEventListener("click", function () { H.pantallaAcceso("alta", (H.$("#email") || {}).value || ""); });
+    // v0.7.2: autorrelleno del navegador o de un gestor de contraseñas. Puede poner el correo y la contraseña SIN disparar «input»
+    // (Chrome en un equipo nuevo, Safari, extensiones): al enviar se lee siempre el DOM, se recuerda lo último visto por cualquier
+    // evento (input, change, animationstart de :-webkit-autofill, blur) y, si el campo está autorrellenado pero aún vacío para la
+    // página, se espera un instante y se vuelve a leer antes de dar un error. El botón nunca se desactiva por «campo vacío».
+    var ultimo = { email: "", clave: "" }, enviando = false;
+    function autorrellenado(el) { if (!el) return false; try { if (el.matches(":-webkit-autofill")) return true; } catch (x) { } try { return el.matches(":autofill"); } catch (x2) { } return false; }
+    function leerAcceso() {   // el DOM manda; lo recordado solo cuenta si el campo sigue marcado como autorrellenado
+      var ie = H.$("#email"), ic = H.$("#clave"), em = ie ? String(ie.value || "") : "", cl = ic ? String(ic.value || "") : "";
+      return { email: (em || (autorrellenado(ie) ? ultimo.email : "")).trim().toLowerCase(), clave: cl || (autorrellenado(ic) ? ultimo.clave : "") };
+    }
+    function marcarAcceso() {
+      var ie = H.$("#email"), ic = H.$("#clave"); ultimo.email = ie ? String(ie.value || "") || (autorrellenado(ie) ? ultimo.email : "") : ""; ultimo.clave = ic ? String(ic.value || "") || (autorrellenado(ic) ? ultimo.clave : "") : "";
+      var v = leerAcceso(), bt = H.$("#btEntrar"), err = H.$("#errAcc");
+      if (bt && !enviando) bt.textContent = v.clave ? "Entrar" : "Continuar";
+      if (err && err.getAttribute("data-tipo") === "correo" && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) { err.textContent = ""; err.removeAttribute("data-tipo"); }
+    }
+    H.leerAcceso = leerAcceso;
+    if (fE) {
+      ["input", "change", "keyup", "blur", "animationstart"].forEach(function (tipo) { fE.addEventListener(tipo, function () { marcarAcceso(); }, true); });
+      setTimeout(marcarAcceso, 400); setTimeout(marcarAcceso, 1500);          // autorrellenos que no avisan con ningún evento
+    }
     if (fE) fE.addEventListener("submit", function (e) {
-      e.preventDefault(); var em = H.$("#email").value.trim().toLowerCase(), cl = H.$("#clave") ? H.$("#clave").value : "", err = H.$("#errAcc"), bt = fE.querySelector("button[type=submit]");
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { err.textContent = "Escribe un correo válido, por ejemplo nombre@salud.madrid.org."; H.$("#email").focus(); return; }
-      bt.disabled = true; bt.classList.add("cargando-bt"); err.textContent = ""; localStorage.setItem("home_email", em);
-      var fallo = function (x) { err.textContent = x.message || "No se ha podido contactar con el servidor. Comprueba la conexión y vuelve a intentarlo."; bt.disabled = false; bt.classList.remove("cargando-bt"); };
-      if (cl) H.servidor("webEntrarPassword", [em, cl, nombreDispositivo()]).then(function (r) { if (r && r.ok === false) throw new Error(r.mensaje || "Correo o contraseña incorrectos."); sesionIniciada(r, "password"); }).catch(fallo);
-      else H.servidor("webSolicitarCodigo", [em]).then(function (r) { if (r && r.ok === false) throw new Error(r.mensaje || "No se ha podido enviar el código."); H.pantallaAcceso("codigo", em); }).catch(fallo);
+      e.preventDefault(); if (enviando) return;
+      var err = H.$("#errAcc"), bt = H.$("#btEntrar") || fE.querySelector("button[type=submit]"), intento = 0;
+      function enviar() {
+        var v = leerAcceso(), em = v.email, cl = v.clave;
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) {
+          if (intento < 2 && (autorrellenado(H.$("#email")) || autorrellenado(H.$("#clave")) || intento === 0)) { intento++; setTimeout(enviar, intento === 1 ? 60 : 250); return; }
+          err.textContent = "Escribe un correo válido, por ejemplo nombre@salud.madrid.org."; err.setAttribute("data-tipo", "correo"); H.$("#email").focus(); return;
+        }
+        enviando = true; bt.disabled = true; bt.classList.add("cargando-bt"); err.textContent = ""; err.removeAttribute("data-tipo"); localStorage.setItem("home_email", em);
+        var fallo = function (x) { enviando = false; err.textContent = x.message || "No se ha podido contactar con el servidor. Comprueba la conexión y vuelve a intentarlo."; bt.disabled = false; bt.classList.remove("cargando-bt"); marcarAcceso(); };
+        if (cl) H.servidor("webEntrarPassword", [em, cl, nombreDispositivo()]).then(function (r) { if (r && r.ok === false) throw new Error(r.mensaje || "Correo o contraseña incorrectos."); sesionIniciada(r, "password"); }).catch(fallo);
+        else H.servidor("webSolicitarCodigo", [em]).then(function (r) { if (r && r.ok === false) throw new Error(r.mensaje || "No se ha podido enviar el código."); H.pantallaAcceso("codigo", em); }).catch(fallo);
+      }
+      enviar();
     });
     if (H.$("#btPasskey")) H.$("#btPasskey").addEventListener("click", function () {
       var bt = this, err = H.$("#errAcc"), em = H.$("#email").value.trim().toLowerCase(); bt.disabled = true; err.textContent = "";
@@ -375,7 +410,7 @@
       "<nav class=\"riel\" aria-label=\"Secciones\"><a class=\"riel-logo\" href=\"#/inicio\" aria-label=\"HOME, inicio\" data-tip=\"HOME · Perfusión hepática extendida\">" + H.logoSVG() + "</a><div class=\"riel-lista\">" + nav.map(enlaceRiel).join("") + "</div>" +
       "<div class=\"riel-pie\">" + enlaceRiel({ r: "cuenta", n: "Mi cuenta", i: "user" }) + "</div></nav>" +
       "<div class=\"lienzo\"><header class=\"cab\">" + H.marcaHTML() + "<span id=\"chipActivo\"></span><span class=\"empuja\"></span><span id=\"estadoSync\" class=\"estado-sync\" role=\"status\"></span>" +
-      "<span id=\"cabPerf\"></span>" + (H.campanaHTML ? H.campanaHTML() : "") + "<button class=\"usuario-cab\" data-act=\"cuenta\" aria-label=\"Mi cuenta: " + esc(u.nombre || u.email || "") + " (" + esc(H.nombreRol(u.rol)) + ")\">" + (H.avatarHTML ? H.avatarHTML(u, "av-cab") : "<span class=\"avatar\"><span>" + esc(ini) + "</span></span>") + "<span class=\"usr-txt\"><b>" + esc(u.nombre || u.email || "") + "</b><span>" + esc(H.nombreRol(u.rol)) + "</span></span></button></header>" +
+      "<span id=\"cabPerf\"></span>" + (H.campanaHTML ? H.campanaHTML() : "") + "<button class=\"usuario-cab\" data-act=\"cuenta\" aria-label=\"Mi cuenta: " + esc(H.nombreVisible(u)) + " (" + esc(H.nombreRol(u.rol)) + ")\">" + (H.avatarHTML ? H.avatarHTML(u, "av-cab") : "<span class=\"avatar\"><span>" + esc(ini) + "</span></span>") + "<span class=\"usr-txt\"><b>" + esc(H.nombreVisible(u)) + "</b><span>" + esc(H.nombreRol(u.rol)) + "</span></span></button></header>" +
       "<main id=\"principal\" class=\"principal\" tabindex=\"-1\"></main></div>" +
       "<nav class=\"inferior\" aria-label=\"Secciones\">" + movil.map(function (x) { return "<a href=\"#/" + x.r + "\" data-nav=\"" + x.r + "\">" + H.ico(x.i) + "<span>" + esc(x.n) + "</span>" + cont(x.r) + "</a>"; }).join("") +
       "<button type=\"button\" data-act=\"menuMas\" aria-haspopup=\"dialog\" class=\"" + (resto.some(function (x) { return x.r === H.ruta().partes[0]; }) ? "activo" : "") + "\">" + H.ico("menu") + "<span>Más</span>" + (nResto ? "<span class=\"cont\">" + nResto + "</span>" : "") + "</button></nav>" +
@@ -527,4 +562,4 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar); else setTimeout(iniciar, 0);
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_core.js"] = "0.7.1";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_core.js"] = "0.7.2";

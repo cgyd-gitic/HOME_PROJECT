@@ -21,7 +21,7 @@
   function guardarG() { localStorage.setItem("home_graf", JSON.stringify(G)); }
   // v0.5: bioquímica (sin lo que mide la gasometría), las tres gasometrías, parámetros calculados, inmunología y receptor post-trasplante
   var MUESTRAS_G = [["PERF", "Bioquímica del perfusato"], ["ART", "Gasometría arterial"], ["POR", "Gasometría portal"], ["CAV", "Gasometría cava"], ["DERIV", "Parámetros calculados (VO₂, resistencias, flujo/100 g, bilis)"],
-    ["INMUNO", "Inmunología"], ["REC", "Receptor · seguimiento post-trasplante"], ["REC_EVAL", "Receptor · evaluación funcional"]];
+    ["INMUNO", "Inmunología"], ["REC", "Receptor · seguimiento post-trasplante"]];   // v0.7.2: sin «Receptor · evaluación funcional» (puntuación clínica, no una serie para graficar)
   var GAS_IDS = ["pH", "pO2", "pCO2", "sO2", "HCO3", "BE", "Hb", "Lactato", "Glucosa", "Na", "K", "Ca", "Cl"];
   function varsDe(m) {
     if (MUESTRAS_G.every(function (x) { return x[0] !== m; })) m = "PERF";
@@ -57,4 +57,4 @@
   H.descargar = function (nombre, contenido, tipo) { var b = contenido instanceof Blob ? contenido : new Blob([contenido], { type: (tipo || "text/plain") + ";charset=utf-8" }), a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = nombre; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000); };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_graf.js"] = "0.7.1";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_graf.js"] = "0.7.2";

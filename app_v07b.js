@@ -129,7 +129,7 @@
       var g = ""; if (v.grupo && v.grupo !== grupo) { grupo = v.grupo; g = '<tr><th class="grupo" colspan="' + (cols.length + 1) + '"><span class="g-fijo">' + esc(grupo) + "</span></th></tr>"; }
       var uni = H.unidadVisible(v.id, v.unidad);
       return g + '<tr><th class="var" scope="row">' + esc(v.nombre) + (uni ? '<span class="u">' + esc(uni) + "</span>" : "") + "</th>" + cols.map(function (c) {
-        var x = H.valor(e.ID, c.m, c.p, v.id), val = x ? (C.num(x.Valor) !== null ? String(H.aVista(v.id, x.Valor)).replace(".", ",") : x.Texto) : "", cl = x ? H.claseValor(opc.objM || c.m, v.id, x.Valor) + (H.pendiente(x) ? " pend" : "") : "";
+        var x = H.valor(e.ID, c.m, c.p, v.id), val = x ? (C.num(x.Valor) !== null ? String(H.aVista(v.id, x.Valor)).replace(".", ",") : x.Texto) : "", cl = x ? H.claseValor((C.MUESTRAS_BASALES || []).indexOf(c.m) !== -1 ? c.m : opc.objM || c.m, v.id, x.Valor) + (H.pendiente(x) ? " pend" : "") : "";
         return '<td><input class="' + cl + '" inputmode="decimal" autocomplete="off" aria-label="' + esc(v.nombre + " · " + c.et) + '" value="' + esc(val || "") + '" data-cambio="celda" data-exp="' + esc(e.ID) + '" data-m="' + c.m + '" data-p="' + esc(c.p) + '" data-t="' + (c.t === undefined || c.t === null ? "" : c.t) + '" data-f="' + esc(c.f || "") + '" data-v="' + v.id + '"' + (puedo ? "" : " readonly") + "></td>";
       }).join("") + "</tr>";
     }).join("");
@@ -391,18 +391,45 @@
   };
 
   // ============================================================== 8. Horario circadiano por versión del protocolo (Config «circadiano_protocolos»)
-  var PRECARGA = ["V8", "V9"];
+  // v0.7.2: cada versión se guarda en su propia fila de Config («circadiano_protocolo_Vn», por el límite de 45 000 caracteres por celda);
+  // se leen también las guardadas en «circadiano_protocolos» (v0.7–v0.7.1). Sin guardar: precarga del Excel del protocolo con «Revisar».
   function vRef() { return C.num((S.cfg.general || {}).volumen_sangre_mL) || 2200; }
+  function claveH(v) { return "circadiano_protocolo_" + v; }
   H.horarioProtocolo = function (v) {
-    var g = S.cfg.circadiano_protocolos || {}, x = g[v];
-    if (x && x.cambios) return Object.assign({ lineas: [], cambios: [], V_ref_mL: vRef(), revisar: false }, x);
-    var base = H.copia(v === C.versionActual() && S.cfg.circadiano ? S.cfg.circadiano : C.DEF.circadiano);
-    return { lineas: base.lineas, cambios: base.cambios, V_ref_mL: vRef(), revisar: PRECARGA.indexOf(v) === -1, verificado: PRECARGA.indexOf(v) !== -1 && base.verificado, precargado: true };
+    var x = S.cfg[claveH(v)] || (S.cfg.circadiano_protocolos || {})[v];
+    if (x && x.cambios) { var o = Object.assign({ lineas: [], cambios: [], V_ref_mL: vRef(), revisar: false }, x); if (!o.madres) o.madres = (C.horarioPrecargado(v) || {}).madres || C.madresDe(v, o.lineas); return o; }
+    var p = C.horarioPrecargado(v) || C.horarioPrecargado(C.versionActual());
+    return Object.assign({ V_ref_mL: vRef() }, p, { precargado: true });
   };
   function guardarHorario(v, hp) {
-    var g = H.copia(S.cfg.circadiano_protocolos || {}); delete hp.precargado; g[v] = hp; H.guardarCfg("circadiano_protocolos", g);
+    delete hp.precargado; H.guardarCfg(claveH(v), hp);
     if (v === C.versionActual()) H.guardarCfg("circadiano", Object.assign(H.copia(S.cfg.circadiano || C.DEF.circadiano), { lineas: hp.lineas, cambios: hp.cambios, verificado: !hp.revisar && hp.verificado !== false }));
   }
+  // configuración efectiva: versiones creadas en Configuración y horario vigente (S.cfg.circadiano) = el de la versión actual
+  var recPrev = H.recalcCfg;
+  H.recalcCfg = function () {
+    var cfg = recPrev.apply(this, arguments);
+    try { C.registrarVersionesExtra(cfg.protocolos_extra || {}); var hp = H.horarioProtocolo(C.versionActual()); cfg.circadiano = Object.assign({}, cfg.circadiano, { lineas: hp.lineas, cambios: hp.cambios, verificado: !hp.revisar && hp.verificado !== false }); } catch (e) { console.error(e); }
+    return cfg;
+  };
+  // solución madre: la del horario del protocolo, salvo que el experimento haya guardado la suya en la tabla de infusiones
+  var protPrev = H.protocoloExp;
+  function conMadres(v, lineas, propias) {
+    var hp = H.horarioProtocolo(v); propias = propias || {};
+    Object.keys(lineas).forEach(function (l) { if (propias[l]) return; (lineas[l].componentes || []).forEach(function (c) { var m = C.madreHorario(hp, l, c.nombre); if (m) { c.madre = m.madre; c.unidad = m.unidad || c.unidad; } }); });
+    (hp.lineas || []).forEach(function (l) { if (lineas[l] || C.LINEAS_SIN_MADRE.indexOf(l) !== -1) return; var ms = (hp.madres || {})[l]; lineas[l] = { producto: l, incluida: true, componentes: (ms && ms.length ? ms : [{ nombre: l, madre: null, unidad: "mg/mL" }]).map(function (c) { return { nombre: c.nombre, madre: c.madre, unidad: c.unidad }; }) }; });
+    return lineas;
+  }
+  H.protocoloExp = function (e) {
+    var p = protPrev(e), f = e ? H.form(e.ID, "protocolo", "") : {}, conf = (f && f.lineas) || {}, propias = {};
+    Object.keys(conf).forEach(function (l) { if (conf[l] && conf[l].componentes && conf[l].componentes.length) propias[l] = true; });
+    conMadres(p.version, p.lineas, propias); return p;
+  };
+  H.acc.protVersion = function (el) {
+    var exp = el.getAttribute("data-exp"), v = el.value, f = { version: v, lineas: conMadres(v, H.copia(C.PROTOCOLOS[v].lineas)) };
+    Object.keys(f.lineas).forEach(function (l) { f.lineas[l].incluida = true; }); H.guardarForm(exp, "protocolo", "", f); H.guardar("Experimentos", [{ ID: exp, Protocolo: v }], { sinRepintar: true });
+    H.toast("Tabla cargada con la versión " + v + ". Revísala y confírmala."); H.repintarPronto();
+  };
   H.horarioDe = function (e) { return H.horarioProtocolo(H.versionExp(e)); };
   // horario efectivo del experimento: el de su protocolo, sin las líneas no administradas y reescalado si el volumen real se desvía > 100 mL
   H.circadianoDe = function (e) {
@@ -468,23 +495,42 @@
   // ============================================================== 11. Configuración → Horario circadiano (por protocolo) y → HDF
   H.seccionesExtra = H.seccionesExtra || {};
   var UNIDADES_CIRC = ["mL/h", "bolo", "mL"];
+  var ABIERTOS = {};   // v0.7.2: desplegables abiertos del editor (se conservan al añadir o borrar horas y al repintar)
+  function recordarAbiertos() { H.$$("details.circ-linea[data-v]").forEach(function (d) { var k = d.getAttribute("data-v") + "|" + d.getAttribute("data-l"); if (d.open) ABIERTOS[k] = true; else delete ABIERTOS[k]; }); }
+  function vNum(x) { return x === null || x === undefined || x === "" ? "" : String(x).replace(".", ","); }
+  function madreTxt(c) { return c && c.madre !== null && c.madre !== undefined ? vNum(c.madre) + " " + (c.unidad || "") : "sin concentración"; }
+  function selUnidad(attrs, u) { return '<select ' + attrs + '>' + C.MADRE_UNIDADES.concat(C.MADRE_UNIDADES.indexOf(u) === -1 && u ? [u] : []).map(function (x) { return "<option" + (x === u ? " selected" : "") + ">" + esc(x) + "</option>"; }).join("") + "</select>"; }
+  function camposMadre(v, l, hp) {
+    if (C.LINEAS_SIN_MADRE.indexOf(l) !== -1) return "";
+    var comps = ((hp.madres || {})[l]) || (((C.PROTOCOLOS[v] || {}).lineas || {})[l] || {}).componentes || [{ nombre: l, madre: null, unidad: "mg/mL" }];
+    return '<div class="circ-madres">' + comps.map(function (c, j) { var at = 'data-v="' + v + '" data-l="' + esc(l) + '" data-c="' + j + '" data-n="' + esc(c.nombre) + '"';
+      return '<div class="campo circ-madre"><label class="et" for="cpM_' + j + "_" + esc(l.replace(/\W/g, "")) + '">Solución madre · ' + esc(c.nombre) + '</label><div class="madre-in"><input id="cpM_' + j + "_" + esc(l.replace(/\W/g, "")) + '" inputmode="decimal" autocomplete="off" placeholder="?" value="' + esc(vNum(c.madre)) + '" data-cambio="cpMadre" ' + at + ">" + selUnidad('aria-label="Unidad de la solución madre de ' + esc(c.nombre) + '" data-cambio="cpMadreU" ' + at, c.unidad) + "</div></div>"; }).join("") + "</div>";
+  }
   H.seccionesExtra.circadiano = function () {
     var r = H.ruta(), v = (r.partes || [])[2] || r.p2 || C.versionActual(); if (C.VERSIONES.indexOf(v) === -1) v = C.versionActual();
-    var hp = H.horarioProtocolo(v), lineas = hp.lineas.filter(function (l) { return l; }), prot = C.PROTOCOLOS[v] || {};
-    var sel = '<div class="segmentado vers" role="tablist">' + C.VERSIONES.map(function (x) { var h2 = H.horarioProtocolo(x); return '<button role="tab" class="' + (x === v ? "activo" : "") + '" aria-selected="' + (x === v) + '" data-act="irSub" data-r="config/circadiano/' + x + '">' + x + (h2.revisar ? ' <span class="punto-rev" title="Revisar">•</span>' : "") + "</button>"; }).join("") + "</div>";
+    recordarAbiertos();
+    var hp = H.horarioProtocolo(v), lineas = hp.lineas.filter(function (l) { return l; }), prot = C.PROTOCOLOS[v] || {}, admin = H.esAdmin();
+    var sel = '<div class="fila-flex cfg-circ-vers"><div class="segmentado vers" role="tablist">' + C.VERSIONES.map(function (x) { var h2 = H.horarioProtocolo(x); return '<button role="tab" class="' + (x === v ? "activo" : "") + '" aria-selected="' + (x === v) + '" data-act="irSub" data-r="config/circadiano/' + x + '">' + x + (h2.revisar ? ' <span class="punto-rev" title="Revisar">•</span>' : "") + "</button>"; }).join("") + "</div>" +
+      (admin ? '<button class="bt" data-act="cpNuevoProt" data-v="' + v + '">' + ico("plus") + "Añadir protocolo</button>" : "") + "</div>";
     var bloques = lineas.map(function (l) {
       var filas = hp.cambios.map(function (c, i) { return { c: c, i: i }; }).filter(function (x) { return x.c.linea === l; }).sort(function (a, b) { return C.hm(a.c.h) - C.hm(b.c.h); }), vd = C.volumenDiaLinea(hp, l);
-      return '<details class="circ-linea"' + (filas.length ? "" : " open") + "><summary><b>" + esc(C.nombreLinea(l)) + '</b><span class="muy-tenue">' + filas.length + " cambio(s)" + (vd ? " · " + H.n(vd, 1) + " mL/día" : "") + "</span></summary><div class=\"dentro\">" +
+      var ms = C.LINEAS_SIN_MADRE.indexOf(l) === -1 ? ((hp.madres || {})[l] || []) : [];
+      return '<details class="circ-linea" data-v="' + v + '" data-l="' + esc(l) + '"' + (filas.length && !ABIERTOS[v + "|" + l] ? "" : " open") + "><summary><b>" + esc(C.nombreLinea(l)) + '</b><span class="muy-tenue">' + filas.length + " cambio(s)" + (vd ? " · " + H.n(vd, 1) + " mL/día" : "") + (ms.length ? " · " + esc(ms.map(madreTxt).join(" + ")) : "") + "</span></summary><div class=\"dentro\">" + camposMadre(v, l, hp) +
         '<div class="circ-filas"><div class="circ-cab"><span>Hora</span><span>Ritmo</span><span>Unidad</span><span>Nota (concentración, bolo…)</span><span></span></div>' + filas.map(function (x) { var c = x.c, i = x.i;
           return '<div class="circ-fila"><input type="time" aria-label="Hora" value="' + esc(c.h) + '" data-cambio="cpCampo" data-v="' + v + '" data-i="' + i + '" data-k="h"><input type="text" inputmode="decimal" aria-label="Ritmo" value="' + esc(c.valor === null || c.valor === undefined ? "" : String(c.valor).replace(".", ",")) + '" data-cambio="cpCampo" data-v="' + v + '" data-i="' + i + '" data-k="valor">' +
             '<select aria-label="Unidad" data-cambio="cpCampo" data-v="' + v + '" data-i="' + i + '" data-k="unidad">' + UNIDADES_CIRC.concat(UNIDADES_CIRC.indexOf(c.unidad) === -1 && c.unidad ? [c.unidad] : []).map(function (u) { return "<option" + (u === c.unidad ? " selected" : "") + ">" + esc(u) + "</option>"; }).join("") + '</select><input aria-label="Nota" autocomplete="off" value="' + esc(c.nota || "") + '" data-cambio="cpCampo" data-v="' + v + '" data-i="' + i + '" data-k="nota"><button class="bt ico-solo texto" data-act="cpBorrar" data-v="' + v + '" data-i="' + i + '" aria-label="Borrar el cambio">' + ico("trash-2", "s") + "</button></div>"; }).join("") +
         '</div><button class="bt mini" data-act="cpFila" data-v="' + v + '" data-l="' + esc(l) + '">' + ico("plus", "s") + "Añadir hora</button></div></details>";
     }).join("");
-    return '<div class="aviso ' + (hp.revisar ? "aj" : "ok") + '">' + ico(hp.revisar ? "triangle-alert" : "circle-check") + "<div>" + (hp.revisar ? "<b>Revisar.</b> El horario de " + esc(v) + " se ha precargado con el horario circadiano de referencia (el de V8/V9): comprueba cada línea con la hoja del protocolo." : "Horario de " + esc(v) + (hp.precargado ? " precargado con la pauta circadiana de referencia." : " revisado.")) +
-      " Cada fila es un <b>cambio de ritmo</b>: la línea mantiene ese ritmo hasta su siguiente cambio. Los ritmos de cada experimento salen de su protocolo y se reescalan si el volumen real se desvía más de 100 mL de la referencia.</div></div>" + sel +
+    var hep = hp.heparina || {}, hepB = '<details class="circ-linea circ-hep" data-v="' + v + '" data-l="Heparina"' + (ABIERTOS[v + "|Heparina"] ? " open" : "") + '><summary><b>Heparina</b><span class="muy-tenue">continua, fuera del horario' + (hep.ritmo_mL_h ? " · " + H.n(hep.ritmo_mL_h, 1) + " mL/h" : "") + (hep.madre ? " · " + H.n(hep.madre, 0) + " " + esc(hep.unidad || "U/mL") : "") + '</span></summary><div class="dentro">' + camposMadre(v, "Heparina", hp) +
+      '<div class="campo"><label class="et" for="cpHepR">Ritmo del protocolo</label><div class="unidad-in"><input id="cpHepR" inputmode="decimal" value="' + esc(vNum(hep.ritmo_mL_h)) + '" data-cambio="cpHep" data-v="' + v + '"><span>mL/h</span></div><div class="ayuda">Dato del protocolo; la anticoagulación del experimento se calcula en la tabla de infusiones.</div></div></div></details>';
+    var ext = prot.extra ? '<section class="tarjeta cfg-prot-extra"><div class="cabecera"><h3>Protocolo ' + esc(v) + "</h3>" + info("Versión creada en Configuración" + (prot.base ? " a partir de " + prot.base : "") + ". Para usarla en un experimento, elígela en su tabla de infusiones (Versión del protocolo); la versión vigente por defecto sigue siendo " + C.versionActual() + ".") + '</div><div class="rejilla dos">' +
+      '<div class="campo"><label class="et" for="cpPRef">Referencia</label><input id="cpPRef" autocomplete="off" value="' + esc(prot.ref || "") + '" data-cambio="cpProtCampo" data-k="ref" data-v="' + v + '"></div><div class="campo"><label class="et" for="cpPNot">Notas</label><input id="cpPNot" autocomplete="off" value="' + esc(prot.notas || "") + '" data-cambio="cpProtCampo" data-k="notas" data-v="' + v + '"></div></div>' +
+      (admin ? '<button class="bt peligro" data-act="cpBorrarProt" data-v="' + v + '">' + ico("trash-2") + "Eliminar " + esc(v) + "</button>" : "") + "</section>" : "";
+    return '<div class="aviso ' + (hp.revisar ? "aj" : "ok") + '">' + ico(hp.revisar ? "triangle-alert" : "circle-check") + "<div>" + (hp.revisar ? "<b>Revisar.</b> El horario de " + esc(v) + " se ha precargado " + (C.HORARIOS_PROTOCOLO[v] ? "de la hoja " + esc(C.HORARIOS_PROTOCOLO[v].ref) + " del Excel del protocolo" : prot.extra ? "copiando " + esc(prot.base || "otra versión") : "con el horario circadiano de referencia") + ": comprueba cada línea y márcalo como revisado." : "Horario de " + esc(v) + " revisado.") +
+      " Cada fila es un <b>cambio de ritmo</b>: la línea mantiene ese ritmo hasta su siguiente cambio.</div>" + info("Los ritmos de cada experimento salen de su protocolo y se reescalan si el volumen real se desvía más de 100 mL de la referencia. La solución madre de cada línea (salvo nutrición, antifúngico y antibiótico, de concentración fija) es la que usan la tabla de infusiones y los cálculos de los experimentos con este protocolo, salvo que en el experimento se cambie.") + "</div>" + sel + ext +
       '<div class="fila-flex cfg-circ-barra"><label class="check"><input type="checkbox" data-cambio="cpRevisado" data-v="' + v + '"' + (!hp.revisar ? " checked" : "") + "> Horario de " + esc(v) + ' revisado</label><div class="campo"><label class="et" for="cpVref">Volumen de referencia</label><div class="unidad-in"><input id="cpVref" inputmode="decimal" data-num="1" value="' + esc(hp.V_ref_mL) + '" data-cambio="cpVref" data-v="' + v + '"><span>mL</span></div></div>' +
-      '<div class="campo"><label class="et" for="cpCopia">Copiar el horario de</label><select id="cpCopia" data-cambio="cpCopiar" data-v="' + v + '"><option value="">—</option>' + C.VERSIONES.filter(function (x) { return x !== v; }).map(function (x) { return "<option>" + x + "</option>"; }).join("") + "</select></div>" + (H.esAdmin() ? '<button class="bt" data-act="cpLinea" data-v="' + v + '">' + ico("plus") + "Añadir línea</button>" : "") + "</div>" +
-      '<p class="muy-tenue">' + esc(v + " · " + (prot.propuesto ? "protocolo propuesto" : (prot.ref || "")) + (prot.notas ? " · " + prot.notas : "")) + "</p>" + bloques + recomendacionModelo(v, hp);
+      '<div class="campo"><label class="et" for="cpCopia">Copiar el horario de</label><select id="cpCopia" data-cambio="cpCopiar" data-v="' + v + '"><option value="">—</option>' + C.VERSIONES.filter(function (x) { return x !== v; }).map(function (x) { return "<option>" + x + "</option>"; }).join("") + "</select></div>" + (admin ? '<button class="bt" data-act="cpLinea" data-v="' + v + '">' + ico("plus") + "Añadir línea</button>" : "") + "</div>" +
+      '<p class="muy-tenue">' + esc(v + " · " + (prot.propuesto ? "protocolo propuesto" : (prot.ref || "")) + (prot.notas ? " · " + prot.notas : "")) + "</p>" + bloques + hepB + recomendacionModelo(v, hp);
   };
   // recomendación del modelo (antes «Coherencia con la administración circadiana» de los cálculos del perfusato)
   function recomendacionModelo(v, hp) {
@@ -501,13 +547,62 @@
     return '<section class="tarjeta"><div class="cabecera"><h3>Recomendación del modelo para ' + esc(v) + "</h3>" + info("Estimaciones sin aclaramiento hepático (cortisol) o con un aclaramiento provisional (melatonina, Configuración → Fármacos), con el volumen de referencia del protocolo. Úsalas al crear o revisar un protocolo; no sustituyen a las mediciones.") + '</div><div class="recs">' + recs.map(function (x) { return '<div class="rec ' + x[0] + '">' + ico(x[0] === "ok" ? "circle-check" : x[0] === "info" ? "info" : "sliders-horizontal", "s") + "<div>" + esc(x[1]) + "</div></div>"; }).join("") + "</div></section>";
   }
   function hpEdit(v, fn) { var hp = H.copia(H.horarioProtocolo(v)); fn(hp); guardarHorario(v, hp); }
-  H.acc.cpCampo = function (el) { var v = el.getAttribute("data-v"), i = +el.getAttribute("data-i"), k = el.getAttribute("data-k"); hpEdit(v, function (hp) { hp.cambios[i][k] = k === "valor" ? C.num(String(el.value).replace(",", ".")) : el.value; }); };
-  H.acc.cpBorrar = function (el) { var v = el.getAttribute("data-v"); hpEdit(v, function (hp) { hp.cambios.splice(+el.getAttribute("data-i"), 1); }); H.repintar(); };
-  H.acc.cpFila = function (el) { var v = el.getAttribute("data-v"), l = el.getAttribute("data-l"); hpEdit(v, function (hp) { hp.cambios.push({ h: "12:00", linea: l, valor: 0, unidad: "mL/h", nota: "" }); }); H.repintar(); };
-  H.acc.cpRevisado = function (el) { var v = el.getAttribute("data-v"); hpEdit(v, function (hp) { hp.revisar = !el.checked; hp.verificado = el.checked; }); H.repintar(); };
+  function repintarCirc() { recordarAbiertos(); H.repintar(); }
+  // v0.7.2: al cambiar la hora, la fila se coloca en su sitio (al salir del campo, para no cortar la escritura)
+  function ordenarFilas(cont) { if (!cont) return; H.$$(".circ-fila", cont).map(function (f) { var t = f.querySelector("input[type=time]"); return { f: f, m: t ? C.hm(t.value) : 0 }; }).sort(function (a, b) { return a.m - b.m; }).forEach(function (x) { cont.appendChild(x.f); }); }
+  H.acc.cpCampo = function (el) {
+    var v = el.getAttribute("data-v"), i = +el.getAttribute("data-i"), k = el.getAttribute("data-k");
+    if (k === "h" && !/^\d{2}:\d{2}$/.test(el.value)) return;
+    hpEdit(v, function (hp) { hp.cambios[i][k] = k === "valor" ? C.num(String(el.value).replace(",", ".")) : el.value; });
+    if (k === "h") { var cont = el.closest(".circ-filas"); if (document.activeElement === el) el.addEventListener("blur", function () { ordenarFilas(cont); }, { once: true }); else ordenarFilas(cont); }
+  };
+  H.acc.cpBorrar = function (el) { var v = el.getAttribute("data-v"), d = el.closest("details"); if (d) ABIERTOS[v + "|" + d.getAttribute("data-l")] = true; hpEdit(v, function (hp) { hp.cambios.splice(+el.getAttribute("data-i"), 1); }); repintarCirc(); };
+  H.acc.cpFila = function (el) {
+    var v = el.getAttribute("data-v"), l = el.getAttribute("data-l"), n = 0; hpEdit(v, function (hp) { hp.cambios.push({ h: "12:00", linea: l, valor: 0, unidad: "mL/h", nota: "" }); n = hp.cambios.length - 1; });
+    recordarAbiertos(); ABIERTOS[v + "|" + l] = true; H.repintar();
+    var nueva = H.$('.circ-fila input[data-k="h"][data-v="' + v + '"][data-i="' + n + '"]'); if (nueva) try { nueva.focus({ preventScroll: true }); } catch (e) { }
+  };
+  H.acc.cpRevisado = function (el) {
+    var v = el.getAttribute("data-v");
+    if (!el.checked) { hpEdit(v, function (hp) { hp.revisar = true; hp.verificado = false; }); repintarCirc(); return; }
+    el.checked = false;
+    H.confirmar("Horario de " + v + " revisado", "¿Has comprobado todas las líneas del horario de " + v + " (horas, ritmos y soluciones madre) con la hoja del protocolo? Los experimentos con este protocolo lo usarán como horario verificado.", "Sí, está revisado").then(function (ok) {
+      if (!ok) return; hpEdit(v, function (hp) { hp.revisar = false; hp.verificado = true; }); H.toast("Horario de " + v + " marcado como revisado."); repintarCirc();
+    });
+  };
   H.acc.cpVref = function (el) { var v = el.getAttribute("data-v"); hpEdit(v, function (hp) { hp.V_ref_mL = C.num(String(el.value).replace(",", ".")) || vRef(); }); };
-  H.acc.cpCopiar = function (el) { var v = el.getAttribute("data-v"), de = el.value; if (!de) return; var o = H.copia(H.horarioProtocolo(de)); hpEdit(v, function (hp) { hp.lineas = o.lineas; hp.cambios = o.cambios; hp.revisar = true; }); H.toast("Horario copiado de " + de + ": revísalo."); H.repintar(); };
-  H.acc.cpLinea = function (el) { var v = el.getAttribute("data-v"); H.modal({ titulo: "Añadir línea al horario de " + v, cuerpo: '<div class="campo"><label class="et" for="cpLN">Nombre de la línea</label><input id="cpLN" autocomplete="off"></div>', pie: '<button class="bt" data-cerrar>Cancelar</button><button class="bt pri" id="cpLOk">Añadir</button>', alAbrir: function (d) { d.querySelector("#cpLOk").addEventListener("click", function () { var n = d.querySelector("#cpLN").value.trim(); if (!n) return; hpEdit(v, function (hp) { if (hp.lineas.indexOf(n) === -1) hp.lineas.push(n); }); d.close(); H.repintar(); }); } }); };
+  function madreEdit(el, fn) {
+    var v = el.getAttribute("data-v"), l = el.getAttribute("data-l"), j = +el.getAttribute("data-c");
+    hpEdit(v, function (hp) { hp.madres = hp.madres || {}; if (!hp.madres[l]) hp.madres[l] = H.copia((((C.PROTOCOLOS[v] || {}).lineas || {})[l] || {}).componentes || [{ nombre: el.getAttribute("data-n") || l, madre: null, unidad: "mg/mL" }]).map(function (c) { return { nombre: c.nombre, madre: c.madre, unidad: c.unidad }; }); if (hp.madres[l][j]) fn(hp.madres[l][j], hp); });
+  }
+  H.acc.cpMadre = function (el) { madreEdit(el, function (c, hp) { c.madre = C.num(String(el.value).replace(",", ".")); if (el.getAttribute("data-l") === "Heparina") hp.heparina = Object.assign({}, hp.heparina, { madre: c.madre }); }); };
+  H.acc.cpMadreU = function (el) { madreEdit(el, function (c) { c.unidad = el.value; }); };
+  H.acc.cpHep = function (el) { var v = el.getAttribute("data-v"); hpEdit(v, function (hp) { hp.heparina = Object.assign({ unidad: "U/mL" }, hp.heparina, { ritmo_mL_h: C.num(String(el.value).replace(",", ".")) }); }); };
+  H.acc.cpCopiar = function (el) { var v = el.getAttribute("data-v"), de = el.value; if (!de) return; var o = H.copia(H.horarioProtocolo(de)); hpEdit(v, function (hp) { hp.lineas = o.lineas; hp.cambios = o.cambios; hp.madres = o.madres; hp.heparina = o.heparina; hp.revisar = true; hp.verificado = false; }); H.toast("Horario copiado de " + de + ": revísalo."); repintarCirc(); };
+  H.acc.cpLinea = function (el) { var v = el.getAttribute("data-v"); H.modal({ titulo: "Añadir línea al horario de " + v, cuerpo: '<div class="campo"><label class="et" for="cpLN">Nombre de la línea</label><input id="cpLN" autocomplete="off"></div>', pie: '<button class="bt" data-cerrar>Cancelar</button><button class="bt pri" id="cpLOk">Añadir</button>', alAbrir: function (d) { d.querySelector("#cpLOk").addEventListener("click", function () { var n = d.querySelector("#cpLN").value.trim(); if (!n) return; hpEdit(v, function (hp) { if (hp.lineas.indexOf(n) === -1) hp.lineas.splice(Math.max(0, hp.lineas.indexOf("HDF") === -1 ? hp.lineas.length : hp.lineas.indexOf("HDF")), 0, n); }); ABIERTOS[v + "|" + n] = true; d.close(); repintarCirc(); }); } }); };
+  // v0.7.2: «Añadir protocolo» = versión nueva (V10, V11…) con la estructura de la versión elegida (por defecto, la última)
+  H.acc.cpNuevoProt = function (el) {
+    if (!H.esAdmin()) return; var nv = C.siguienteVersion(), ult = C.VERSIONES[C.VERSIONES.length - 1], de0 = el.getAttribute("data-v") || ult;
+    H.modal({ titulo: "Añadir protocolo " + nv, cuerpo: '<p class="muy-tenue">Se crea la versión ' + nv + " con las líneas, el horario y las soluciones madre de la versión elegida, para modificarla.</p>" +
+      '<div class="campo"><label class="et" for="npDe">Copiar la estructura de</label><select id="npDe">' + C.VERSIONES.map(function (x) { var p = C.PROTOCOLOS[x]; return '<option value="' + x + '"' + (x === ult ? " selected" : "") + ">" + x + " · " + esc(p.propuesto ? "propuesto" : p.ref) + "</option>"; }).join("") + "</select></div>" +
+      '<div class="campo"><label class="et" for="npRef">Referencia</label><input id="npRef" autocomplete="off" placeholder="p. ej. HOME-PM-11"></div><div class="campo"><label class="et" for="npNot">Notas</label><input id="npNot" autocomplete="off" placeholder="Qué cambia respecto a la versión anterior"></div>',
+      pie: '<button class="bt" data-cerrar>Cancelar</button><button class="bt pri" id="npOk">' + ico("plus") + "Crear " + nv + "</button>",
+      alAbrir: function (d) { d.querySelector("#npOk").addEventListener("click", function () {
+        var de = d.querySelector("#npDe").value || de0, ex = H.copia(S.cfg.protocolos_extra || {}), base = C.PROTOCOLOS[de];
+        ex[nv] = { ref: d.querySelector("#npRef").value.trim() || "Nuevo protocolo (copia de " + de + ")", notas: d.querySelector("#npNot").value.trim(), fecha: C.diaISO(new Date()), base: de, creado_por: (S.usuario || {}).email || "", lineas: conMadres(de, H.copia(base.lineas)) };
+        var hp = H.copia(H.horarioProtocolo(de)); hp.revisar = true; hp.verificado = false; hp.copia_de = de; delete hp.fuente; delete hp.ref;
+        H.guardarCfg("protocolos_extra", ex); guardarHorario(nv, hp); d.close(); H.toast("Protocolo " + nv + " creado a partir de " + de + ": modifícalo y márcalo como revisado."); H.ir("config/circadiano/" + nv);
+      }); } });
+  };
+  H.acc.cpProtCampo = function (el) { var v = el.getAttribute("data-v"), ex = H.copia(S.cfg.protocolos_extra || {}); if (!ex[v]) return; ex[v][el.getAttribute("data-k")] = el.value.trim(); H.guardarCfg("protocolos_extra", ex); };
+  H.acc.cpBorrarProt = function (el) {
+    var v = el.getAttribute("data-v"), ex = H.copia(S.cfg.protocolos_extra || {}); if (!ex[v]) return;
+    var usan = H.filas("Experimentos").filter(function (e) { return H.versionExp(e) === v; }).map(function (e) { return e.ID; });
+    if (usan.length) { H.toast(v + " lo usa" + (usan.length > 1 ? "n " : " ") + usan.join(", ") + ": cambia antes su versión del protocolo.", "error"); return; }
+    H.confirmar("Eliminar " + v, "Se eliminan la versión " + v + " y su horario. No se puede deshacer.", "Eliminar", true).then(function (ok) {
+      if (!ok) return; delete ex[v]; H.guardarCfg("protocolos_extra", ex); H.borrar("Config", [claveH(v)]); H.recalcCfg(); H.toast("Versión " + v + " eliminada."); H.ir("config/circadiano/" + C.versionActual());
+    });
+  };
 
   var GRUPOS_HDF = [["Extracción y balance", ["paso_mL_h", "max_mL_h", "horizonte_h", "otras_infusiones_mL_h"], "Solo se recomienda la extracción (mL/h) que deja el balance de volumen en cero en el horizonte indicado, en pasos que admite la máquina. El volumen de las muestras ya no se configura: sale de los tubos de cada punto del muestreo."],
     ["Parámetros fijos de la máquina", ["parametros.set", "parametros.liquido", "parametros.Q_sangre", "parametros.Q_dialisis", "parametros.Reposicion", "parametros.Reposicion_modo", "parametros.Temp_min", "parametros.Temp_max"], "Son siempre los mismos: se precargan en la pre-perfusión y en cada registro de la HDF."],
@@ -740,8 +835,9 @@
   // al programar los avisos de la perfusión (inicio o reprogramación): horario circadiano del protocolo y resúmenes diarios
   var progOrig = H.programarAvisos;
   H.programarAvisos = function (exp, avisos, tipos) {
-    tipos = (tipos || []).slice(); var e = H.exp(exp), t0 = H.inicioPerf(exp), g = S.cfg.general;
-    if (e && t0 && tipos.indexOf("circadiano") !== -1 && H.esCircadiano(e)) avisos = avisos.filter(function (a) { return a.Tipo !== "circadiano"; }).concat(C.avisosCircadianos(exp, t0, g.dias_perfusion, H.circadianoDe(e), g.aviso_antelacion_min));
+    tipos = (tipos || []).slice(); var e = H.exp(exp), t0 = H.inicioPerf(exp) || (e && e.Inicio_perfusion) || null, g = S.cfg.general, ya = Date.now() - 6e4;
+    // v0.7.2: siempre con el horario del protocolo del experimento (también si el inicio aún no está en los eventos) y solo los avisos futuros
+    if (e && t0 && tipos.indexOf("circadiano") !== -1 && H.esCircadiano(e)) avisos = avisos.filter(function (a) { return a.Tipo !== "circadiano"; }).concat(C.avisosCircadianos(exp, t0, g.dias_perfusion, H.circadianoDe(e), g.aviso_antelacion_min).filter(function (a) { var d = C.aFecha(a.Fecha_hora); return !d || d.getTime() > ya; }));
     if (e && t0 && tipos.indexOf("muestra") !== -1 && tipos.indexOf("resumen") === -1) { avisos = avisos.concat(H.avisosResumen(exp)); tipos.push("resumen"); }
     return progOrig(exp, avisos, tipos);
   };
@@ -764,4 +860,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v07b.js"] = "0.7.1";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v07b.js"] = "0.7.2";

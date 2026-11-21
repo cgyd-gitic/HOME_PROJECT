@@ -136,24 +136,31 @@
   function esPend(f) { return f.Validado === false || f.Validado === "FALSE"; }
 
   // ------------------------------------------------------------------ API simulada
-  function sesion(token) { var s = DB.sesiones[token]; if (!s) throw new Error("Sesión caducada. Vuelve a entrar."); var u = DB.tablas.Usuarios.filter(function (x) { return x.Email === s; })[0]; if (!u || u.Activo === false) throw new Error("Sesión caducada. Vuelve a entrar."); return { email: u.Email, nombre: u.Nombre, rol: normRol(u.Rol), id: u.ID, foto: u.Foto || "" }; }
+  function sesion(token) { var s = DB.sesiones[token]; if (!s) throw new Error("Sesión caducada. Vuelve a entrar."); var u = DB.tablas.Usuarios.filter(function (x) { return x.Email === s; })[0]; if (!u || u.Activo === false) throw new Error("Sesión caducada. Vuelve a entrar."); return { email: u.Email, nombre: u.Nombre, apellidos: u.Apellidos || "", rol: normRol(u.Rol), id: u.ID, foto: u.Foto || "" }; }   // v0.7.2: apellidos
   function req(u, roles) { if (roles.indexOf(u.rol) === -1) throw new Error("Tu rol (" + u.rol + ") no permite esta acción."); }
   function vivas(t, admin) { return DB.tablas[t].filter(function (f) { return f.Borrado !== true || (admin && esPend(f)); }); }
   // v0.7 (a): preferencias de notificación (contrato v0.7, anexo A). Celda vacía = valor por defecto del rol.
   function siNoD(v) { if (v === true || v === false) return v; var t = String(v === null || v === undefined ? "" : v).trim().toLowerCase(); return t ? /^(true|s[ií]|1|verdadero|x)$/.test(t) : null; }
   function notifD(f, k) { var v = siNoD(f[k]), r = normRol(f.Rol); return v !== null ? v : k === "Notif_perfusion" ? (r === "ADMIN" || r === "INVESTIGADOR") : k === "Notif_revision" ? r === "ADMIN" : false; }
+  function nombreVisibleD(n, a) { n = String(n || "").trim(); a = String(a || "").trim(); return !a ? n : !n ? a : n.toLowerCase().indexOf(a.toLowerCase()) !== -1 ? n : n + " " + a; }
   var sesionSinNotif = sesion;
   sesion = function (token) { var u = sesionSinNotif(token), f = DB.tablas.Usuarios.filter(function (x) { return x.Email === u.email; })[0]; if (f) u.notif = { diaria: notifD(f, "Notif_diaria"), revision: notifD(f, "Notif_revision"), perfusion: notifD(f, "Notif_perfusion") }; return u; };
   function stockDemo(m) { var s2 = C.num(m.Stock_inicial) || 0; DB.tablas.Movimientos.forEach(function (x) { if (x.Material === m.ID && x.Borrado !== true) s2 += C.num(x.Cantidad) || 0; }); return s2; }
   var API = {
     webSolicitarCodigo: function () { return { ok: true, mensaje: "Si el correo tiene acceso, recibirás un código." }; },
-    webVerificarCodigo: function (email) { var u = DB.tablas.Usuarios.filter(function (x) { return x.Email === email; })[0]; if (!u) throw new Error("Código incorrecto o caducado."); var tok = "demo-" + Math.random().toString(36).slice(2) + Date.now(); DB.sesiones[tok] = email; u.Ultimo_acceso = ahoraISO(); persistir(); return { ok: true, token: tok, usuario: { email: u.Email, nombre: u.Nombre, rol: normRol(u.Rol), personalId: "", id: u.ID, foto: u.Foto || "" } }; },
+    webVerificarCodigo: function (email) { var u = DB.tablas.Usuarios.filter(function (x) { return x.Email === email; })[0]; if (!u) throw new Error("Código incorrecto o caducado."); var tok = "demo-" + Math.random().toString(36).slice(2) + Date.now(); DB.sesiones[tok] = email; u.Ultimo_acceso = ahoraISO(); persistir(); return { ok: true, token: tok, usuario: { email: u.Email, nombre: u.Nombre, apellidos: u.Apellidos || "", rol: normRol(u.Rol), personalId: "", id: u.ID, foto: u.Foto || "" } }; },
     webSesion: function (tok) { return { usuario: sesion(tok) }; },
     webSalir: function (tok) { delete DB.sesiones[tok]; persistir(); return { ok: true }; },
     webCargar: function (tok) { var u = sesion(tok), o = {}, ad = u.rol === "ADMIN"; TABLAS.forEach(function (t) { if (t !== "Mediciones") o[t] = vivas(t, ad); }); if (!ad) { o.Usuarios = []; o.Solicitudes_Acceso = []; if (!esGestor(u)) o.Pedidos = []; } if (u.rol === "COLABORADOR") { o.Material = []; o.Movimientos = []; o.Solicitudes = []; o.Pedidos = []; }
-      o.Equipo = DB.tablas.Usuarios.filter(function (x) { return x.Activo !== false && x.Borrado !== true; }).map(function (x) { var q = { ID: x.ID, Nombre: x.Nombre, Rol: normRol(x.Rol), Foto: x.Foto || "" }; if (u.rol !== "COLABORADOR") q.Email = x.Email; return q; });
+      o.Equipo = DB.tablas.Usuarios.filter(function (x) { return x.Activo !== false && x.Borrado !== true; }).map(function (x) { var q = { ID: x.ID, Nombre: nombreVisibleD(x.Nombre, x.Apellidos), Rol: normRol(x.Rol), Foto: x.Foto || "" }; if (u.rol !== "COLABORADOR") q.Email = x.Email; return q; });
       return { usuario: u, ahora: ahoraISO(), config: {}, tablas: o }; },
-    webPerfilFoto: function (tok, url) { var u = sesion(tok); url = String(url || ""); if (url && (!/^data:image\/(jpeg|webp);base64,[A-Za-z0-9+\/=]+$/.test(url) || url.length > 20000)) throw new Error("La foto no es válida o es demasiado grande."); var f = DB.tablas.Usuarios.filter(function (x) { return x.Email === u.email; })[0]; f.Foto = url; meta(f, u.email, ahoraISO()); persistir(); return { ok: true, usuario: sesion(tok) }; },
+    webPerfilFoto: function (tok, url) { var u = sesion(tok); url = String(url || ""); if (url && (!/^data:image\/(jpeg|webp);base64,[A-Za-z0-9+\/=]+$/.test(url) || url.length > 40000)) throw new Error("La foto no es válida o es demasiado grande."); var f = DB.tablas.Usuarios.filter(function (x) { return x.Email === u.email; })[0]; f.Foto = url; meta(f, u.email, ahoraISO()); persistir(); return { ok: true, usuario: sesion(tok) }; },
+    webPerfilDatos: function (tok, o) {   // v0.7.2: nombre y apellidos de cada usuario (como el servidor)
+      var u = sesion(tok), f = DB.tablas.Usuarios.filter(function (x) { return x.Email === u.email; })[0], lim = function (v) { return String(v === null || v === undefined ? "" : v).replace(/[\u0000-\u001f\u007f<>]/g, " ").replace(/\s+/g, " ").trim(); }, n = 0;
+      if (!o || typeof o !== "object") throw new Error("Indica los datos: {nombre, apellidos}.");
+      if (o.nombre !== undefined && o.nombre !== null) { var nm = lim(o.nombre); if (!nm) throw new Error("Escribe tu nombre."); if (nm.length > 60) throw new Error("El nombre admite como mucho 60 caracteres."); f.Nombre = nm; n++; }
+      if (o.apellidos !== undefined && o.apellidos !== null) { var ap = lim(o.apellidos); if (ap.length > 80) throw new Error("Los apellidos admiten como mucho 80 caracteres."); f.Apellidos = ap; n++; }
+      if (!n) throw new Error("Indica al menos el nombre o los apellidos."); meta(f, u.email, ahoraISO()); persistir(); return { ok: true, usuario: sesion(tok) }; },
     webPerfilNotificaciones: function (tok, o) { var u = sesion(tok), f = DB.tablas.Usuarios.filter(function (x) { return x.Email === u.email; })[0]; o = o || {}; if (o.gestor_inventario !== undefined) throw new Error("Sin permiso: el gestor de inventario lo asigna un administrador.");   // v0.7 (a)
       if (o.revision === true && u.rol !== "ADMIN") throw new Error("Sin permiso: solo los administradores reciben los datos para revisar."); [["diaria", "Notif_diaria"], ["revision", "Notif_revision"], ["perfusion", "Notif_perfusion"]].forEach(function (k) { if (o[k[0]] !== undefined) f[k[1]] = !!siNoD(o[k[0]]); }); meta(f, u.email, ahoraISO()); persistir(); return { ok: true, usuario: sesion(tok) }; },
     webMediciones: function (tok, exps) { var u = sesion(tok); return { filas: vivas("Mediciones", u.rol === "ADMIN").filter(function (m) { return exps.indexOf(m.Experimento) !== -1; }) }; },
@@ -296,4 +303,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["demo.js"] = "0.7.1";
+;(window.HOME_MODS = window.HOME_MODS || {})["demo.js"] = "0.7.2";

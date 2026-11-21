@@ -170,7 +170,7 @@
     var filas = vars.filter(function (v) { return !v.calculada; }).map(function (v) {
       var g = ""; if (v.grupo && v.grupo !== grupo) { grupo = v.grupo; g = '<tr class="grupo"><th colspan="' + (cols.length + 1) + '">' + esc(grupo) + "</th></tr>"; }
       return g + '<tr><th scope="row">' + esc(v.nombre) + ' <span class="u">' + esc(H.unidadVisible(v.id, v.unidad)) + "</span></th>" + cols.map(function (c) {
-        var x = H.valor(e.ID, c.m, c.p, v.id), val = x ? (C.num(x.Valor) !== null ? String(H.aVista(v.id, x.Valor)).replace(".", ",") : x.Texto) : "", cl = x ? H.claseValor(opc.objM || c.m, v.id, x.Valor) + (H.pendiente(x) ? " pend" : "") : "";
+        var x = H.valor(e.ID, c.m, c.p, v.id), val = x ? (C.num(x.Valor) !== null ? String(H.aVista(v.id, x.Valor)).replace(".", ",") : x.Texto) : "", cl = x ? H.claseValor((C.MUESTRAS_BASALES || []).indexOf(c.m) !== -1 ? c.m : opc.objM || c.m, v.id, x.Valor) + (H.pendiente(x) ? " pend" : "") : "";
         return '<td><input class="' + cl + '" inputmode="decimal" autocomplete="off" aria-label="' + esc(v.nombre + " · " + c.et) + '" value="' + esc(val || "") + '" data-cambio="celda" data-exp="' + esc(e.ID) + '" data-m="' + c.m + '" data-p="' + esc(c.p) + '" data-t="' + (c.t === undefined || c.t === null ? "" : c.t) + '" data-f=""' + (puedo ? "" : " readonly") + "></td>";
       }).join("") + "</tr>";
     }).join("");
@@ -332,4 +332,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v05d.js"] = "0.7.1";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v05d.js"] = "0.7.2";

@@ -7,10 +7,17 @@
 
   // ============================================================== 1. opciones nuevas (se añaden a las de app_graf.js)
   var NUEVAS = { v7: 0, disposicion: "auto", proporcion: "16:9", fig_mm: 180, ppp: 300, letras: "A", titulos: true, familia: "Arial", fuente_pt: 8, linea_pt: 1.2, punto_pt: 2.2,
-    rejilla_t: "tenue", ingles: false, y0: false, dias: true, etiq_x: "horas", sup_prandial: true, sup_gluco: true, sup_noche: true, color_media: "#1d3a5a" };
+    rejilla_t: "tenue", ingles: false, y0: false, dias: true, etiq_x: "horas", sup_prandial: true, sup_gluco: true, sup_noche: true, color_media: "#1d3a5a", fuente_auto: true };   // v0.7.2: fuente_auto
   Object.keys(NUEVAS).forEach(function (k) { if (!(k in GI.DEF)) GI.DEF[k] = NUEVAS[k]; });
   GI.DEF.leyenda = "abajo";
   var EJES = [["real", "Tiempo real de perfusión (h)"], ["reloj", "Hora de perfusión (reloj)"], ["nominal", "Tiempo nominal del protocolo (h)"], ["dia", "Día de perfusión"], ["hora", "Hora del día (circadiano, 0–24 h)"]];
+  // v0.7.2: (i) del «Eje X» en lista: qué es cada eje y cuándo usarlo (una línea por elemento: «Título: explicación»)
+  var INFO_EJE = "Qué representa cada eje X y cuándo usarlo:\n" +
+    "Tiempo real de perfusión (h): horas transcurridas desde el inicio de cada perfusión hasta la hora real en que se tomó cada muestra. Es el eje por defecto. Úsalo para ver la evolución tal y como ocurrió.\n" +
+    "Hora de perfusión (reloj): cada muestra a la hora del reloj en que se tomó. El 0 son las 00:00 del día en que empezó cada perfusión, así que perfusiones que empezaron a distinta hora quedan alineadas por la hora del día; marcas principales a las 08:00 y a las 20:00 y bloques «Día N» por días naturales (día 1 = día del inicio). Úsalo para relacionar los datos con el horario circadiano o el turno.\n" +
+    "Tiempo nominal del protocolo (h): la hora teórica del punto de muestreo según el protocolo (T0, T1, T24…), no la hora real. Úsalo para comparar perfusiones punto a punto o para medias ± DE/EEM cuando las muestras no se tomaron exactamente a la misma hora.\n" +
+    "Día de perfusión: el tiempo real en días (1 día = 24 h desde el inicio). Úsalo para perfusiones largas (de varios días), para ver la tendencia general.\n" +
+    "Hora del día (circadiano, 0–24 h): todas las muestras plegadas en un único día de 0 a 24 h, sin importar el día de perfusión. Úsalo para buscar patrones circadianos (p. ej. si un valor sube siempre a la misma hora).";
   var MODOS = [["individual", "Cada perfusión"], ["media_de", "Media ± DE"], ["media_eem", "Media ± EEM"], ["ind_media", "Cada perfusión + media"]];
   var DISPOS = [["auto", "Automática"], ["1x1", "1 × 1"], ["1x2", "1 × 2 (una fila, dos paneles)"], ["2x1", "2 × 1 (dos filas)"], ["2x2", "2 × 2"], ["2x3", "2 × 3 (dos filas, tres columnas)"], ["3x2", "3 × 2 (tres filas, dos columnas)"], ["3x3", "3 × 3"],
     ["col1", "1 columna"], ["col2", "2 columnas"], ["col3", "3 columnas"], ["col4", "4 columnas"]];
@@ -21,6 +28,7 @@
     if (!g.v7) { g.v7 = 1; g.rejilla_t = g.rejilla === false ? "ninguna" : "tenue"; g.leyenda = "abajo"; }
     if (EJES.every(function (x) { return x[0] !== g.eje; })) g.eje = "real";
     if (MODOS.every(function (x) { return x[0] !== g.modo; })) g.modo = "individual";
+    if (GI.muestras.every(function (x) { return x[0] !== g.muestra; })) { g.muestra = GI.muestras[0][0]; var ids0 = GI.varsDe(g.muestra).map(function (v) { return v.id; }); g.vars = (g.vars || []).filter(function (v) { return ids0.indexOf(v) !== -1; }); }   // v0.7.2: sin «Receptor · evaluación funcional»
     if (!Array.isArray(g.vars)) g.vars = []; if (!Array.isArray(g.exps)) g.exps = []; if (!g.colores || typeof g.colores !== "object") g.colores = {};
     return g;
   }
@@ -80,7 +88,9 @@
     var np = tramos("NP (glucosa + AA)"), lip = tramos("NP (lípidos)"), hc = tramos("Hidrocortisona"), mel = tramos("Melatonina"), out = { prandial: [], gluco: [], noche: [], fuente: {} };
     if (np.length) { var mx = Math.max.apply(null, np.map(function (t) { return t.v; })), mn = Math.min.apply(null, np.map(function (t) { return t.v; })); if (mx > mn) { out.prandial = sobre(np, function (t) { return t.v === mx; }); out.fuente.prandial = "NP (glucosa + AA)"; } }
     if (!out.prandial.length && lip.length) { out.prandial = sobre(lip, function (t) { return t.v > 0; }); if (out.prandial.length) out.fuente.prandial = "NP (lípidos)"; }
-    if (hc.length) { var b = Math.min.apply(null, hc.map(function (t) { return t.v; })); out.gluco = sobre(hc, function (t) { return t.v > b; }); if (out.gluco.length) out.fuente.gluco = "Hidrocortisona"; }
+    if (hc.length) {   // v0.7.2: pulsos = tramos de ≤ 1 h por encima de los dos vecinos (con nocturno < basal, «por encima del mínimo» marcaba todo el día); si no hay, por encima del mínimo
+      var pic = hc.filter(function (t, j) { var p = hc[(j - 1 + hc.length) % hc.length], q = hc[(j + 1) % hc.length]; return hc.length > 2 && t.b - t.a <= 60 && t.v > p.v && t.v > q.v; });
+      var b = Math.min.apply(null, hc.map(function (t) { return t.v; })); out.gluco = pic.length ? sobre(pic, function () { return true; }) : sobre(hc, function (t) { return t.v > b; }); if (out.gluco.length) out.fuente.gluco = "Hidrocortisona"; }
     if (mel.length) { out.noche = sobre(mel, function (t) { return t.v > 0; }); if (out.noche.length) out.fuente.noche = "Melatonina"; }
     return out;
   };
@@ -152,8 +162,18 @@
     return { c: c, f: Math.max(1, Math.ceil(n / c)), celdas: c * Math.max(1, Math.ceil(n / c)), fija: false };
   }
   function tw(s, f) { return String(s || "").length * f * 0.53; }
+  // v0.7.2 · letra automática con la disposición automática: el tamaño elegido (fuente_pt) es el máximo y se reduce lo necesario
+  // para que, con más columnas (paneles más estrechos y bajos), los textos no se coman el panel: ≤ 6,9 % del alto del panel
+  // (títulos, «Día N», marcas y título del eje ocupan ~6,5 letras de alto → ≥ 55 % queda para los datos) y ≤ 7,5 % del ancho
+  // (marcas y título del eje Y). Nunca por debajo de 6 pt (mínimo legible en una revista); se redondea a 0,5 pt.
+  function fuenteAuto(c, Wt) {
+    var base = fpt(); if (G().disposicion !== "auto" || G().fuente_auto === false) return base;
+    var gap0 = base * 1.4, Wp = (Wt - (c - 1) * gap0) / c, Hp = Wp / aspecto(), lim = Math.min(Hp * 0.069, Wp * 0.075);
+    return Math.max(Math.min(base, 6), Math.min(base, Math.floor(lim * 2) / 2));
+  }
+  H.g7fuenteAuto = function (n) { var d = disposicion(n); return fuenteAuto(d.c, anchoMM() * PT_MM); };
   function geometria(n, leyenda) {
-    var g = G(), d = disposicion(n), f = fpt(), Wt = anchoMM() * PT_MM, gap = f * 1.4, Lw = 0;
+    var g = G(), d = disposicion(n), Wt = anchoMM() * PT_MM, f = fuenteAuto(d.c, Wt), gap = f * 1.4, Lw = 0;
     if (g.leyenda === "derecha" && leyenda && leyenda.length) Lw = Math.min(Wt * 0.35, Math.max.apply(null, leyenda.map(function (x) { return tw(x.texto, f) + f * 3.2; })) + f);
     var Wp = (Wt - Lw - (d.c - 1) * gap) / d.c, Hp = Wp / aspecto();
     return { c: d.c, f: d.f, celdas: d.celdas, fija: d.fija, Wt: Wt, Wp: Wp, Hp: Hp, gap: gap, Lw: Lw, fs: f };
@@ -326,8 +346,8 @@
     var pal = paleta(false);
     return '<div class="g7-leyenda" id="g7Leyenda" role="list" aria-label="Leyenda común de los gráficos">' + items.map(function (it, i) { return '<span class="g7-li" role="listitem" data-tipo="' + it.tipo + '"><svg viewBox="0 0 24 10" width="24" height="10" aria-hidden="true">' + muestraSVG(it, 0, 0, 24, 10, pal, "g7l" + i) + "</svg>" + esc(it.texto) + "</span>"; }).join("") + "</div>";
   }
-  function leyendaSVG(items, ancho, pal, vertical) {
-    var f = fpt(), h = f, w = f * 2.2, sep = f * 1.2, filas = [[]], x = 0, out = "", alto;
+  function leyendaSVG(items, ancho, pal, vertical, fs) {
+    var f = fs || fpt(), h = f, w = f * 2.2, sep = f * 1.2, filas = [[]], x = 0, out = "", alto;
     if (vertical) { items.forEach(function (it, i) { var y = i * f * 1.5; out += muestraSVG(it, 0, y, w, h, pal, "lgx" + i) + '<text x="' + f1(w + f * 0.5) + '" y="' + f1(y + h * 0.82) + '" font-size="' + f1(f) + '" fill="' + pal.texto + '">' + esc(it.texto) + "</text>"; }); return { svg: out, alto: items.length * f * 1.5, ancho: ancho }; }
     items.forEach(function (it) { var a = w + f * 0.5 + tw(it.texto, f); if (x && x + a > ancho) { filas.push([]); x = 0; } filas[filas.length - 1].push({ it: it, a: a }); x += a + sep; });
     filas.forEach(function (fl, j) { var tot = fl.reduce(function (s, q) { return s + q.a; }, 0) + sep * (fl.length - 1), x0 = (ancho - tot) / 2, y = j * f * 1.6;
@@ -365,8 +385,8 @@
   }
   // figura compuesta (SVG) en milímetros; los paneles son los mismos de la pantalla
   function figuraSVG(px) {
-    var F = construir(true), geo = F.geo, g = F.g, pal = F.ctx.pal, f = fpt(), n = F.paneles.length, filas = Math.max(1, geo.fija ? geo.f : Math.ceil(n / geo.c));
-    var Wt = geo.Wt, top = g.titulo ? f * 2.2 : 0, ley = g.leyenda === "oculta" || !F.items.length ? null : leyendaSVG(F.items, g.leyenda === "derecha" ? geo.Lw : Wt, pal, g.leyenda === "derecha");
+    var F = construir(true), geo = F.geo, g = F.g, pal = F.ctx.pal, f = geo.fs, n = F.paneles.length, filas = Math.max(1, geo.fija ? geo.f : Math.ceil(n / geo.c));
+    var Wt = geo.Wt, top = g.titulo ? f * 2.2 : 0, ley = g.leyenda === "oculta" || !F.items.length ? null : leyendaSVG(F.items, g.leyenda === "derecha" ? geo.Lw : Wt, pal, g.leyenda === "derecha", f);
     var Hpaneles = filas * geo.Hp + (filas - 1) * geo.gap, ytop = top + (ley && g.leyenda === "arriba" ? ley.alto + f * 0.8 : 0);
     var Ht = ytop + Hpaneles + (ley && g.leyenda === "abajo" ? f * 1.0 + ley.alto : 0) + f * 0.3; if (ley && g.leyenda === "derecha") Ht = Math.max(Ht, ytop + ley.alto);
     var defs = "", cuerpo = "";
@@ -405,7 +425,7 @@
     return '<h3 style="margin-bottom:8px">Perfusiones</h3><div class="fila-flex" style="margin-bottom:6px"><button class="bt mini" data-act="gTodas">Todas</button><button class="bt mini" data-act="gNinguna">Ninguna</button><button class="bt mini" data-act="gPaleta" title="Reasignar la paleta apta para daltonismo">Paleta</button></div>' +
       '<div class="lista-sel">' + (exps.length ? exps.map(function (e, i) { var on = g.exps.indexOf(e.ID) !== -1; return '<label><input type="checkbox" data-cambio="gExp" data-id="' + esc(e.ID) + '"' + (on ? " checked" : "") + "> <span>" + esc(e.ID) + '</span> <span class="muy-tenue">' + esc(e.Estado || "") + '</span><input type="color" aria-label="Color de ' + esc(e.ID) + '" value="' + esc(GI.colorDe(e.ID, i)) + '" data-cambio="gColor" data-id="' + esc(e.ID) + '"></label>'; }).join("") : '<p class="tenue">Sin experimentos.</p>') + "</div>" +
       '<h3 style="margin:14px 0 8px">Variables</h3><div id="g7Vars">' + varsHTML() + "</div>" +
-      '<h3 style="margin:14px 0 8px">Presentación</h3>' + sel("eje", "Eje X", EJES).replace('<label class="et" for="g_eje">Eje X</label>', '<label class="et et-i" for="g_eje">Eje X</label>' + H.botonInfo("Hora de perfusión (reloj): cada perfusión se dibuja a la hora del reloj en que se tomó cada muestra. El 0 del eje son las 00:00 del día en que empezó cada perfusión, así que perfusiones que empezaron a distinta hora quedan alineadas por la hora del día; las marcas principales están a las 08:00 y a las 20:00 y los bloques «Día N» son días naturales (el día 1 es el día del inicio).")) + sel("modo", "Modo", MODOS) +
+      '<h3 style="margin:14px 0 8px">Presentación</h3>' + sel("eje", "Eje X", EJES).replace('<label class="et" for="g_eje">Eje X</label>', '<label class="et et-i" for="g_eje">Eje X</label>' + H.botonInfo(INFO_EJE)) + sel("modo", "Modo", MODOS) +
       '<div class="rejilla estrecha">' + num("xmin", "X desde", "") + num("xmax", "X hasta", "") + "</div>" +
       '<div class="g7-checks">' + chk("puntos", "Puntos") + chk("lineas", "Líneas") + chk("objetivo", "Banda de objetivo") + chk("historica", "Banda histórica (media ± 2 DE del resto)") + chk("y0", "Eje Y desde 0") + "</div>" +
       '<h3 style="margin:14px 0 8px">Protocolo circadiano</h3><div class="g7-checks">' + chk("sup_prandial", '<span class="g7-sw prandial"></span>Prandial (nutrición parenteral)') + chk("sup_gluco", '<span class="g7-sw gluco"></span>Glucocorticoides (bolos de hidrocortisona)') +
@@ -422,7 +442,9 @@
       "</div></details>" +
       '<details class="plegable" style="margin-top:10px"><summary>Estilo</summary><div class="dentro">' +
       sel("estilo", "Estilo", [["pantalla", "Pantalla (sigue el tema)"], ["publicacion", "Publicación (fondo blanco, ejes negros)"]]) + sel("familia", "Fuente", [["Arial", "Arial"], ["Helvetica", "Helvetica"], ["Roboto", "Roboto"], ["Times New Roman", "Times New Roman"]]) +
-      '<div class="rejilla estrecha">' + num("fuente_pt", "Tamaño de letra", "pt") + num("linea_pt", "Grosor de línea", "pt") + num("punto_pt", "Tamaño de punto", "pt") + "</div>" +
+      '<div class="rejilla estrecha">' + num("fuente_pt", g.disposicion === "auto" && g.fuente_auto !== false ? "Tamaño de letra (máximo)" : "Tamaño de letra", "pt") + num("linea_pt", "Grosor de línea", "pt") + num("punto_pt", "Tamaño de punto", "pt") + "</div>" +
+      '<div class="fila-info">' + chk("fuente_auto", "Ajustar la letra a la disposición automática") + H.botonInfo("Con la disposición «Automática», la letra se adapta al número de paneles: el tamaño que escribas es el máximo y, con más columnas (paneles más pequeños), se reduce lo justo para que los textos no tapen los datos, sin bajar de 6 pt. Con una disposición fija (2 × 2, 3 columnas…) o con esta casilla desmarcada se usa siempre el tamaño escrito.") + "</div>" +
+      (g.disposicion === "auto" && g.fuente_auto !== false && g.vars.length ? '<p class="muy-tenue g7-letra-auto" id="g7LetraAuto">Letra en la figura: ' + esc(H.n(H.g7fuenteAuto(g.vars.length), 1)) + " pt (" + disposicion(g.vars.length).c + (disposicion(g.vars.length).c === 1 ? " columna" : " columnas") + ")</p>" : "") +
       sel("rejilla_t", "Cuadrícula", [["ninguna", "Sin cuadrícula"], ["tenue", "Tenue (solo horizontal)"], ["completa", "Completa"]]) +
       '<div class="campo"><label class="et" for="g_color_media">Color de la media y su banda</label><input id="g_color_media" type="color" value="' + esc(g.color_media || "#1d3a5a") + '" data-cambio="gOpc" data-k="color_media"></div>' +
       sel("leyenda", "Leyenda en la figura exportada", [["abajo", "Abajo"], ["arriba", "Arriba"], ["derecha", "Derecha"], ["oculta", "Oculta"]]) +
@@ -463,7 +485,7 @@
     if (LIM[k]) { val = C.num(val); if (val === null) { el.value = g[k]; return; } val = Math.min(LIM[k][1], Math.max(LIM[k][0], val)); }
     g[k] = val; var panel = false;
     if (k === "muestra") { var ids = GI.varsDe(g.muestra).map(function (v) { return v.id; }); g.vars = g.vars.filter(function (v) { return ids.indexOf(v) !== -1; }); if (!g.vars.length) g.vars = [ids[0]]; panel = true; }
-    if (k === "fig_mm" || k === "letras") panel = true;
+    if (k === "fig_mm" || k === "letras" || k === "disposicion" || k === "fuente_auto" || k === "fuente_pt" || k === "proporcion") panel = true;   // v0.7.2: letra automática
     GI.guardar(); refrescar(panel);
   };
   H.acc.gExp = function (el) { var g = G(), id = el.getAttribute("data-id"), i = g.exps.indexOf(id); if (el.checked && i === -1) g.exps.push(id); if (!el.checked && i !== -1) g.exps.splice(i, 1); g._ninguna = !g.exps.length; GI.guardar(); asegurar(); refrescar(); };
@@ -518,6 +540,19 @@
       X.writeFile(wb, GI.nombreArchivo("Prism") + ".xlsx");
     });
   };
+  // ============================================================== 12. (i) con listas (v0.7.2)
+  // Un texto de (i) con saltos de línea se muestra como lista: la primera línea es la entrada y cada línea siguiente un elemento;
+  // «Título: explicación» pone el título en negrita. Un texto de una sola línea se muestra exactamente como antes.
+  var infoPrev = H.acc.infoTexto;
+  H.infoTextoHTML = function (t) {
+    var l = String(t || "").split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean); if (l.length < 2) return "<p>" + esc(String(t || "")) + "</p>";
+    var it = function (x) { var m = /^([^:]{2,70}):\s+([\s\S]+)$/.exec(x); return "<li>" + (m ? "<b>" + esc(m[1]) + "</b>: " + esc(m[2]) : esc(x)) + "</li>"; };
+    return "<p>" + esc(l[0]) + '</p><ul class="info-lista">' + l.slice(1).map(it).join("") + "</ul>";
+  };
+  H.acc.infoTexto = function (el) {
+    var t = el.getAttribute("data-t") || ""; if (!/\n/.test(t) && infoPrev) return infoPrev.apply(this, arguments);
+    H.modal({ titulo: "Información", cuerpo: H.infoTextoHTML(t), pie: '<button class="bt pri" data-cerrar>Entendido</button>' });
+  };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v07c.js"] = "0.7.1";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v07c.js"] = "0.7.2";

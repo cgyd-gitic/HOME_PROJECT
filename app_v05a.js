@@ -11,7 +11,7 @@
   function iniciales(n) { var p = String(n || "?").trim().split(/\s+/); return ((p[0] || "?").charAt(0) + (p.length > 1 ? p[p.length - 1].charAt(0) : "")).toUpperCase(); }
   H.avatarHTML = function (u, cls) {
     u = u || {}; var f = u.foto || u.Foto || "";
-    return f && /^data:image\/(jpeg|webp|png);base64,/.test(f) ? '<img class="avatar ' + (cls || "") + '" src="' + esc(f) + '" alt="">' : '<span class="avatar ' + (cls || "") + '" aria-hidden="true"><span>' + esc(iniciales(u.nombre || u.Nombre || u.email || u.Email)) + "</span></span>";
+    return f && /^data:image\/(jpeg|webp|png);base64,/.test(f) ? '<img class="avatar ' + (cls || "") + '" src="' + esc(f) + '" alt="">' : '<span class="avatar ' + (cls || "") + '" aria-hidden="true"><span>' + esc(iniciales(H.nombreVisible ? H.nombreVisible(u) : u.nombre || u.Nombre || u.email || u.Email)) + "</span></span>";
   };
   // nombre visible de un correo: Usuarios (ADMIN) → Equipo (resto) → parte local del correo
   H.nombreDe = function (email) {
@@ -169,7 +169,7 @@
     }
     if (o.ref !== null && o.ref !== undefined) g += '<line class="ge-ref" x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(o.ref).toFixed(1) + '" y2="' + Y(o.ref).toFixed(1) + '"><title>Basal del donante de hígado: ' + esc(H.n(o.ref, o.dec || 1)) + '</title></line>' + (o.W ? '<text class="ge-ref-tx" x="' + (W - R + 4) + '" y="' + (Y(o.ref) + 3.5).toFixed(1) + '">basal LD</text>' : "");
     if (vis.length > 1) g += '<polyline class="ge-linea" points="' + vis.map(function (p) { return X(p.t).toFixed(1) + "," + Y(p.v).toFixed(1); }).join(" ") + '"/>';
-    vis.forEach(function (p, i) { var fuera = o.ob ? C.enRango(p.v, o.ob) : 0; g += '<circle class="ge-punto' + (fuera ? " fuera" : "") + (i === vis.length - 1 ? " ultimo" : "") + '" cx="' + X(p.t).toFixed(1) + '" cy="' + Y(p.v).toFixed(1) + '" r="' + (i === vis.length - 1 ? 3.6 : 2.4) + '"><title>' + esc((p.punto || "") + " · " + H.n(p.t, 1) + " h · " + H.n(p.v, o.dec || 1)) + "</title></circle>"; });
+    vis.forEach(function (p, i) { var fuera = o.ob ? C.enRango(p.v, o.ob) : 0; g += '<circle class="ge-punto' + (fuera ? " fuera" : "") + (i === vis.length - 1 ? " ultimo" : "") + '" cx="' + X(p.t).toFixed(1) + '" cy="' + Y(p.v).toFixed(1) + '" r="' + (i === vis.length - 1 ? 3.6 : 2.4) + '" data-v="' + p.v + '" data-t="' + p.t + '" data-p="' + esc(p.punto || "") + '"><title>' + esc(H.n(p.v, o.dec || 1) + (o.u ? " " + o.u : "") + (p.punto ? " · " + p.punto : "") + " · " + H.n(p.t, 1) + " h") + "</title></circle>"; });   // v0.7.2: valor y unidad primero; data-* para tocar el punto en la ampliación
     g += '<line class="ge-eje" x1="' + L + '" x2="' + L + '" y1="' + T + '" y2="' + (T + ph) + '"/><line class="ge-eje" x1="' + L + '" x2="' + (W - R) + '" y1="' + (T + ph) + '" y2="' + (T + ph) + '"/>';
     g += '<text class="ge-tit-x" x="' + (W - R) + '" y="' + (Hh - 1) + '" text-anchor="end">h de perfusión</text>';
     return '<svg class="graf-ejes" viewBox="0 0 ' + W + " " + Hh + '" role="img" aria-label="' + esc(o.titulo || "Gráfico") + '">' + g + "</svg>";
@@ -184,7 +184,7 @@
     var ob = d.ob ? [C.num(H.aVista(d.v, d.ob[0])), C.num(H.aVista(d.v, d.ob[1]))] : null, ref = basalLD(e.ID, k), cls = u && ob ? (C.enRango(u.v, ob) ? "al" : "ok") : "";
     var tend = u && a ? (function () { var dv = u.v - a.v, fl = Math.abs(dv) < Math.pow(10, -d.dec) / 2 ? "=" : dv > 0 ? "↑" : "↓"; return '<span class="tend"><span class="flecha" aria-label="' + (fl === "↑" ? "sube" : fl === "↓" ? "baja" : "sin cambio") + '">' + fl + "</span> " + esc(H.n(a.v, d.dec)) + "</span>"; })() : u ? '<span class="tend muy-tenue">primer valor</span>' : "";
     return '<div class="g-tarjeta ' + cls + '" data-ampliar="' + esc(e.ID) + '" data-k="' + esc(k) + '" data-modo="' + esc(modo) + '" role="button" tabindex="0" aria-label="Ampliar el gráfico de ' + esc(d.nombre) + '"><div class="g-cab"><div class="g-tit"><span class="et">' + esc(d.nombre) + (d.mu !== "PERF" && d.mu !== "BILIS" && d.mu !== "FLUJO" && d.mu !== "DERIV" ? " · " + esc(NOMBRE_M[d.mu] || d.mu) : "") + '</span><span class="u">' + esc(d.unidad) + (u && u.punto ? " · " + esc(u.punto) : "") + '</span></div><div class="g-val"><b>' + (u ? esc(H.n(u.v, d.dec)) : "—") + "</b>" + tend + "</div></div>" +
-      H.graficoEjes(serie, { x0: x0, x1: x1, ob: ob, banda: banda, dec: d.dec, ref: ref, titulo: d.nombre }) +
+      H.graficoEjes(serie, { x0: x0, x1: x1, ob: ob, banda: banda, dec: d.dec, ref: ref, titulo: d.nombre, u: d.unidad }) +
       (modo === "comparar" ? '<div class="g-pie">' + (nComp ? "Media ± DE de " + nComp + " perfusión(es) anterior(es)" : "Sin perfusiones anteriores con este dato") + "</div>" : "") + "</div>";
   }
 
@@ -203,8 +203,9 @@
     if (modo === "comparar") { var bc = bandaComparacion(e, k); banda = bc.puntos.map(function (b) { return { t: b.t, m: C.num(H.aVista(d.v, b.m)), s: b.s === null ? null : Math.abs(C.num(H.aVista(d.v, b.m + b.s)) - C.num(H.aVista(d.v, b.m))), n: b.n }; }); }
     var ob = d.ob ? [C.num(H.aVista(d.v, d.ob[0])), C.num(H.aVista(d.v, d.ob[1]))] : null, ref = basalLD(e.ID, k), u = serie[serie.length - 1];
     var o = document.createElement("div"); o.id = "grafAmpliado"; o.className = "g-ampliado"; o.setAttribute("role", "dialog"); o.setAttribute("aria-modal", "true"); o.setAttribute("aria-label", d.nombre);
+    o.setAttribute("data-exp", e.ID); o.setAttribute("data-u", d.unidad || ""); o.setAttribute("data-dec", String(d.dec === undefined ? 1 : d.dec)); if (t0) o.setAttribute("data-t0", String(C.aFecha(t0) ? C.aFecha(t0).getTime() : ""));   // v0.7.2: para la etiqueta del punto tocado
     o.innerHTML = '<div class="g-amp-caja"><div class="g-amp-cab"><div><b>' + esc(d.nombre) + (NOMBRE_M[d.mu] && d.mu !== "PERF" ? " · " + esc(NOMBRE_M[d.mu]) : "") + '</b><span class="muy-tenue">' + esc(e.ID) + " · " + esc(d.unidad) + (u ? " · último " + esc(H.n(u.v, d.dec)) + (u.punto ? " (" + esc(u.punto) + ")" : "") : "") + (ref !== null ? " · basal LD " + esc(H.n(ref, d.dec)) : "") + '</span></div><button class="bt ico-solo" data-act="cerrarAmpliado" aria-label="Cerrar la ampliación">' + ico("x") + "</button></div>" +
-      H.graficoEjes(serie, { x0: x0, x1: x1, ob: ob, banda: banda, dec: d.dec, ref: ref, titulo: d.nombre, W: 760, H: 380 }) + '<p class="muy-tenue g-amp-pie">Toca en cualquier sitio para cerrar.</p></div>';
+      H.graficoEjes(serie, { x0: x0, x1: x1, ob: ob, banda: banda, dec: d.dec, ref: ref, titulo: d.nombre, W: 760, H: 380, u: d.unidad }) + '<p class="muy-tenue g-amp-pie">Toca en cualquier sitio para cerrar.</p></div>';
     o.addEventListener("click", cerrarAmpliado); document.body.appendChild(o); document.body.classList.add("con-ampliado");
   };
   function cerrarAmpliado() { var o = H.$("#grafAmpliado"); if (o) o.remove(); document.body.classList.remove("con-ampliado"); }
@@ -294,28 +295,78 @@
   };
 
   // ============================================================== Mi cuenta: foto de perfil
+  // v0.7.2: se abre con createImageBitmap (respeta la orientación EXIF) o con <img> desde un blob (sin pasar por una data URL de
+  // varios MB), se recorta en cuadrado, se pinta sobre blanco (PNG con transparencia) y se reduce a 256 px (192/160/128 si hace
+  // falta) en JPEG de calidad 0,85 → 0,5 hasta ≤ 28 000 caracteres (el servidor admite 40 000; una celda de Sheets, 50 000).
+  // HEIC/HEIF (iPhone): si el navegador lo decodifica (Safari) se convierte; si no, mensaje claro. Mensajes visibles en la tarjeta.
+  var FOTO = { lados: [256, 192, 160, 128], max: 28000, mb: 40 };
+  function esHeic(f) { return /hei[cf]/i.test(f.type || "") || /\.(heic|heif)$/i.test(f.name || ""); }
+  function errHeic() { return new Error("Este navegador no puede abrir fotos HEIC (el formato del iPhone). Súbela desde el iPhone o el iPad (Safari la convierte sola), ábrela en Safari, o guárdala antes como JPG."); }
+  function abrirImagen(file) {
+    function conImg() {
+      return new Promise(function (ok, ko) {
+        var url = null, img = new Image(), fin = function () { if (url && window.URL && URL.revokeObjectURL) try { URL.revokeObjectURL(url); } catch (x) { } };
+        img.onload = function () { var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height; if (!w || !h) { fin(); ko(esHeic(file) ? errHeic() : new Error("Este navegador no puede abrir esa imagen.")); return; } ok({ fuente: img, w: w, h: h, cerrar: fin }); };
+        img.onerror = function () { fin(); ko(esHeic(file) ? errHeic() : new Error("Este navegador no puede abrir esa imagen. Prueba con una foto JPG o PNG.")); };
+        try { url = URL.createObjectURL(file); img.src = url; }
+        catch (x) { var rd = new FileReader(); rd.onerror = function () { ko(new Error("No se ha podido leer la imagen.")); }; rd.onload = function () { img.src = rd.result; }; rd.readAsDataURL(file); }
+      });
+    }
+    if (window.createImageBitmap) return window.createImageBitmap(file, { imageOrientation: "from-image" }).then(function (b) { return { fuente: b, w: b.width, h: b.height, cerrar: function () { if (b.close) b.close(); } }; }, conImg);
+    return conImg();
+  }
   function reducirFoto(file) {
-    return new Promise(function (ok, ko) {
-      if (!/^image\//.test(file.type)) { ko(new Error("Elige una imagen (JPG, PNG o HEIC convertida).")); return; }
-      var rd = new FileReader(); rd.onerror = function () { ko(new Error("No se ha podido leer la imagen.")); };
-      rd.onload = function () { var img = new Image(); img.onerror = function () { ko(new Error("Este navegador no puede abrir esa imagen.")); }; img.onload = function () {
-        try { var lado = 160, cv = document.createElement("canvas"); cv.width = lado; cv.height = lado; var cx = cv.getContext("2d"), m = Math.min(img.width, img.height); cx.drawImage(img, (img.width - m) / 2, (img.height - m) / 2, m, m, 0, 0, lado, lado);
-          var q = 0.85, url = cv.toDataURL("image/jpeg", q); while (url.length > 19000 && q > 0.4) { q -= 0.1; url = cv.toDataURL("image/jpeg", q); } ok(url); } catch (e) { ko(new Error("No se ha podido reducir la imagen en este navegador.")); } }; img.src = rd.result; };
-      rd.readAsDataURL(file);
+    if (!file) return Promise.reject(new Error("No se ha elegido ninguna imagen."));
+    if (file.type && !/^image\//.test(file.type) && !esHeic(file)) return Promise.reject(new Error("Ese archivo no es una imagen. Elige una foto JPG, PNG, WebP o HEIC."));
+    if (file.size > FOTO.mb * 1048576) return Promise.reject(new Error("La imagen pesa " + H.n(file.size / 1048576, 0) + " MB: elige una de menos de " + FOTO.mb + " MB."));
+    return abrirImagen(file).then(function (im) {
+      try {
+        var m = Math.min(im.w, im.h), sx = (im.w - m) / 2, sy = (im.h - m) / 2, url = "";
+        for (var k = 0; k < FOTO.lados.length; k++) {
+          var lado = Math.min(FOTO.lados[k], m), cv = document.createElement("canvas"); cv.width = lado; cv.height = lado;
+          var cx = cv.getContext("2d"); if (!cx) throw new Error("sin canvas");
+          cx.fillStyle = "#fff"; cx.fillRect(0, 0, lado, lado); if ("imageSmoothingQuality" in cx) cx.imageSmoothingQuality = "high";
+          cx.drawImage(im.fuente, sx, sy, m, m, 0, 0, lado, lado);
+          for (var q = 0.85; q >= 0.49; q -= 0.07) { url = cv.toDataURL("image/jpeg", q); if (!/^data:image\/jpeg;base64,/.test(url)) url = cv.toDataURL("image/webp", q); if (url.length <= FOTO.max) break; }
+          if (url.length <= FOTO.max) break;
+        }
+        im.cerrar();
+        if (!/^data:image\/(jpeg|webp);base64,/.test(url)) throw new Error("formato");
+        if (url.length > FOTO.max) throw new Error("No se ha podido reducir la imagen lo suficiente. Prueba con otra foto.");
+        return url;
+      } catch (e) { im.cerrar(); throw /^(sin canvas|formato)$/.test(e.message) || !e.message ? new Error("No se ha podido reducir la imagen en este navegador. Actualízalo o prueba desde otro dispositivo.") : e; }
     });
   }
+  H.reducirFotoPerfil = reducirFoto;
+  function estadoFoto(txt, error) { var el = H.$("#fotoEstado"); if (!el) return; el.textContent = txt || ""; el.className = (error ? "msg-error" : "muy-tenue") + " foto-estado"; }
   var cuentaPrev = H.vistas.cuenta;
   H.vistas.cuenta = function (p, q) {
     var u = S.usuario || {}, h = cuentaPrev(p, q);
-    var foto = '<section class="tarjeta perfil"><div class="perfil-fila">' + H.avatarHTML(u, "grande") + '<div class="perfil-txt"><b>' + esc(u.nombre || u.email || "") + "</b><span>" + esc(H.nombreRol(u.rol)) + " · " + esc(u.email || "") + '</span><div class="fila-flex"><label class="bt" for="fotoPerfil">' + ico("camera") + (u.foto ? "Cambiar la foto" : "Añadir una foto") + '</label><input id="fotoPerfil" class="sr" type="file" accept="image/*" data-cambio="fotoPerfil">' + (u.foto ? '<button class="bt texto" data-act="quitarFotoPerfil">Quitar la foto</button>' : "") + '</div><p class="muy-tenue">Aparece arriba a la derecha, junto a tu nombre. Se guarda reducida (160 × 160 px).</p></div></div></section>';
+    var foto = '<section class="tarjeta perfil"><div class="perfil-fila">' + H.avatarHTML(u, "grande") + '<div class="perfil-txt"><b>' + esc(H.nombreVisible(u)) + "</b><span>" + esc(H.nombreRol(u.rol)) + " · " + esc(u.email || "") + '</span><div class="fila-flex"><label class="bt" for="fotoPerfil">' + ico("camera") + (u.foto ? "Cambiar la foto" : "Añadir una foto") + '</label><input id="fotoPerfil" class="sr" type="file" accept="image/*,.heic,.heif" data-cambio="fotoPerfil">' + (u.foto ? '<button class="bt texto" data-act="quitarFotoPerfil">Quitar la foto</button>' : "") +
+      H.botonInfo("La foto aparece arriba a la derecha, junto a tu nombre, y en tu actividad. Se recorta en cuadrado y se guarda reducida (256 × 256 px, JPEG), así que vale una foto del móvil de cualquier tamaño (hasta " + FOTO.mb + " MB). Formatos: JPG, PNG, WebP y HEIC del iPhone (este último solo si el navegador lo abre, como Safari).") +
+      '</div><p class="muy-tenue foto-estado" id="fotoEstado" role="status" aria-live="polite"></p></div></div></section>';
     var i = h.indexOf('<section class="tarjeta"'); return i === -1 ? h : h.slice(0, i) + foto + h.slice(i);
   };
   function guardarFoto(url) {
-    return H.api("webPerfilFoto", url).then(function (r) { S.usuario = Object.assign({}, S.usuario, { foto: (r && r.usuario && r.usuario.foto !== undefined) ? r.usuario.foto : url }); if (H.guardarSesion) H.guardarSesion(); H.pintarMarco(); H.repintar(); H.toast(url ? "Foto actualizada." : "Foto quitada."); })
-      .catch(function (e) { H.toast(e.message || "No se ha podido guardar la foto.", "error"); });
+    estadoFoto(url ? "Guardando la foto…" : "Quitando la foto…");
+    return H.api("webPerfilFoto", url).then(function (r) {
+      var f = r && r.usuario && r.usuario.foto !== undefined ? r.usuario.foto : url;
+      if (url && f !== url) throw new Error("El servidor no ha guardado la foto. Puede que no esté actualizado a la versión " + H.VERSION + ": avisa al administrador.");
+      S.usuario = Object.assign({}, S.usuario, r && r.usuario ? r.usuario : {}, { foto: f }); if (H.guardarSesion) H.guardarSesion();
+      if (H.upsertLocal && S.usuario.id) { if (H.fila && H.fila("Usuarios", S.usuario.id)) H.upsertLocal("Usuarios", [{ ID: S.usuario.id, Foto: f }]); if (H.fila && H.fila("Equipo", S.usuario.id)) H.upsertLocal("Equipo", [{ ID: S.usuario.id, Foto: f }]); if (H.guardarCache) H.guardarCache(); }
+      H.pintarMarco(); H.repintar(); H.toast(url ? "Foto actualizada." : "Foto quitada.");
+    }).catch(function (e) {
+      var m = e && e.message ? e.message : "No se ha podido guardar la foto.";
+      if (/no permitida|no tiene «webPerfilFoto»/i.test(m)) m = "El servidor no tiene la función de fotos de perfil: hay que actualizarlo (avisa al administrador).";
+      else if (!(e && e.servidor) && !/servidor/i.test(m)) m = "No se ha podido enviar la foto: comprueba la conexión y vuelve a intentarlo.";
+      estadoFoto(m, true); H.toast(m, "error");
+    });
   }
-  H.acc.fotoPerfil = function (el) { var f = el.files && el.files[0]; if (!f) return; reducirFoto(f).then(guardarFoto).catch(function (e) { H.toast(e.message, "error"); }); };
+  H.acc.fotoPerfil = function (el) {
+    var f = el.files && el.files[0]; if (!f) return; estadoFoto("Preparando la foto…");
+    reducirFoto(f).then(guardarFoto).catch(function (e) { estadoFoto(e.message, true); H.toast(e.message, "error"); }).then(function () { try { el.value = ""; } catch (x) { } });
+  };
   H.acc.quitarFotoPerfil = function () { guardarFoto(""); };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v05a.js"] = "0.7.1";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v05a.js"] = "0.7.2";

@@ -368,4 +368,4 @@
   return C;
 });
 
-;(window.HOME_MODS = window.HOME_MODS || {})["calc7.js"] = "0.7.1";
+;(window.HOME_MODS = window.HOME_MODS || {})["calc7.js"] = "0.7.2";
