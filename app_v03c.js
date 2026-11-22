@@ -213,7 +213,7 @@
       var g = {}; C.MUESTRAS[r].vars.forEach(function (v) { var x = H.valor(e.ID, r, p.punto, v.id); if (x && C.num(x.Valor) !== null) g[v.id] = C.num(x.Valor); });
       if (g.pH === undefined && g.pO2 === undefined && g.pCO2 === undefined) return "";
       var aj = {}; ["FiO2", "Barrido"].forEach(function (k) { var x = H.valor(e.ID, "FLUJO", p.punto, k + "_" + r) || H.ultimo(e.ID, "FLUJO", k + "_" + r); if (x) aj[k] = C.num(x.Valor); });
-      var a = C.asesorGas(r, g, aj, S.cfg.objetivos, S.cfg.gases, { V_mL: V });
+      var a = C.asesorGas(r, g, aj, S.cfg.objetivos, S.cfg.gases, { V_mL: V, exp: e.ID, punto: p.punto });
       return '<h4 class="reg-grupo">' + (r === "ART" ? "Rama arterial" : "Rama portal") + '</h4><div class="recs">' + a.recomendaciones.map(function (x) { return '<div class="rec ' + x.nivel + '">' + ico(x.nivel === "ok" ? "circle-check" : x.nivel === "alerta" ? "triangle-alert" : x.nivel === "ajuste" ? "sliders-horizontal" : "info", "s") + "<div>" + esc(x.texto) + "</div></div>"; }).join("") + "</div>";
     }).join("");
     return out;
@@ -313,4 +313,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v03c.js"] = "0.7.2";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v03c.js"] = "0.7.3";

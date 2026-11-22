@@ -19,4 +19,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v04.js"] = "0.7.2";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v04.js"] = "0.7.3";

@@ -57,4 +57,4 @@
   H.descargar = function (nombre, contenido, tipo) { var b = contenido instanceof Blob ? contenido : new Blob([contenido], { type: (tipo || "text/plain") + ";charset=utf-8" }), a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = nombre; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000); };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_graf.js"] = "0.7.2";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_graf.js"] = "0.7.3";

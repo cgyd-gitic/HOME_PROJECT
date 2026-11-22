@@ -201,4 +201,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_vistas.js"] = "0.7.2";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_vistas.js"] = "0.7.3";

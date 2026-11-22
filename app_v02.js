@@ -287,4 +287,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v02.js"] = "0.7.2";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v02.js"] = "0.7.3";

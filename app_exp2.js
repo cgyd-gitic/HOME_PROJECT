@@ -300,7 +300,7 @@
   function recsHTML(e) {
     var V = H.Vperf(e.ID), out = ["ART", "POR"].map(function (r) {
       var g = BORR.g[r]; if (g.pH === undefined && g.pO2 === undefined && g.pCO2 === undefined) return "";
-      var a = C.asesorGas(r, g, { FiO2: BORR.f["FiO2_" + r], Barrido: BORR.f["Barrido_" + r] }, S.cfg.objetivos, S.cfg.gases, { V_mL: V });
+      var a = C.asesorGas(r, g, { FiO2: BORR.f["FiO2_" + r], Barrido: BORR.f["Barrido_" + r] }, S.cfg.objetivos, S.cfg.gases, { V_mL: V, exp: e.ID, punto: BORR.punto });
       return "<h4 style=\"margin:12px 0 6px\">" + (r === "ART" ? "Rama arterial (gasometría arterial)" : "Rama portal (gasometría venosa)") + "</h4><div class=\"recs\">" + a.recomendaciones.map(function (x) {
         return "<div class=\"rec " + x.nivel + "\">" + ico(x.nivel === "ok" ? "circle-check" : x.nivel === "alerta" ? "triangle-alert" : x.nivel === "ajuste" ? "sliders-horizontal" : "info", "s") + "<div>" + esc(x.texto) + "</div>" +
           (x.accion && x.accion.campo && BORR.f.hasOwnProperty(x.accion.campo.replace(/_(ART|POR)$/, "_$1")) !== undefined && /^(FiO2|Barrido)_/.test(x.accion.campo) && H.puede("registrar") ? "<button class=\"bt mini accion\" data-act=\"aplicarRec\" data-k=\"" + x.accion.campo + "\" data-a=\"" + x.accion.a + "\">Aplicar " + H.n(x.accion.a, 0) + "</button>" : "") + "</div>";
@@ -328,7 +328,7 @@
     if (Object.keys(BORR.f).length) H.guardarMediciones(exp, "FLUJO", BORR.punto, tn, f, BORR.f);
     (BORR.ajustes || []).forEach(function (a) { H.guardar("Eventos", [{ ID: H.uid(), Experimento: exp, Tipo: "ajuste", Fecha_hora: new Date().toISOString(), Valor_JSON: JSON.stringify(a), Nota: a.k.replace("_ART", " arterial").replace("_POR", " portal").replace("Barrido", "Flujo de aire") + ": " + a.de + " → " + a.a + " (recomendación del asesor, punto " + BORR.punto + ")" }], { sinRepintar: true }); });
     BORR.ajustes = []; BORR.cargado = null; H.toast("Gasometría guardada en el punto «" + BORR.punto + "» (" + n + " rama" + (n === 1 ? "" : "s") + ")."); H.repintar();
-    var alertas = ["ART", "POR"].map(function (r) { return C.asesorGas(r, BORR.g[r], {}, S.cfg.objetivos, S.cfg.gases, { V_mL: H.Vperf(exp) }); }).filter(function (a) { return a.estado === "alerta"; });
+    var alertas = ["ART", "POR"].map(function (r) { return C.asesorGas(r, BORR.g[r], {}, S.cfg.objetivos, S.cfg.gases, { V_mL: H.Vperf(exp), exp: exp, punto: BORR.punto }); }).filter(function (a) { return a.estado === "alerta"; });
     if (alertas.length && H.puede("registrar")) H.servidor("webNotificar", [S.token, { titulo: "Alerta gasometría " + exp, texto: alertas.map(function (a) { return a.recomendaciones.filter(function (x) { return x.nivel === "alerta"; }).map(function (x) { return x.texto; }).join(" "); }).join(" · "), destino: "equipo", vista: "exp:" + exp + ":seguimiento" }]).catch(function () { });
   };
   function hdfConfig(e) {
@@ -383,4 +383,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_exp2.js"] = "0.7.2";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_exp2.js"] = "0.7.3";

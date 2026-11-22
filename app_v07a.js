@@ -303,7 +303,7 @@
       '<div class="tabla-env"><table class="t t-usuarios"><thead><tr><th>Usuario</th><th>Rol</th><th class="centro">Activo</th>' + NOTIF.map(function (n) { return '<th class="centro">' + esc(n[2]) + "</th>"; }).join("") + '<th class="centro">Gestor de inventario</th><th>Último acceso</th></tr></thead><tbody>' +
       l.map(function (u) {
         var em = String(u.Email || "").toLowerCase();
-        return '<tr class="' + (activo(u) ? "" : "inactivo") + '"><td data-et="Usuario"><input value="' + esc(u.Nombre || "") + '" aria-label="Nombre de ' + esc(u.Email) + '" data-cambio="usrCampo" data-id="' + esc(u.ID) + '" data-k="Nombre" autocomplete="off" placeholder="Nombre…"><input class="usr-ape" value="' + esc(u.Apellidos || "") + '" aria-label="Apellidos de ' + esc(u.Email) + '" data-cambio="usrCampo" data-id="' + esc(u.ID) + '" data-k="Apellidos" autocomplete="off" placeholder="Apellidos…"><div class="muy-tenue usr-mail">' + esc(u.Email) + (em === yo ? ' · <b>tú</b>' : "") + "</div></td>" +
+        return '<tr class="' + (activo(u) ? "" : "inactivo") + '"><td data-et="Usuario"><div class="usr-nom"><input value="' + esc(u.Nombre || "") + '" aria-label="Nombre de ' + esc(u.Email) + '" data-cambio="usrCampo" data-id="' + esc(u.ID) + '" data-k="Nombre" autocomplete="off" placeholder="Nombre…"><input class="usr-ape" value="' + esc(u.Apellidos || "") + '" aria-label="Apellidos de ' + esc(u.Email) + '" data-cambio="usrCampo" data-id="' + esc(u.ID) + '" data-k="Apellidos" autocomplete="off" placeholder="Apellidos…"></div><div class="muy-tenue usr-mail">' + esc(u.Email) + (em === yo ? ' · <b>tú</b>' : "") + "</div></td>" +
           '<td data-et="Rol"><select aria-label="Rol de ' + esc(u.Email) + '" data-cambio="usrCampo" data-id="' + esc(u.ID) + '" data-k="Rol">' + H.ROLES.map(function (r) { return '<option value="' + r[0] + '"' + (r[0] === H.normRol(u.Rol) ? " selected" : "") + ">" + esc(r[1]) + "</option>"; }).join("") + "</select></td>" +
           '<td class="centro" data-et="Activo"><label class="check usr-chk"><input type="checkbox" aria-label="Activo · ' + esc(u.Nombre || u.Email) + '" data-cambio="usrCampo" data-id="' + esc(u.ID) + '" data-k="Activo"' + (activo(u) ? " checked" : "") + '><span class="usr-chk-et">Activo</span></label></td>' +
           NOTIF.map(function (n) { return casilla(u, n[0], n[2]); }).join("") + casilla(u, "Gestor_inventario", "Gestor de inventario") +
@@ -466,7 +466,7 @@
   function infoRef() {
     var R = REFP(), ns = C.PERF_PORCINA.map(function (k) { var x = refDe(k); return (C.variable("PERF", k) || { nombre: k }).nombre + " " + (x ? x.n : "—"); }).join(", ");
     return "Referencia porcina: " + R.fuente + ". Se muestra la mediana [P2,5–P97,5] y el número de animales (n) de cada variable; el rango que se aplica son esos percentiles redondeados con criterio clínico. n por variable: " + ns + ". Se actualizará al añadir más basales del grupo. " +
-      "Los rangos de HCO₃⁻, BE, Na⁺, K⁺, Ca²⁺, Cl⁻, fosfato, albúmina, osmolalidad y urea del perfusato pasan a ser la referencia porcina (antes, rangos humanos a validar); lactato, glucosa, Hb, Hto, cortisol, amonio y Mg siguen el criterio de perfusión y la gasometría (pH, pO₂, pCO₂) los objetivos del circuito. " +
+      "Los rangos de HCO₃⁻, BE, Na⁺, K⁺, Ca²⁺, Cl⁻, fosfato, albúmina y osmolalidad del perfusato pasan a ser la referencia porcina (antes, rangos humanos a validar); la urea usa el intervalo humano del laboratorio HULP (11–49 mg/dL), porque la referencia porcina (7–38) refleja cerdos jóvenes con poca ingesta proteica y el injerto perfundido produce urea a partir de los aminoácidos de la nutrición parenteral; lactato, glucosa, Hb, Hto, cortisol, amonio y Mg siguen el criterio de perfusión y la gasometría (pH, pO₂, pCO₂) los objetivos del circuito. " +
       "Laboratorio HULP: " + (R.lab_fuente || "intervalos humanos") + "; solo informativo. Un valor fuera de la referencia en un animal concreto es normal (desviación del animal). La estandarización no se dibuja en las gráficas.";
   }
   function celdasRef(v, vd, actual) {
@@ -513,4 +513,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v07a.js"] = "0.7.2";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v07a.js"] = "0.7.3";

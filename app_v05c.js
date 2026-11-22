@@ -20,11 +20,39 @@
     return { tipo: "igual", texto: "Pauta sin cambios: pon la misma cantidad que ayer" + (gramos ? " (" + gramos + " g por toma)" : "") + "." };
   }
 
+  // v0.7.3: perfusión anterior (Histórico) o ya finalizada → la comida se registra con su fecha, hora y responsable reales
+  function dietaHist(e) { return !!e && (!!(H.esHistorico && H.esHistorico(e)) || !!(H.expFinalizado && H.expFinalizado(e))); }
+  function rangoDieta(e) { var hoy = C.diaISO(new Date()), qx = e.Fecha_cirugia ? C.diaISO(C.aDia(e.Fecha_cirugia)) : "", max = qx && qx < hoy ? qx : hoy, min = llegada(e) || ""; if (min && min > max) min = max; return { min: min, max: max }; }
+  function horaToma(toma, cfgD) { var h = (cfgD || S.cfg.dieta || C.DEF.dieta).horas_tomas || C.DEF.dieta.horas_tomas || []; return toma === "2ª toma" ? h[1] || "" : toma === "1ª toma" ? h[0] || "" : ""; }
+  function respHTML(pre, valor) {   // lista de responsables de la alimentación + «Otra persona…» (el campo de texto #<pre> es el que se guarda)
+    var l = H.responsablesComida ? H.responsablesComida() : [], v = String(valor || "").trim(), enL = l.indexOf(v) !== -1, otro = !!v && !enL;
+    return '<div class="campo"><label class="et" for="' + pre + 'Sel">Responsable</label><select id="' + pre + 'Sel" data-cambio="dietaRespSel" data-in="' + pre + '"><option value="">Quién dio la comida…</option>' + l.map(function (n) { return "<option" + (n === v ? " selected" : "") + ">" + esc(n) + "</option>"; }).join("") + '<option value="__otro"' + (otro ? " selected" : "") + ">Otra persona…</option></select></div>" +
+      '<div class="campo dieta-otro"' + (otro ? "" : " hidden") + '><label class="et" for="' + pre + '">Nombre de quien dio la comida</label><input id="' + pre + '" value="' + esc(v) + '" autocomplete="off" placeholder="Nombre y apellidos…"></div>';
+  }
+  H.acc.dietaRespSel = function (el) {
+    var i = H.$("#" + el.getAttribute("data-in")), caja = i ? i.closest(".dieta-otro") : null; if (!i) return;
+    if (el.value === "__otro") { i.value = ""; if (caja) caja.hidden = false; i.focus(); } else { i.value = el.value; if (caja) caja.hidden = true; }
+  };
+  H.acc.dietaTomaHist = function (el) { var h = H.$("#dHora"), v = horaToma(el.value); if (h && v) h.value = v; };
+  function validarHist(e, f, hora, resp) {
+    var rg = rangoDieta(e);
+    if (!f) return "Indica la fecha en que se dio la comida.";
+    if (rg.min && f < rg.min || f > rg.max) return "La fecha debe estar dentro de la aclimatación de esta perfusión: del " + dma(rg.min || rg.max) + " al " + dma(rg.max) + ".";
+    if (!hora) return "Indica la hora en que se dio la comida.";
+    var t = C.aFecha(f + "T" + hora + ":00"); if (t && t.getTime() > Date.now()) return "La fecha y la hora no pueden ser futuras.";
+    if (!resp) return "Indica quién dio la comida.";
+    return "";
+  }
+  H.dietaHist = dietaHist;
+  var MEMO_HIST = {};   // última fecha/toma/responsable usados al pasar los registros de una perfusión anterior
+
   // ============================================================== DIETA (ficha del experimento)
   H.tabsExp.dieta = function (e) {
     var an = H.animales(e.ID), cfg = S.cfg.dieta, puedo = H.puede("registrar"), lista = ["LD", "BD"].map(function (r) { return an[r]; }).filter(Boolean), hoy = C.diaISO(new Date()), ll = llegada(e), ac = ll ? C.diaAclimatacion(ll, hoy, cfg) : null;
     if (H.animalesLlegaron && !H.animalesLlegaron(e) && !(H.expIniciado && H.expIniciado(e))) return '<div class="estado-exp">' + ico("calendar-clock", "l") + "<p>La dieta se registra desde la llegada de los animales" + (ll ? " (prevista el <b>" + esc(dma(ll)) + "</b>)" : "") + ".</p></div>";
     var r0 = lista.length ? racion(lista[0], cfg) : null, pt = ac && C.diasEntre(hoy, e.Fecha_cirugia) >= 0 ? pautaDia(ac, e, cfg, r0 ? r0.g : null) : null;
+    var hist = dietaHist(e), rg = hist ? rangoDieta(e) : null, memo = hist ? MEMO_HIST[e.ID] || {} : null;
+    if (hist && !pt) pt = { tipo: "igual", texto: "Perfusión anterior: aclimatación y dieta del " + dma(rg.min || rg.max) + " al " + dma(rg.max) + "." };
     var cab = '<section class="tarjeta dieta-cab"><div class="dieta-dia"><span class="et">Aclimatación</span><b>' + (ac && C.diasEntre(hoy, e.Fecha_cirugia) >= 0 ? "Día " + ac.dia : "—") + '</b><span class="muy-tenue">' + esc(cfg.nombre_pienso || "") + "</span></div>" +
       (pt ? '<div class="pauta ' + pt.tipo + '">' + ico(pt.tipo === "igual" ? "circle-check" : "triangle-alert") + "<span>" + esc(pt.texto) + "</span></div>" : '<div class="pauta igual">' + ico("info") + "<span>Fuera del periodo de aclimatación.</span></div>") +
       '<div class="dieta-acc">' + (H.esAdmin() ? '<button class="bt pri" data-act="qrDietaRapido">' + ico("qr-code") + "QR para los celadores</button>" : '<span class="muy-tenue">El QR de los celadores lo imprime un administrador.</span>') + "</div></section>";
@@ -34,14 +62,17 @@
         '<div class="rejilla tres">' + campoAnimal(a, "Crotal", "Crotal") + campoAnimal(a, "Sexo", "Sexo", { tipo: "select", opciones: [["H", "Hembra"], ["M", "Macho"]] }) + campoAnimal(a, "Peso_llegada_kg", "Peso a la llegada", { tipo: "number", u: "kg" }) + "</div>" +
         (rc ? '<div class="kpis tres"><div class="kpi"><div class="et">Energía metabolizable</div><div class="v">' + H.n(rc.en.em_kcal, 0) + '<small>kcal/día</small></div></div><div class="kpi ok"><div class="et">Pienso por toma</div><div class="v">' + H.n(rc.g, 0) + "<small>g × " + rc.en.tomas + '</small></div></div><div class="kpi"><div class="et">Pienso al día</div><div class="v">' + H.n(rc.en.g_dia, 0) + "<small>g</small></div></div></div>" : '<p class="tenue">Anota el peso a la llegada para calcular la ración.</p>') + "</section>";
     }).join("");
-    var form = puedo && lista.length ? '<section class="tarjeta"><div class="cabecera"><h2>Nuevo registro</h2><span class="muy-tenue">Fecha y hora de ahora; la temperatura y la humedad sirven para los dos animales.</span></div><div class="rejilla cuatro" id="dietaComun">' +
+    var form = puedo && lista.length ? '<section class="tarjeta"><div class="cabecera"><h2>Nuevo registro</h2>' + (hist ? '<span class="muy-tenue">Fecha, hora y responsable de la toma.</span>' + H.botonInfo("Perfusión anterior o ya finalizada: elige la fecha y la hora en que se dio la comida (entre la llegada de los animales, el " + dma(rg.min || rg.max) + ", y el " + dma(rg.max) + ") y quién la dio. Los registros guardados se modifican o se borran en la tabla «Registros».") : '<span class="muy-tenue">Fecha y hora de ahora; la temperatura y la humedad sirven para los dos animales.</span>') + '</div><div class="rejilla cuatro" id="dietaComun">' +
+      (hist ? (function () { var tm = memo.toma || "1ª toma", fm = memo.fecha && memo.fecha >= (rg.min || memo.fecha) && memo.fecha <= rg.max ? memo.fecha : rg.min || rg.max;
+        return '<div class="campo"><label class="et" for="dFecha">Fecha</label><input id="dFecha" type="date" value="' + esc(fm) + '"' + (rg.min ? ' min="' + rg.min + '"' : "") + ' max="' + rg.max + '" required></div><div class="campo"><label class="et" for="dHora">Hora</label><input id="dHora" type="time" value="' + esc(memo.hora || horaToma(tm, cfg)) + '" required></div>' +
+          '<div class="campo"><label class="et" for="dToma">Toma</label><select id="dToma" data-cambio="dietaTomaHist">' + ["1ª toma", "2ª toma", "Control", "Ayuno"].map(function (x) { return "<option" + (x === tm ? " selected" : "") + ">" + x + "</option>"; }).join("") + "</select></div>" + respHTML("dResp", memo.resp || ""); })() :
       '<div class="campo"><label class="et" for="dFecha">Fecha</label><input id="dFecha" type="date" value="' + H.aFechaLocal(new Date()) + '"></div><div class="campo"><label class="et" for="dHora">Hora</label><input id="dHora" type="time" value="' + H.hora(new Date()) + '"></div>' +
       '<div class="campo"><label class="et" for="dToma">Toma</label><select id="dToma"><option' + (new Date().getHours() < 14 ? " selected" : "") + ">1ª toma</option><option" + (new Date().getHours() >= 14 ? " selected" : "") + '>2ª toma</option><option>Control</option><option>Ayuno</option></select></div>' +
-      '<div class="campo"><label class="et" for="dResp">Responsable</label><input id="dResp" value="' + esc((S.usuario || {}).nombre || "") + '" autocomplete="off"></div>' +
+      '<div class="campo"><label class="et" for="dResp">Responsable</label><input id="dResp" value="' + esc((S.usuario || {}).nombre || "") + '" autocomplete="off"></div>') +
       '<div class="campo"><label class="et" for="dT">Temperatura de la sala</label><div class="unidad-in"><input id="dT" inputmode="decimal" data-num="1"><span>°C</span></div></div><div class="campo"><label class="et" for="dHR">Humedad</label><div class="unidad-in"><input id="dHR" inputmode="decimal" data-num="1"><span>%</span></div></div>' +
       '<div class="campo span2"><span class="et">Corral</span><div class="fila-flex checks"><label class="check"><input type="checkbox" id="dAgua" checked> Agua limpia</label><label class="check"><input type="checkbox" id="dJug" checked> Juguetes</label></div></div></div>' +
       '<div class="dieta-animales">' + lista.map(function (a, i) { var rc = racion(a, cfg); return '<div class="dieta-animal" data-animal="' + esc(a.ID) + '" data-em="' + (rc ? Math.round(rc.en.em_kcal) : "") + '"><b>' + esc(nombreAnimal(a, i)) + '</b><div class="rejilla tres"><div class="campo"><label class="et">Ofrecido</label><div class="unidad-in"><input name="Ofrecido_g" inputmode="numeric" data-num="1" value="' + (rc ? rc.g : "") + '"><span>g</span></div></div><div class="campo"><label class="et">Sobrante</label><div class="unidad-in"><input name="Sobrante_g" inputmode="numeric" data-num="1"><span>g</span></div></div><div class="campo"><label class="et">Observaciones</label><input name="Observaciones" autocomplete="off" placeholder="No come, diarrea…"></div></div></div>'; }).join("") + "</div>" +
-      '<button class="bt pri" data-act="guardarDieta2" data-exp="' + esc(e.ID) + '">' + ico("save") + "Guardar registro</button></section>" : "";
+      '<button class="bt pri" data-act="guardarDieta2" data-exp="' + esc(e.ID) + '"' + (hist ? ' data-hist="1"' : "") + ">" + ico("save") + "Guardar registro</button></section>" : "";
     var regs = H.filas("Dieta").filter(function (d) { return d.Experimento === e.ID; }).sort(function (x, y) { return String(y.Fecha + y.Hora).localeCompare(String(x.Fecha + x.Hora)); });
     var porId = {}; lista.forEach(function (a, i) { porId[a.ID] = nombreAnimal(a, i); });
     var tabla = '<section class="tarjeta"><div class="cabecera"><h2>Registros</h2><span class="muy-tenue">' + (puedo ? "Una vez guardados, solo el equipo los modifica" + (H.requiereValidacion("Dieta") ? " (tus cambios quedan pendientes de validación)" : "") + "." : "") + "</span></div>" +
@@ -57,6 +88,12 @@
   H.acc.guardarDieta2 = function (el) {
     var exp = el.getAttribute("data-exp"), f = H.$("#dFecha").value, hora = H.$("#dHora").value, toma = H.$("#dToma").value, T = C.num(H.$("#dT").value), HR = C.num(H.$("#dHR").value), resp = H.$("#dResp").value.trim(), filas = [];
     if (!f) { H.toast("Indica la fecha.", "error"); return; }
+    if (el.getAttribute("data-hist") === "1") {   // v0.7.3: perfusión anterior → fecha dentro de la aclimatación, hora y responsable obligatorios
+      var eH = H.exp(exp), msg = eH ? validarHist(eH, f, hora, resp) : ""; if (msg) { H.toast(msg, "error"); return; }
+      var sig = toma === "1ª toma" ? ["2ª toma", f] : toma === "2ª toma" ? ["1ª toma", C.sumarDias(f, 1)] : [toma, f], rgH = eH ? rangoDieta(eH) : { max: f };
+      MEMO_HIST[exp] = { toma: sig[0], fecha: sig[1] <= rgH.max ? sig[1] : f, hora: horaToma(sig[0]), resp: resp };
+      var ae = document.activeElement; if (ae && ae.blur && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)) ae.blur();   // repinta ya con la toma siguiente (Safari no quita el foco al pulsar el botón)
+    }
     H.$$(".dieta-animal").forEach(function (d) {
       var g = function (n) { var i = d.querySelector("[name=" + n + "]"); return i.hasAttribute("data-num") ? C.num(i.value) : i.value.trim(); }, sinP = toma === "Control" || toma === "Ayuno", of = sinP ? null : g("Ofrecido_g"), so = sinP ? null : g("Sobrante_g");   // v0.5: Control y Ayuno no llevan pienso
       filas.push({ ID: H.uid(), Experimento: exp, Animal: d.getAttribute("data-animal"), Fecha: f, Hora: hora, Toma: toma, Temperatura_C: T, Humedad_pct: HR, Ofrecido_g: of, Sobrante_g: so, Consumido_g: of !== null && so !== null ? of - so : null, Responsable: resp, Observaciones: g("Observaciones"), Agua_ok: H.$("#dAgua").checked, Enriquecimiento_ok: H.$("#dJug").checked, EM_objetivo_kcal: sinP ? null : C.num(d.getAttribute("data-em")), Origen: "web" });
@@ -65,12 +102,15 @@
   };
   H.acc.editarDieta = function (el) {
     var d = H.fila("Dieta", el.getAttribute("data-id")); if (!d) return;
+    var eH = H.exp(d.Experimento), hist = dietaHist(eH), rg = hist ? rangoDieta(eH) : null;
     function f(k, et, t, u) { return '<div class="campo"><label class="et" for="ed_' + k + '">' + et + "</label>" + (u ? '<div class="unidad-in">' : "") + '<input id="ed_' + k + '" ' + (t === "num" ? 'inputmode="decimal" data-num="1"' : 'type="' + (t || "text") + '"') + ' value="' + esc(d[k] === null || d[k] === undefined ? "" : String(d[k]).replace(".", ",")) + '">' + (u ? "<span>" + u + "</span></div>" : "") + "</div>"; }
-    H.modal({ titulo: "Modificar registro de dieta", cuerpo: '<div class="rejilla dos">' + f("Hora", "Hora", "time") + f("Ofrecido_g", "Ofrecido", "num", "g") + f("Sobrante_g", "Sobrante", "num", "g") + f("Temperatura_C", "Temperatura", "num", "°C") + f("Humedad_pct", "Humedad", "num", "%") + f("Responsable", "Responsable") + '<div class="campo span2"><label class="et" for="ed_Observaciones">Observaciones</label><input id="ed_Observaciones" value="' + esc(d.Observaciones || "") + '"></div></div>' +
+    H.modal({ titulo: "Modificar registro de dieta", cuerpo: '<div class="rejilla dos">' + (hist ? '<div class="campo"><label class="et" for="ed_Fecha">Fecha</label><input id="ed_Fecha" type="date" value="' + esc(C.diaISO(C.aDia(d.Fecha)) || "") + '"' + (rg.min ? ' min="' + rg.min + '"' : "") + ' max="' + rg.max + '"></div>' : "") + f("Hora", "Hora", "time") +
+      (hist ? '<div class="campo"><label class="et" for="ed_Toma">Toma</label><select id="ed_Toma">' + ["1ª toma", "2ª toma", "Control", "Ayuno"].map(function (x) { return "<option" + (x === d.Toma ? " selected" : "") + ">" + x + "</option>"; }).join("") + "</select></div>" : "") + f("Ofrecido_g", "Ofrecido", "num", "g") + f("Sobrante_g", "Sobrante", "num", "g") + f("Temperatura_C", "Temperatura", "num", "°C") + f("Humedad_pct", "Humedad", "num", "%") + (hist ? respHTML("ed_Responsable", d.Responsable) : f("Responsable", "Responsable")) + '<div class="campo span2"><label class="et" for="ed_Observaciones">Observaciones</label><input id="ed_Observaciones" value="' + esc(d.Observaciones || "") + '"></div></div>' +
       (H.requiereValidacion("Dieta") ? '<p class="muy-tenue">El cambio queda pendiente de validación por un administrador.</p>' : ""),
       pie: '<button class="bt" data-cerrar>Cancelar</button><button class="bt pri" id="edOk">Guardar</button>',
       alAbrir: function (dl) { dl.querySelector("#edOk").addEventListener("click", function () {
         var o = { ID: d.ID }; ["Hora", "Responsable", "Observaciones"].forEach(function (k) { o[k] = dl.querySelector("#ed_" + k).value.trim(); }); ["Ofrecido_g", "Sobrante_g", "Temperatura_C", "Humedad_pct"].forEach(function (k) { o[k] = C.num(dl.querySelector("#ed_" + k).value); });
+        if (hist) { o.Fecha = dl.querySelector("#ed_Fecha").value; o.Toma = dl.querySelector("#ed_Toma").value; var msg = validarHist(eH, o.Fecha, o.Hora, o.Responsable); if (msg) { H.toast(msg, "error"); return; } }
         o.Consumido_g = o.Ofrecido_g !== null && o.Sobrante_g !== null ? o.Ofrecido_g - o.Sobrante_g : null; H.guardar("Dieta", [o]); dl.close(); H.toast("Registro modificado."); }); } });
   };
 
@@ -288,4 +328,4 @@
   H.calculosPerfusato = function (e) { return sinSub(prepOrig(e, ["calculos"])); };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v05c.js"] = "0.7.2";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v05c.js"] = "0.7.3";

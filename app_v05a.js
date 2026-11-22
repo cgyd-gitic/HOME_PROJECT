@@ -369,4 +369,4 @@
   H.acc.quitarFotoPerfil = function () { guardarFoto(""); };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v05a.js"] = "0.7.2";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v05a.js"] = "0.7.3";

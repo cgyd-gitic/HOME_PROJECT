@@ -274,7 +274,7 @@
     C.MUESTRAS[m].vars.forEach(function (v) { var x = H.valor(exp, m, p, v.id); if (x && C.num(x.Valor) !== null) g[v.id] = C.num(x.Valor); });
     if (g.pO2 === undefined && g.pCO2 === undefined) return;
     var aj = {}; ["FiO2", "Barrido"].forEach(function (k) { var x = H.valor(exp, "FLUJO", p, k + "_" + m) || H.ultimo(exp, "FLUJO", k + "_" + m); if (x) aj[k] = C.num(x.Valor); });
-    var a = C.asesorGas(m, g, aj, S.cfg.objetivos, S.cfg.gases, { V_mL: H.Vperf(exp) }), rec = a.recomendaciones.filter(function (x) { return x.nivel === "ajuste" || x.nivel === "alerta"; });
+    var a = C.asesorGas(m, g, aj, S.cfg.objetivos, S.cfg.gases, { V_mL: H.Vperf(exp), exp: exp, punto: p }), rec = a.recomendaciones.filter(function (x) { return x.nivel === "ajuste" || x.nivel === "alerta"; });
     var clave = exp + "|" + p + "|" + m + "|" + rec.map(function (x) { return x.texto; }).join("|"); if (!rec.length || avisados[clave]) return; avisados[clave] = 1;
     H.mostrarAlarma([{ ID: "mezclador|" + clave, Titulo: "Ajustar el mezclador " + (m === "ART" ? "arterial" : "portal") + " · " + exp, Texto: rec.map(function (x) { return x.texto; }).join(" "), Tipo: rec.some(function (x) { return x.nivel === "alerta"; }) ? "critico" : "otro", Vista: "exp:" + exp + ":seguimiento" }]);
   };
@@ -332,4 +332,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v05d.js"] = "0.7.2";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v05d.js"] = "0.7.3";

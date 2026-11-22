@@ -123,7 +123,8 @@
         proteina_bruta_pct: 15.7, grasa_bruta_pct: 3.8, fibra_bruta_pct: 7.1, cenizas_pct: 6.7, humedad_pct: 11.1, lisina_g_kg: 5.672, calcio_g_kg: 10.314, fosforo_g_kg: 7.085 },
       f_sexo: { M_entero: 1.05, M_castrado: 1.0, H: 1.0 }, f_actividad: 1.0, f_termico_por_grado: 0.07425, tci_C: null, tci_aviso_C: 24, horas_tomas: ["09:30", "18:00"], ayuno_h: 12 },
     perfusato: {
-      objetivos_correccion: { K: 4.5, Ca: 1.1, HCO3: 24, Albumina: 3.0 },
+      // v0.7.3: objetivos dentro de la referencia porcina del grupo (K⁺ y Ca²⁺ también dentro del intervalo humano del HULP); antes 4,5 / 1,1 / 24 / 3,0
+      objetivos_correccion: { K: 4.0, Ca: 1.25, HCO3: 28, Albumina: 3.0 },
       factores_grupo: { K: 0.3, Ca: 0.5, HCO3: 0.3 },
       conc: { KCl_mEq_mL: 2, CaCl2_mmol_mL: 0.4565, NaHCO3_mmol_mL: 1, Albumina_g_mL: 0.2 },
       fraccion_bicarbonato: 0.3, fraccion_potasio: 0.5,
@@ -629,12 +630,13 @@
     return { infundido_mL: inf, bilis_mL: bil, muestras_mL: mue, extraido_mL: ext, balance_mL: inf - bil - mue - ext, extraccion_actual: ult ? ult.v : null, horas: (t1 - t0) / 36e5 };
   }
   // Extracción para dejar el balance en cero al final del horizonte. Como la máquina solo admite pasos de 10,
-  // devuelve el valor exacto, el redondeado y el reparto en el tiempo entre los dos escalones que lo consiguen exactamente.
+  // devuelve el valor exacto, el redondeado (v0.7.3: hacia arriba) y el reparto en el tiempo entre los dos escalones (ya no se muestra: el plan por tramos es C.planExtraccion).
   // o = { balance_mL, infusion_mL (prevista en el horizonte), bilis_mL (prevista), muestras_mL (previstas), horizonte_h, cfg }
   function recomendarExtraccion(o) {
     var cfg = o.cfg || DEF.hdf, h = num(o.horizonte_h) || cfg.horizonte_h || 4, paso = num(cfg.paso_mL_h) || 10, max = num(cfg.max_mL_h) || 1e9;
     var objetivo = (num(o.balance_mL) || 0) + (num(o.infusion_mL) || 0) - (num(o.bilis_mL) || 0) - (num(o.muestras_mL) || 0);   // mL a retirar en el horizonte
-    var exacta = clamp(objetivo / h, 0, max), bajo = Math.floor(exacta / paso + 1e-9) * paso, alto = Math.min(max, bajo + paso), red = Math.round(exacta / paso) * paso;
+    // v0.7.3: la recomendada se redondea HACIA ARRIBA al paso (nunca se deja líquido sin retirar); bajo/alto/min_* se conservan como referencia
+    var exacta = clamp(objetivo / h, 0, max), bajo = Math.floor(exacta / paso + 1e-9) * paso, alto = Math.min(max, bajo + paso), red = exacta <= 1e-9 ? 0 : Math.min(Math.floor(max / paso + 1e-9) * paso, Math.ceil(exacta / paso - 1e-9) * paso);
     var fAlto = alto > bajo ? (exacta - bajo) / (alto - bajo) : 0, minAlto = Math.round(fAlto * h * 60);
     return { objetivo_mL: objetivo, exacta_mL_h: exacta, redondeada_mL_h: red, bajo_mL_h: bajo, alto_mL_h: alto, min_alto: minAlto, min_bajo: Math.round(h * 60) - minAlto,
       residuo_redondeo_mL: objetivo - red * h, horizonte_h: h, limitada: objetivo / h > max || objetivo < 0 };
@@ -786,4 +788,4 @@
     dializado: dializado, consejoHDF: consejoHDF, SUPERVISION_REC: SUPERVISION_REC, PUNTOS_REC: PUNTOS_REC, EVAL_REC: EVAL_REC, sacrificioPorEvaluacion: sacrificioPorEvaluacion, MORFO: MORFO, GRUPOS_INICIO: GRUPOS_INICIO };
 });
 
-;(window.HOME_MODS = window.HOME_MODS || {})["calc.js"] = "0.7.2";
+;(window.HOME_MODS = window.HOME_MODS || {})["calc.js"] = "0.7.3";

@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var C = window.HOMECalc, H = window.HOME = window.HOME || {};
-  var VERSION = "0.7.2";
+  var VERSION = "0.7.3";
   var S = H.S = { token: null, usuario: null, demo: false, cfg: null, t: {}, med: {}, medCargada: {}, cola: [], enviando: false, online: navigator.onLine !== false,
     ultima: null, pref: {}, avisosVistos: {}, pendienteRepintar: false, errores: [] };
   var TABLAS = ["Experimentos", "Animales", "Dieta", "Formularios", "Eventos", "Avisos", "Material", "Movimientos", "Solicitudes", "Personal", "Usuarios", "Config", "Solicitudes_Acceso", "Fotos", "Pedidos"];
@@ -562,4 +562,4 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar); else setTimeout(iniciar, 0);
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_core.js"] = "0.7.2";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_core.js"] = "0.7.3";

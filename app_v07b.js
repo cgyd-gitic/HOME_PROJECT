@@ -307,7 +307,7 @@
   H.consejoHDFLista = consejoLista;
   function consejoCuerpo(e) {
     var t0 = H.inicioPerf(e.ID); if (!t0) return ""; var d = datosConsejo(e), bx = H.balanceExp(e), paso = cfgH().paso_mL_h || 10;
-    var ext = bx ? (function () { var act = bx.b.extraccion_actual, r = bx.rec.redondeada_mL_h, cambia = act === null || Math.abs(r - act) >= paso;
+    var ext = bx ? (function () { var act = bx.b.extraccion_actual, r = H.extRecomendada(bx), cambia = act === null || Math.abs(r - act) >= paso;
       return '<div class="rec ' + (cambia ? "ajuste" : "ok") + '">' + ico("filter", "s") + "<div><b>Extracción recomendada: " + H.n(r, 0) + " mL/h</b>" + (act !== null ? " (ahora " + H.n(act, 0) + " mL/h" + (cambia ? ": cámbiala" : ": se mantiene") + ")" : " (aún no hay extracción registrada)") + ". Es lo único que se ajusta de forma rutinaria; flujo de sangre, diálisis y reposición son fijos salvo que lo indiquen las recomendaciones de abajo.</div></div>"; })() : "";
     if (!d) return '<section class="tarjeta"><div class="cabecera"><h3>Recomendaciones de la HDF</h3></div><div class="recs">' + ext + '</div><p class="tenue">Las recomendaciones renales aparecen con la primera bioquímica del perfusato (urea e iones).</p></section>';
     var recs = C.consejoHDF(d.v, d.ctx);
@@ -322,9 +322,11 @@
       '<p class="muy-tenue">' + esc(pm.liquido) + ". Dializado efectivo: Na⁺ " + D.Na + " · K⁺ " + H.n(D.K, 1) + " · Ca²⁺ " + D.Ca + " · Mg²⁺ " + D.Mg + " · HCO₃⁻ " + D.HCO3 + " mmol/L · fosfato " + H.n(D.P_mmol, 1) + " mmol/L · glucosa " + D.Glucosa_mg_dL + " mg/dL.</p></section>";
   }
   function extraccionInicial(e) {
-    var cfg = cfgH(), hz = C.num(cfg.horizonte_h) || 4, inf = C.infusionA(H.circadianoDe(e), new Date(), cfg).mL_h;
-    return C.recomendarExtraccion({ balance_mL: 0, infusion_mL: inf * hz, bilis_mL: 0, muestras_mL: 0, horizonte_h: hz, cfg: cfg }).redondeada_mL_h;
+    // v0.7.3: primer tramo del plan de extracción (infusiones del protocolo a esta hora, redondeadas hacia arriba al paso de 10)
+    var cfg = cfgH(), p = C.planExtraccion({ circ: H.circadianoDe(e), desde: new Date(), horas: 1, balance_mL: 0, bilis_mL_h: 0, cfg: cfg });
+    return p.ahora_mL_h === null ? 0 : p.ahora_mL_h;
   }
+  H.extraccionInicial = extraccionInicial;
   H.hdfPre = function (e) {
     var puedo = H.puede("registrar"), ext = extraccionInicial(e);
     return '<div class="aviso info">' + ico("filter") + "<div>La HDF empieza en la <b>pre-perfusión</b>, con los parámetros fijos. Registra aquí las variables de la máquina; en la perfusión se registran cada hora las primeras 24 h y después en los puntos del muestreo. <b>Extracción inicial recomendada: " + H.n(ext, 0) + " mL/h</b> (infusiones del protocolo a esta hora; sin bilis ni muestras todavía).</div></div>" +
@@ -341,7 +343,7 @@
   H.acc.hdfFijos = function (el) {
     var exp = el.getAttribute("data-exp"), m = el.getAttribute("data-m"), p = el.getAttribute("data-p"), t = el.getAttribute("data-t"), pm = cfgH().parametros, e = H.exp(exp), bx = m === "HDF" && H.balanceExp ? H.balanceExp(e) : null;
     var o = { Q_sangre: pm.Q_sangre, Q_dialisis: pm.Q_dialisis, Reposicion: pm.Reposicion, Temp: (pm.Temp_min + pm.Temp_max) / 2 };
-    if (bx && bx.rec) o.Extraccion = bx.b.extraccion_actual !== null ? bx.b.extraccion_actual : bx.rec.redondeada_mL_h; else if (m === "PRE_HDF" && !H.valor(exp, m, p, "Extraccion")) o.Extraccion = extraccionInicial(e);
+    if (bx && bx.rec) o.Extraccion = bx.b.extraccion_actual !== null ? bx.b.extraccion_actual : H.extRecomendada(bx); else if (m === "PRE_HDF" && !H.valor(exp, m, p, "Extraccion")) o.Extraccion = extraccionInicial(e);
     H.guardarMediciones(exp, m, p, t === null || t === "" ? null : Number(t), new Date().toISOString(), o); H.toast("Parámetros de la HDF registrados."); H.repintarPronto();
   };
   H.acc.hdfRegistrar = function (el) {
@@ -371,23 +373,57 @@
     var nM = pts.filter(function (p) { return p.fecha > ahora && p.fecha <= finH; }), mlM = nM.reduce(function (a, p) { return a + p.mL; }, 0);
     var infPrev = circ.cambios.length ? C.volumenInfundido(circ, ahora, finH, cfg) : (C.num(cfg.otras_infusiones_mL_h) || 0) * hz;
     var rec = C.recomendarExtraccion({ balance_mL: b.balance_mL, infusion_mL: infPrev, bilis_mL: (prod || 0) * hz, muestras_mL: mlM, horizonte_h: hz, cfg: cfg });
-    return { b: b, rec: rec, prod: prod, nMuestras: nM.length, mlMuestras: C.r(mlM, 1), infPrev: infPrev, cfg: cfg, sinMuestra: false, conectada: ext.length > 0, muestrasPasadas: muestras.length };
+    // v0.7.3: plan de extracción por tramos del horario circadiano (múltiplos de 10, balance previsto nunca positivo); la recomendada es la del tramo actual
+    var finP = new Date(C.aFecha(t0).getTime() + (C.num(S.cfg.general.dias_perfusion) || 7) * 864e5), ph = C.num(cfg.plan_h) || 24;
+    var plan = fin ? null : C.planExtraccion({ circ: circ, desde: ahora, horas: ph, fin: finP, balance_mL: b.balance_mL, bilis_mL_h: prod || 0, actual_mL_h: b.extraccion_actual,
+      muestras: pts.filter(function (p) { return p.fecha > ahora && p.fecha.getTime() <= ahora.getTime() + ph * 36e5; }).map(function (p) { return { t: p.fecha, mL: p.mL }; }), cfg: cfg });
+    if (plan && plan.ahora_mL_h !== null) { rec.horizonte_redondeada_mL_h = rec.redondeada_mL_h; rec.redondeada_mL_h = plan.ahora_mL_h; }   // la que se muestra en Inicio y en las recomendaciones
+    return { b: b, rec: rec, plan: plan, prod: prod, nMuestras: nM.length, mlMuestras: C.r(mlM, 1), infPrev: infPrev, cfg: cfg, sinMuestra: false, conectada: ext.length > 0, muestrasPasadas: muestras.length };
+  };
+  H.extRecomendada = function (bx) { return bx && bx.plan && bx.plan.ahora_mL_h !== null ? bx.plan.ahora_mL_h : bx && bx.rec ? bx.rec.redondeada_mL_h : null; };
+  // ---- v0.7.3: panel «Balance de volumen y extracción de la HDF» con el plan de extracción del día por tramos (hora → mL/h)
+  function mlTxt(x) { var v = Math.round(x); return (v > 0 ? "+" : v < 0 ? "−" : "") + H.n(Math.abs(v), 0); }
+  H.hdfPanel = function (e, compacto) {
+    var x = H.balanceExp(e); if (!x) return ""; var b = x.b, pl = x.plan, puedo = H.puede("registrar"), act = b.extraccion_actual, paso = C.pasoHDF(x.cfg), rec = H.extRecomendada(x);
+    function k(et, v, u, cls) { return '<div class="kpi ' + (cls || "") + '"><div class="et">' + et + '</div><div class="v">' + v + "<small>" + u + "</small></div></div>"; }
+    var dif = act === null || rec === null ? null : rec - act, tope = C.num(x.cfg.tope_deficit_mL), clsBal = b.balance_mL > 50 ? "al" : b.balance_mL > 0.5 ? "aj" : tope !== null && b.balance_mL < -tope ? "aj" : "ok";
+    var t0 = pl && pl.tramos[0], expl = t0 ? "Tramo actual (hasta las " + esc(t0.h_hasta) + "): infusiones " + H.n(t0.infusion_mL_h, 1) + " mL/h − bilis prevista " + H.n(t0.bilis_mL_h, 1) + " mL/h" + (pl.balance_inicial_mL > 0.5 ? " + retirar el exceso acumulado (" + mlTxt(pl.balance_inicial_mL) + " mL) en " + H.n(pl.horizonte_h, 0) + " h" : "") + " = " + H.n(t0.necesaria_mL_h, 1) + " mL/h necesarios → <b>" + H.n(t0.ext_mL_h, 0) + " mL/h</b> (redondeado hacia arriba a múltiplo de " + paso + (t0.limitada ? "; limitado por la extracción máxima" : "") + (t0.por_tope ? "; menos por el tope de déficit, para no deshidratar el injerto" : "") + ")." : "";
+    var inf = "La máquina solo cambia la extracción de " + paso + " en " + paso + " mL/h. Cada tramo del horario circadiano del protocolo (infusiones + heparina − bilis prevista con la última producción medida) lleva la extracción necesaria redondeada hacia arriba, de modo que el balance previsto nunca es positivo y no se acumula líquido que pueda causar edema. El escalón sube a la vez que la infusión (el aviso llega antes) y baja cuando la infusión ya ha bajado, nunca antes. Las muestras solo se descuentan cuando se sacan. Un exceso ya acumulado se retira en " + H.n(x.cfg.horizonte_h || 4, 0) + " h. " + (tope !== null ? "Si el déficit acumulado supera " + H.n(tope, 0) + " mL (tope de Configuración → HDF), se baja un paso siempre que el balance siga sin pasar de 0, para no deshidratar el injerto. " : "") + "La reposición post-dilución la compensa la máquina y no entra en el balance.";
+    var filas = pl ? pl.tramos.map(function (t) { return "<tr" + (t.cambio ? ' class="cambia-esc"' : "") + '><td data-et="Tramo">' + esc(t.h_desde) + "–" + esc(t.h_hasta) + '</td><td class="num" data-et="Infusión">' + H.n(t.infusion_mL_h, 1) + '</td><td class="num" data-et="Necesaria">' + H.n(t.necesaria_mL_h, 1) + '</td><td class="num" data-et="Extracción"><b>' + H.n(t.ext_mL_h, 0) + "</b>" + (t.cambio ? ' <span class="chip ' + (t.cambio === "sube" ? "aj" : "info") + '">' + (t.cambio === "sube" ? "↑ sube" : "↓ baja") + "</span>" : "") + '</td><td class="num" data-et="Balance del tramo">' + mlTxt(t.balance_mL) + '</td><td class="num" data-et="Acumulado previsto">' + mlTxt(t.acumulado_mL) + "</td></tr>"; }).join("") : "";
+    var tabla = pl && pl.tramos.length ? '<details class="plegable hdf-plan"' + (compacto ? "" : " open") + "><summary>Plan de extracción por tramos · próximas " + H.n((pl.hasta - pl.desde) / 36e5, 0) + ' h</summary><div class="dentro"><div class="tabla-env"><table class="t tabla-hdf-plan"><thead><tr><th>Tramo</th><th class="num">Infusión (mL/h)</th><th class="num">Necesaria (mL/h)</th><th class="num">Extracción (mL/h)</th><th class="num">Balance del tramo (mL)</th><th class="num">Acumulado previsto (mL)</th></tr></thead><tbody>' + filas + "</tbody></table></div>" +
+      '<p class="muy-tenue">Acumulado previsto: máximo ' + mlTxt(pl.max_acumulado_mL) + " mL · al final " + mlTxt(pl.final_mL) + " mL." + (pl.positivo ? (pl.limitada ? " La infusión supera la extracción máxima: revisa las infusiones." : " Positivo solo mientras se retira el exceso ya acumulado.") : " Nunca positivo.") + "</p></div></details>" : "";
+    var html = '<section class="tarjeta hdf-panel"><div class="cabecera"><h3>Balance de volumen y extracción de la HDF</h3><span class="muy-tenue">desde el inicio de la perfusión (' + H.n(b.horas, 1) + " h)</span>" + H.botonInfo(inf) + "</div>" +
+      '<div class="kpis">' + k("Infundido", H.n(b.infundido_mL, 0), "mL") + k("Bilis", "−" + H.n(b.bilis_mL, 0), "mL") + k("Muestras", "−" + H.n(b.muestras_mL, 0), "mL") + k("Extraído por la HDF", "−" + H.n(b.extraido_mL, 0), "mL") + k("Balance", mlTxt(b.balance_mL), "mL", clsBal) + "</div>" +
+      '<div class="rec ' + (dif === null || Math.abs(dif) >= paso ? "ajuste" : "ok") + '" style="margin-top:10px">' + ico("sliders-horizontal", "s") + "<div><b>Extracción recomendada ahora: " + (rec === null ? "—" : H.n(rec, 0)) + " mL/h</b>" + (act !== null ? " (ahora está en " + H.n(act, 0) + " mL/h)" : " (aún no hay ninguna extracción registrada)") + ". " + expl + "</div></div>" + tabla +
+      (x.prod === null || x.prod === undefined ? '<p class="muy-tenue">Sin producción de bilis registrada todavía: la bilis prevista cuenta como 0.</p>' : '<p class="muy-tenue">Bilis prevista con la última producción medida: ' + H.n(x.prod, 1) + " mL/h.</p>");
+    if (puedo && !compacto) html += '<div class="fila-flex" style="margin-top:8px"><label class="et" for="hdfNueva" style="margin:0">Extracción que programo ahora (mL/h)</label><input id="hdfNueva" style="width:100px" inputmode="numeric" data-num="1" value="' + (rec === null ? "" : H.n(rec, 0)) + '"><button class="bt pri" data-act="hdfRegistrar" data-exp="' + esc(e.ID) + '">' + ico("save") + "Registrar el cambio</button></div>";
+    return html + "</section>";
   };
 
   // ---- aviso (tipo «hdf») cuando cambia la extracción recomendada o aparece una recomendación renal nueva
   function memHDF() { try { return JSON.parse(localStorage.getItem("home_aviso_hdf") || "{}") || {}; } catch (x) { return {}; } }
   H.revisarHDF = function (exp) {
     var e = H.exp(exp); if (!e || !H.inicioPerf(exp) || H.perfTerminada(exp) || !H.puede("registrar") || !S.cfg) return null;
-    var bx = H.balanceExp(e); if (!bx) return null; var act = bx.b.extraccion_actual, rec = bx.rec.redondeada_mL_h, paso = cfgH().paso_mL_h || 10;
+    var bx = H.balanceExp(e); if (!bx) return null; var act = bx.b.extraccion_actual, rec = H.extRecomendada(bx), paso = C.pasoHDF(cfgH());
     if (act === null) return null;   // la HDF aún no tiene extracción registrada: se programa desde el panel, sin aviso
+    H.programarPlanHDF(exp, bx);   // v0.7.3: avisos «hdf» de los cambios de escalón del plan (24 h)
     var dc = datosConsejo(e); if (dc && dc.ctx.normotermia === false || dc && dc.ctx.temp !== null && dc.ctx.temp < (H.mezclar ? H.mezclar(C.DEF.hdf.consejo, cfgH().consejo || {}) : C.DEF.hdf.consejo).temp_minima) return null;   // recalentamiento: sin cambios
     var cons = consejoLista(e).filter(function (x) { return x.nivel === "ajuste" || x.nivel === "alerta"; }), firma = cons.map(function (x) { return x.texto; }).join("|"), mem = memHDF(), prev = mem[exp] || {};
     var cambiaExt = Math.abs(rec - act) >= paso, nuevaRec = cambiaExt && (prev.rec !== rec) && (prev.rec === undefined || Math.abs(prev.rec - rec) >= 2 * paso || Date.now() - (prev.t || 0) > 36e5), nuevoCons = !!firma && firma !== prev.cons;
     if (!nuevaRec && !nuevoCons) return null;
-    mem[exp] = { rec: cambiaExt ? rec : prev.rec, cons: firma, t: Date.now() }; try { localStorage.setItem("home_aviso_hdf", JSON.stringify(mem)); } catch (x) { }
+    mem = memHDF(); prev = Object.assign({}, prev, { plan: (mem[exp] || {}).plan }); mem[exp] = { rec: cambiaExt ? rec : prev.rec, cons: firma, t: Date.now(), plan: prev.plan }; try { localStorage.setItem("home_aviso_hdf", JSON.stringify(mem)); } catch (x) { }
     var txt = (cambiaExt ? ["Extracción recomendada " + H.n(rec, 0) + " mL/h" + (act !== null ? " (ahora " + H.n(act, 0) + " mL/h)" : "")] : []).concat(cons.map(function (x) { return x.texto; })).join("\n");   // v0.7.1: una recomendación por línea
     var av = { ID: exp + "|hdf|" + Date.now(), Experimento: exp, Fecha_hora: new Date().toISOString(), Tipo: "hdf", Destino: "equipo", Vista: "exp:" + exp + ":seguimiento", Titulo: "HDF · " + exp + (cambiaExt ? ": cambiar la extracción a " + H.n(rec, 0) + " mL/h" : ": revisar los parámetros"), Texto: txt.slice(0, 900) };
-    H.programarAvisos(exp, [av], ["hdf"]); return av;
+    H.programarAvisos(exp, [av].concat(planPendiente(exp)), ["hdf"]); return av;
+  };
+  // v0.7.3: avisos programados del plan de extracción; se reprograman solo si cambia el plan (horas y valores de los escalones)
+  function planPendiente(exp) { var ya = Date.now(); return (S.t.Avisos || []).filter(function (a) { return a.Experimento === exp && a.Tipo === "hdf" && a.Estado === "Pendiente" && /\|hdf\|plan\|/.test(a.ID) && C.aFecha(a.Fecha_hora) && C.aFecha(a.Fecha_hora).getTime() >= ya - 6e4; }); }
+  H.programarPlanHDF = function (exp, bx) {
+    if (!bx || !bx.plan || !H.puede("registrar")) return []; var lst = C.avisosPlanHDF(exp, bx.plan, (S.cfg.general || {}).aviso_antelacion_min, new Date());
+    var firma = lst.map(function (a) { return a.ID + a.Titulo; }).join("|"), mem = memHDF(), prev = mem[exp] || {}; if (prev.plan === firma) return lst;
+    mem[exp] = Object.assign({}, prev, { plan: firma }); try { localStorage.setItem("home_aviso_hdf", JSON.stringify(mem)); } catch (x) { }
+    var otros = (S.t.Avisos || []).filter(function (a) { return a.Experimento === exp && a.Tipo === "hdf" && a.Estado === "Pendiente" && !/\|hdf\|plan\|/.test(a.ID); });
+    H.programarAvisos(exp, otros.concat(lst), ["hdf"]); return lst;
   };
 
   // ============================================================== 8. Horario circadiano por versión del protocolo (Config «circadiano_protocolos»)
@@ -409,6 +445,7 @@
   var recPrev = H.recalcCfg;
   H.recalcCfg = function () {
     var cfg = recPrev.apply(this, arguments);
+    if (cfg.hdf) cfg.hdf.paso_mL_h = C.pasoHDF(cfg.hdf);   // v0.7.3: la máquina no admite pasos menores de 10 mL/h
     try { C.registrarVersionesExtra(cfg.protocolos_extra || {}); var hp = H.horarioProtocolo(C.versionActual()); cfg.circadiano = Object.assign({}, cfg.circadiano, { lineas: hp.lineas, cambios: hp.cambios, verificado: !hp.revisar && hp.verificado !== false }); } catch (e) { console.error(e); }
     return cfg;
   };
@@ -452,6 +489,7 @@
     "Profilaxis (bolo)": "Metronidazol 500 mg/100 mL (1 al día) con 1 g de cefoxitina (10 mL a 100 mg/mL).",
     "Profilaxis": "Fluconazol 2 mg/mL (frasco de 50 mL), continuo.",
     "Heparina": "Heparina sódica: cebado según el volumen del perfusato e infusión continua (ver la fila)." };
+  H.RECETAS_INF = RECETAS;   // v0.7.3: también en la preparación de las soluciones al programar
   function ritmosLinea(circ, l) {
     var ini = 8 * 60, rel = function (h) { return ((C.hm(h) - ini) % 1440 + 1440) % 1440; };
     return circ.cambios.filter(function (x) { return x.linea === l; }).sort(function (a, b) { return rel(a.h) - rel(b.h); });
@@ -604,7 +642,7 @@
     });
   };
 
-  var GRUPOS_HDF = [["Extracción y balance", ["paso_mL_h", "max_mL_h", "horizonte_h", "otras_infusiones_mL_h"], "Solo se recomienda la extracción (mL/h) que deja el balance de volumen en cero en el horizonte indicado, en pasos que admite la máquina. El volumen de las muestras ya no se configura: sale de los tubos de cada punto del muestreo."],
+  var GRUPOS_HDF = [["Extracción y balance", ["paso_mL_h", "max_mL_h", "horizonte_h", "tope_deficit_mL", "plan_h", "otras_infusiones_mL_h"], "Solo se recomienda la extracción (mL/h), siempre en múltiplos de 10 (la máquina no admite otros cambios). Cada tramo del horario circadiano lleva la extracción necesaria redondeada hacia arriba: el balance previsto nunca es positivo (no se acumula líquido que pueda causar edema). El escalón sube a la vez que la infusión (o antes) y baja después de que baje, nunca antes. El déficit acumulado se limita con el tope indicado y un exceso ya acumulado se retira en el horizonte. El volumen de las muestras ya no se configura: sale de los tubos de cada punto del muestreo."],
     ["Parámetros fijos de la máquina", ["parametros.set", "parametros.liquido", "parametros.Q_sangre", "parametros.Q_dialisis", "parametros.Reposicion", "parametros.Reposicion_modo", "parametros.Temp_min", "parametros.Temp_max"], "Son siempre los mismos: se precargan en la pre-perfusión y en cada registro de la HDF."],
     ["Dializado (Accusol 35 K2 + fosfato dipotásico)", ["dializado.Na", "dializado.K", "dializado.Ca", "dializado.Mg", "dializado.Cl", "dializado.HCO3", "dializado.Glucosa_mg_dL", "dializado.fosfato_mL_bolsa", "dializado.fosfato_M", "dializado.bolsa_L"], "Composición efectiva del líquido de diálisis y reposición: es el valor hacia el que tienden los iones al subir el intercambio."],
     ["Límites de las recomendaciones", ["consejo.urea_max", "consejo.urea_subida_pct", "consejo.K_min", "consejo.K_max", "consejo.Na_min", "consejo.Na_max", "consejo.HCO3_min", "consejo.HCO3_max", "consejo.BE_min", "consejo.BE_max", "consejo.Ca_min", "consejo.P_min", "consejo.P_max", "consejo.Mg_min", "consejo.Glucosa_max", "consejo.Osm_min", "consejo.Osm_max", "consejo.Lactato_max", "consejo.temp_minima"], "Las recomendaciones combinan todos estos límites a la vez (no uno a uno): urea, iones, ácido-base, lactato y temperatura del perfusato. Por ejemplo, con alcalosis no se sube la reposición aunque la urea esté alta; con lactato alto la acidosis no se trata con la HDF; por debajo de la temperatura mínima no se propone ningún cambio."],
@@ -835,9 +873,9 @@
   // al programar los avisos de la perfusión (inicio o reprogramación): horario circadiano del protocolo y resúmenes diarios
   var progOrig = H.programarAvisos;
   H.programarAvisos = function (exp, avisos, tipos) {
-    tipos = (tipos || []).slice(); var e = H.exp(exp), t0 = H.inicioPerf(exp) || (e && e.Inicio_perfusion) || null, g = S.cfg.general, ya = Date.now() - 6e4;
+    tipos = (tipos || []).slice(); var e = H.exp(exp), t0 = H.inicioPerf(exp) || (e && e.Inicio_perfusion) || null, g = S.cfg.general, ya = Date.now() - ((C.num(g.aviso_antelacion_min) || 0) + 1) * 6e4;   // v0.7.3: se conserva el aviso si el cambio de ritmo aún no ha llegado
     // v0.7.2: siempre con el horario del protocolo del experimento (también si el inicio aún no está en los eventos) y solo los avisos futuros
-    if (e && t0 && tipos.indexOf("circadiano") !== -1 && H.esCircadiano(e)) avisos = avisos.filter(function (a) { return a.Tipo !== "circadiano"; }).concat(C.avisosCircadianos(exp, t0, g.dias_perfusion, H.circadianoDe(e), g.aviso_antelacion_min).filter(function (a) { var d = C.aFecha(a.Fecha_hora); return !d || d.getTime() > ya; }));
+    if (e && t0 && tipos.indexOf("circadiano") !== -1 && H.esCircadiano(e)) avisos = avisos.filter(function (a) { return a.Tipo !== "circadiano" || /\|infusiones\|/.test(a.ID); }).concat(C.avisosCircadianos(exp, t0, g.dias_perfusion, H.circadianoDe(e), g.aviso_antelacion_min).filter(function (a) { var d = C.aFecha(a.Fecha_hora); return !d || d.getTime() > ya; }));
     if (e && t0 && tipos.indexOf("muestra") !== -1 && tipos.indexOf("resumen") === -1) { avisos = avisos.concat(H.avisosResumen(exp)); tipos.push("resumen"); }
     return progOrig(exp, avisos, tipos);
   };
@@ -860,4 +898,4 @@
   };
 })();
 
-;(window.HOME_MODS = window.HOME_MODS || {})["app_v07b.js"] = "0.7.2";
+;(window.HOME_MODS = window.HOME_MODS || {})["app_v07b.js"] = "0.7.3";

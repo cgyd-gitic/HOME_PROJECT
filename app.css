@@ -1127,8 +1127,12 @@ html.tema-oscuro .subpestanas a.activo { background: var(--pri-claro); color: va
 table.t-usuarios td, table.t-usuarios th { vertical-align: middle; }
 table.t-usuarios th.centro, table.t-usuarios td.centro { text-align: center; }
 table.t-usuarios thead th { white-space: normal; min-width: 96px; line-height: 1.25; }
-table.t-usuarios thead th:first-child { min-width: 220px; }
-table.t-usuarios td:first-child input { width: 100%; min-width: 180px; }
+table.t-usuarios thead th:first-child { min-width: 240px; }
+/* v0.7.3: Nombre y Apellidos apilados dentro de su columna (mismo ancho), sin invadir la del rol; en tarjetas, uno junto a otro */
+table.t-usuarios td[data-et="Usuario"] { white-space: normal; }
+table.t-usuarios .usr-nom { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+table.t-usuarios .usr-nom input { width: 100%; min-width: 0; }
+table.t-usuarios td[data-et="Rol"] select { width: 100%; min-width: 190px; }
 table.t-usuarios .usr-mail { font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; }
 table.t-usuarios tr.inactivo td { opacity: .6; }
 .usr-chk { display: inline-flex; justify-content: center; align-items: center; min-height: 36px; min-width: 36px; }
@@ -1142,6 +1146,7 @@ table.t-usuarios tr.inactivo td { opacity: .6; }
   table.t-usuarios td { display: block; padding: 0 !important; border: none !important; text-align: left !important; }
   table.t-usuarios td:first-child, table.t-usuarios td[data-et="Rol"] { grid-column: 1 / -1; }
   table.t-usuarios td:last-child { grid-column: 1 / -1; font-size: 12px; }
+  table.t-usuarios .usr-nom { grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); }
   table.t-usuarios td:last-child::before { content: "Último acceso: "; }
   .usr-chk { justify-content: flex-start; gap: 8px; min-height: 40px; }
   .usr-chk-et { display: inline; font-size: 13.5px; color: var(--texto); }
@@ -1166,7 +1171,7 @@ dl.usr-ayuda dt { font-weight: 500; } dl.usr-ayuda dd { margin: 0; color: var(--
 .lista-resp li { display: inline-flex; align-items: center; gap: 2px; padding: 2px 2px 2px 12px; border-radius: 999px; background: var(--sup2); box-shadow: var(--anillo); }
 .lista-resp li .bt { min-height: 32px; min-width: 32px; }
 .qr-resp-nuevo { align-items: flex-end; } .qr-resp-nuevo .campo { flex: 1 1 260px; margin: 0; }
-.qr-otro[hidden] { display: none !important; }
+.qr-otro[hidden], .dieta-otro[hidden] { display: none !important; }
 
 /* ---------- Objetivos: rejilla alineada ---------- */
 .obj-rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: var(--hueco, 14px); align-items: start; }
@@ -1510,6 +1515,7 @@ table.t-obj:not(.t-obj-gas) td.centro .obj-par { min-width: 132px; }
     table.t-usuarios td { display: block; padding: 0 !important; border: none !important; text-align: left !important; white-space: normal; }
     table.t-usuarios td:first-child, table.t-usuarios td[data-et="Rol"] { grid-column: 1 / -1; }
     table.t-usuarios td:first-child input { min-width: 0; }
+    table.t-usuarios .usr-nom { grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); }
     table.t-usuarios td:last-child { grid-column: 1 / -1; font-size: 12px; }
     table.t-usuarios td:last-child::before { content: "Último acceso: "; }
     .usr-chk { justify-content: flex-start; gap: 8px; min-height: 40px; }
